@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Build output
+dist/
+**/dist/
+*.local
+
+# Environment / secrets — never commit these
+.env
+.env.*
+**/.env
+**/.env.*
+
+# UiPath CLI auth + build packages
+**/.uipath/
+*.nupkg
+
+# Playwright MCP / automation artifacts
+.playwright-mcp/
+
+# iOS / Capacitor build
+ios/App/Pods/
+ios/App/build/
+
+# OS / editor cruft
+.DS_Store
+**/.DS_Store
+*.log

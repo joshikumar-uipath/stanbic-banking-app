@@ -1,0 +1,5 @@
+{
+  "scope": "OR.Execution OR.Folders OR.Jobs ConversationalAgents Traces.Api PIMS",
+  "clientId": "22a9d81f-f1ad-4bbc-9d49-2119df1459f3"
+
+}

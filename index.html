@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>Aura AI</title>
+    <!--
+      Critical-video bootstrap. Runs BEFORE the JS bundle loads, so video
+      bytes are downloading in parallel with the bundle. We fetch each video
+      and stash the response on window so React can pick it up. Two reasons
+      we do it this way instead of <link rel="preload" as="video">:
+        - UiPath's CDN serves .mp4 with Content-Type: application/octet-stream,
+          which makes the browser drop the preload AND prevents reuse across
+          multiple <video> elements. We re-wrap with the correct video/mp4 type.
+        - Multiple <video> elements with the same src would otherwise re-download
+          the file. The shared blob URL means one fetch per file, used everywhere.
+    -->
+    <script>
+      (function () {
+        // Default must match ThemeContext (currently 'light'). If they
+        // disagree, the wrong-theme orb is preloaded and the right one
+        // races on first paint.
+        var theme = (localStorage.getItem('aura_theme') || 'light').toLowerCase();
+        var isLight = theme === 'light';
+        // Critical: visible on the login screen — fetch immediately, alone,
+        // so it doesn't compete with the heavier card/chat videos.
+        var criticalSrcs = [
+          isLight ? './orb-light.mp4' : './orb.mp4',
+          './mic-orb.mp4',
+        ];
+        // Deferred: chat orb + agent/maestro/case/rpa cards. Only needed after
+        // the user signs in and navigates, so fetching after `load` is fine.
+        var deferredSrcs = [
+          isLight ? './chat-orb-light.mp4' : './chat-orb.mp4',
+          './agent-card.mp4',
+          './chat-agent-card.mp4',
+          './maestro-card.mp4',
+          './case-card.mp4',
+          './rpa-card.mp4',
+          './delegate-card.mp4',
+          './tasks-card.mp4',
+          isLight ? './rpa-card-light.mp4' : null,
+        ].filter(Boolean);
+        window.__VIDEO_BLOB_URLS__ = window.__VIDEO_BLOB_URLS__ || {};
+        window.__VIDEO_BLOB_PROMISES__ = window.__VIDEO_BLOB_PROMISES__ || {};
+        function fetchSrc(src) {
+          window.__VIDEO_BLOB_PROMISES__[src] = fetch(src)
+            .then(function (r) { return r.blob(); })
+            .then(function (raw) {
+              var blob = new Blob([raw], { type: 'video/mp4' });
+              var url = URL.createObjectURL(blob);
+              window.__VIDEO_BLOB_URLS__[src] = url;
+              return url;
+            })
+            .catch(function () { return undefined; });
+          return window.__VIDEO_BLOB_PROMISES__[src];
+        }
+        var criticalDone = Promise.all(criticalSrcs.map(fetchSrc));
+        function fetchDeferred() { deferredSrcs.forEach(fetchSrc); }
+        // Start deferred fetches once critical land OR the page is fully loaded —
+        // whichever happens first — so heavy cards never starve the login orb.
+        criticalDone.then(fetchDeferred);
+        if (document.readyState === 'complete') fetchDeferred();
+        else window.addEventListener('load', fetchDeferred, { once: true });
+      })();
+    </script>
+    <!-- UiPath brand fonts: Poppins (headlines) + Inter (body).
+         Served from /public/fonts/ via @font-face in index.css so iOS
+         WKWebView never falls back to Arial. -->
+    <link rel="preload" as="font" type="font/woff2" href="./fonts/Poppins-600.woff2" crossorigin />
+    <link rel="preload" as="font" type="font/woff2" href="./fonts/Inter.woff2" crossorigin />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

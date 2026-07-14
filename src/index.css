@@ -1,0 +1,238 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Brand colors — overridden at runtime from tenant config (see BrandColorBridge
+   in App.tsx). These defaults are the Aura AI baseline used before config loads. */
+:root {
+  --brand-primary: #FA4616;
+  --brand-primary-rgb: 250,70,22;
+  /* Secondary — a subtler companion color (overridden at runtime from config). */
+  --brand-secondary: #0BA2B3;
+  --brand-secondary-rgb: 11,162,179;
+}
+
+
+/* iOS Low Power Mode denies autoplay even for muted/playsInline videos and
+ * shows a native "play" button overlay. Hide it — the orb is decorative and a
+ * static first frame is preferable to a broken-looking play button. The first
+ * user touch anywhere in the doc retries play() (see LoopingVideo.tsx). */
+video::-webkit-media-controls-start-playback-button { display: none !important; -webkit-appearance: none; }
+video::-webkit-media-controls { display: none !important; }
+
+/* Local brand fonts — bundled with the app so WKWebView on iOS never falls
+ * back to Arial (which is off-brand and visibly heavier than Poppins 600). */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: block;
+  src: url('/fonts/Inter.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 400;
+  font-display: block;
+  src: url('/fonts/Poppins-400.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 500;
+  font-display: block;
+  src: url('/fonts/Poppins-500.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 600;
+  font-display: block;
+  src: url('/fonts/Poppins-600.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 700;
+  font-display: block;
+  src: url('/fonts/Poppins-700.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Poppins';
+  font-style: normal;
+  font-weight: 900;
+  font-display: block;
+  src: url('/fonts/Poppins-900.woff2') format('woff2');
+}
+
+/* ── UiPath Brand Base ───────────────────────────────────────────── */
+/* Robotic Orange: #FF3333 | Agentic Teal: #FF3333 | Deep Blue: #182126 */
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Inter', 'Arial', sans-serif;
+  background: #000;
+  /* iOS: prevent content from shifting when rubber-banding past edges */
+  overscroll-behavior: none;
+}
+
+html[data-theme='light'], html[data-theme='light'] body {
+  /* Match the primary in-app screen background (ThemeContext.LIGHT.bgPrimary)
+   * so iOS safe-area regions (status bar, home indicator) blend with the
+   * content instead of showing a contrasting strip. Desktop preview keeps
+   * pure white via the @media override below, which draws the phone mockup
+   * on top of body. */
+  background: #e8ebed;
+}
+
+#root {
+  height: 100%;
+  overflow-x: hidden;
+  /* Top safe-area is still padded at the root so screens with hard-coded
+   * header paddings (pt-14) keep clear of the notch. Bottom is NOT padded
+   * here — the BottomNav has its own `paddingBottom: max(env(...),14px)`
+   * and extending its background to the device edge needs #root's box to
+   * reach there too. Screens without a bottom nav (Chat input bar) add
+   * their own safe-area-bottom padding. */
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  box-sizing: border-box;
+}
+
+/* Flexbox min-width: auto trap — a flex item's default min-width is its
+ * min-content, not 0. When a deep descendant has width: max-content (e.g. the
+ * horizontally infinite Recently Active card scroller), that intrinsic width
+ * propagates up through every flex ancestor and forces them wider than the
+ * viewport — which shoves surrounding text (like the "Recently Active" label)
+ * off-screen to the left. Setting min-width: 0 on all descendants breaks that
+ * propagation so overflow: hidden on parents can actually clip. */
+#root * {
+  min-width: 0;
+}
+
+/* ── Desktop: render as centred mobile phone ─────────────────────── */
+@media (min-width: 500px) {
+  body {
+    /* White background */
+    background: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100dvh;
+    position: relative;
+  }
+
+  /* UiPath brand accent glows: Robotic Orange + Agentic Teal */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(ellipse 50% 45% at 10% 15%, rgba(var(--brand-primary-rgb),0.25) 0%, transparent 60%),
+      radial-gradient(ellipse 45% 40% at 90% 85%, rgba(var(--brand-primary-rgb),0.22) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 35% at 85% 10%, rgba(var(--brand-primary-rgb),0.18) 0%, transparent 55%),
+      radial-gradient(ellipse 35% 30% at 20% 80%, rgba(var(--brand-primary-rgb),0.15) 0%, transparent 55%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  #root {
+    width: 390px;
+    /* Always leave a 12px margin top/bottom so the phone NEVER exceeds the
+       viewport height — otherwise `align-items: center` clips the top on short
+       windows / high zoom. min() caps it at the design height of 844px. */
+    height: min(844px, calc(100dvh - 24px));
+    border-radius: 52px;
+    overflow: hidden;
+    position: relative;
+    flex-shrink: 0;
+    z-index: 1;
+    /* Dark titanium phone bezel */
+    box-shadow:
+      0 0 0 2px #2c2c2e,
+      0 0 0 3px #3a3a3c,
+      0 0 0 14px #38383a,
+      0 0 0 15px #48484a,
+      0 0 0 16px #2c2c2e,
+      0 4px 20px rgba(0,0,0,0.12);
+  }
+
+  /* Side buttons — power button & volume */
+  #root::before {
+    content: '';
+    position: absolute;
+    right: calc(100% + 16px);
+    top: 140px;
+    width: 4px;
+    height: 68px;
+    background: linear-gradient(to bottom, #38383a, #48484a, #38383a);
+    border-radius: 3px 0 0 3px;
+    box-shadow: 0 -46px 0 52px transparent, -1px 0 0 rgba(255,255,255,0.08);
+    pointer-events: none;
+  }
+
+  #root::after {
+    content: '';
+    position: absolute;
+    left: calc(100% + 16px);
+    top: 160px;
+    width: 4px;
+    height: 80px;
+    background: linear-gradient(to bottom, #38383a, #48484a, #38383a);
+    border-radius: 0 3px 3px 0;
+    box-shadow: -1px 0 0 rgba(255,255,255,0.08);
+    pointer-events: none;
+  }
+}
+
+/* ── Hide scrollbars ─────────────────────────────────────────────── */
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── UiPath Typography Utilities ────────────────────────────────── */
+.font-headline {
+  font-family: 'Poppins', 'Arial', sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.font-headline-black {
+  font-family: 'Poppins', 'Arial', sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.font-body {
+  font-family: 'Inter', 'Arial', sans-serif;
+}
+
+/* ── Animations ─────────────────────────────────────────────────── */
+@keyframes wave {
+  from { transform: scaleY(0.3); }
+  to   { transform: scaleY(1); }
+}
+
+@keyframes orb-breathe {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%       { transform: scale(1.06); opacity: 0.9; }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.15; }
+  50%       { opacity: 0.35; }
+}
+
+/* UiPath orange glow pulse */
+@keyframes orange-pulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(var(--brand-primary-rgb),0.4); }
+  50%       { box-shadow: 0 0 40px rgba(var(--brand-primary-rgb),0.7); }
+}
