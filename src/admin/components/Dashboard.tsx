@@ -230,7 +230,13 @@ export default function Dashboard({ tenant, profileName, localMode = false, onSw
   return (
     <div
       style={{
-        minHeight: '100vh',
+        // Own scroll container, set inline so it always wins: index.css locks
+        // html/body to overflow:hidden for the phone shell, and relying on a
+        // stylesheet override to unlock it can lose the CSS race (tall forms then
+        // can't scroll). A self-contained scroller sidesteps that entirely.
+        height: '100dvh',
+        overflowY: 'auto',
+        WebkitOverflowScrolling: 'touch',
         background: '#f4f5f7',
         backgroundImage: `
           radial-gradient(ellipse 60% 30% at 12% 0%, rgba(255,51,51,0.06) 0%, transparent 60%),

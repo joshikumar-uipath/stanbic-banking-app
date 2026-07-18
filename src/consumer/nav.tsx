@@ -3,7 +3,8 @@
 // whole consumer app self-contained and isolated from the enterprise app.
 import { createContext, useContext } from 'react';
 
-export type TabId = 'home' | 'pay' | 'wealth' | 'more';
+// 'open' is the raised centre tab — the Account Opening Factory entry point.
+export type TabId = 'home' | 'pay' | 'open' | 'wealth' | 'more';
 
 /** A pushed sub-screen (rendered over the active tab, with a back button). */
 export interface ScreenRoute {
@@ -17,6 +18,9 @@ export interface NavApi {
   stack: ScreenRoute[];
   digibotOpen: boolean;
   hideBalances: boolean;
+  /** True on /customer-web: internet banking on a laptop rather than the phone.
+   *  Screens read it to lay out wide instead of stacking one column. */
+  web: boolean;
   setTab: (t: TabId) => void;
   push: (s: ScreenRoute) => void;
   pop: () => void;

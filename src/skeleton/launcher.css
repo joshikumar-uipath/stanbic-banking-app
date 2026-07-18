@@ -1,0 +1,114 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   The front door (route "/").
+   Light, deliberately — but on the same warm paper and typography as the desk
+   and the Operations Workbench, so the workspace looks like one product from the
+   moment you land. Accents come from --brand-primary, never hardcoded.
+   `.ld` owns its own scroll: index.css locks html/body to overflow:hidden for
+   the phone shell, so without this the page can't scroll at all.
+   ───────────────────────────────────────────────────────────────────────────── */
+.ld {
+  --ld-brand: var(--brand-primary, #0033A1);
+  --ld-brand-rgb: var(--brand-primary-rgb, 0, 51, 161);
+  --ld-ink: #17171a; --ld-text: #4a4a45; --ld-soft: #6f6f69; --ld-faint: #a4a49e;
+  --ld-line: #e6e6e0; --ld-line-2: #f2f2ec; --ld-panel: #ffffff; --ld-ground: #f6f6f3;
+  height: 100dvh; overflow-y: auto; overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  position: relative;
+  background: var(--ld-ground); color: var(--ld-text);
+  font-family: 'Libre Franklin', 'Inter', -apple-system, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+/* Soft brand wash behind the hero only. */
+.ld::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 400px; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(760px 320px at 18% -30%, rgba(var(--ld-brand-rgb), .10), transparent 62%),
+    radial-gradient(620px 280px at 92% -20%, rgba(var(--ld-brand-rgb), .05), transparent 60%);
+}
+.ld-inner { position: relative; z-index: 1; max-width: 940px; margin: 0 auto; padding: 60px 28px 84px; }
+
+/* ── Hero ── */
+.ld-brand { display: inline-flex; align-items: center; gap: 11px; margin-bottom: 22px; }
+.ld-logo { max-height: 38px; max-width: 190px; object-fit: contain; object-position: left center; border-radius: 4px; display: block; }
+.ld-mark { width: 32px; height: 32px; border-radius: 9px; display: inline-flex; align-items: center; justify-content: center; color: #fff; background: var(--ld-brand); }
+.ld-brandname { font: 600 15px/1 'Libre Franklin', system-ui, sans-serif; letter-spacing: -.01em; color: var(--ld-ink); }
+.ld-title { font: 700 clamp(34px, 4.6vw, 48px)/1.04 'Libre Franklin', system-ui, sans-serif; letter-spacing: -.035em; color: var(--ld-ink); margin: 0 0 12px; }
+.ld-sub { font-size: 16px; line-height: 1.55; color: var(--ld-soft); max-width: 580px; margin: 0; }
+.ld-sub b { color: var(--ld-ink); font-weight: 600; }
+
+/* ── Section heads ── */
+.ld-group-h { display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 13px; padding: 0 4px; }
+.ld-group-h .l { font: 700 15px/1 'Libre Franklin', system-ui, sans-serif; letter-spacing: -.01em; color: var(--ld-ink); }
+.ld-group-h .n { font: 500 11.5px/1 'Libre Franklin', system-ui, sans-serif; color: var(--ld-faint); letter-spacing: .04em; }
+
+/* ── Who are you? ── */
+.ld-people { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 720px) { .ld-people { grid-template-columns: minmax(0, 1fr); } }
+.ld-person {
+  background: var(--ld-panel); border: 1px solid var(--ld-line); border-radius: 14px; overflow: hidden;
+  box-shadow: 0 1px 2px rgba(16,26,40,.04), 0 10px 28px -14px rgba(16,26,40,.14);
+  transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease;
+  display: flex; flex-direction: column;
+}
+.ld-person:hover { border-color: rgba(var(--ld-brand-rgb), .38); box-shadow: 0 1px 2px rgba(16,26,40,.05), 0 16px 36px -14px rgba(var(--ld-brand-rgb), .34); transform: translateY(-1px); }
+.ld-person-a { display: flex; align-items: flex-start; gap: 14px; padding: 16px; text-decoration: none; color: inherit; flex: 1; }
+.ld-person-a:focus-visible { outline: 2px solid var(--ld-brand); outline-offset: -3px; border-radius: 12px; }
+.ld-person .ld-ic { color: var(--ld-brand); background: rgba(var(--ld-brand-rgb), .09); border-color: rgba(var(--ld-brand-rgb), .2); }
+.ld-role-sub { display: block; font: 600 10.5px/1 'Libre Franklin', system-ui, sans-serif; letter-spacing: .09em; text-transform: uppercase; color: var(--ld-faint); margin-top: 3px; }
+.ld-person .ld-chev { margin-top: 12px; }
+.ld-person:hover .ld-chev { transform: translateX(3px); color: var(--ld-brand); }
+
+.ld-alts { display: flex; gap: 8px; padding: 0 16px 13px 74px; flex-wrap: wrap; }
+.ld-alt {
+  font: 500 12px/1 'Libre Franklin', system-ui, sans-serif; text-decoration: none;
+  color: var(--ld-brand); background: rgba(var(--ld-brand-rgb), .07);
+  border: 1px solid rgba(var(--ld-brand-rgb), .16); border-radius: 7px; padding: 6px 10px;
+}
+.ld-alt:hover { background: rgba(var(--ld-brand-rgb), .13); }
+
+/* ── Panels & rows (behind the scenes) ── */
+.ld-panel { background: var(--ld-panel); border: 1px solid var(--ld-line); border-radius: 14px; overflow: hidden; box-shadow: 0 1px 2px rgba(16,26,40,.04), 0 10px 28px -14px rgba(16,26,40,.10); }
+.ld-row { position: relative; display: flex; align-items: center; gap: 14px; padding: 13px 16px; text-decoration: none; color: inherit; transition: background .18s ease; }
+.ld-row + .ld-row { border-top: 1px solid var(--ld-line-2); }
+.ld-row:hover { background: #fafaf7; }
+.ld-row:focus-visible { outline: 2px solid var(--a); outline-offset: -2px; }
+.ld-row .ld-ic { color: var(--a); background: color-mix(in srgb, var(--a) 10%, #fff); border-color: color-mix(in srgb, var(--a) 20%, #fff); }
+.ld-row:hover .ld-chev { transform: translateX(3px); color: var(--a); }
+
+.ld-ic { width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: 1px solid transparent; }
+.ld-ic.sm { width: 36px; height: 36px; border-radius: 10px; }
+.ld-main { flex: 1; min-width: 0; }
+.ld-name { display: block; font: 600 15px/1.25 'Libre Franklin', system-ui, sans-serif; letter-spacing: -.01em; color: var(--ld-ink); }
+.ld-desc { display: block; font-size: 12.75px; line-height: 1.5; color: var(--ld-soft); margin-top: 5px; }
+.ld-meta { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+.ld-status { display: inline-flex; align-items: center; gap: 6px; font: 700 9.5px/1 'Libre Franklin', system-ui, sans-serif; letter-spacing: .06em; text-transform: uppercase; padding: 6px 9px; border-radius: 999px; color: #7C8DA0; background: #eef2f7; }
+.ld-status .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.ld-url { font: 500 12px/1 ui-monospace, 'SF Mono', Menlo, monospace; color: var(--a); background: color-mix(in srgb, var(--a) 9%, #fff); border: 1px solid color-mix(in srgb, var(--a) 16%, #fff); padding: 6px 9px; border-radius: 7px; white-space: nowrap; }
+.ld-chev { color: var(--ld-faint); flex-shrink: 0; transition: transform .18s ease, color .18s ease; }
+
+.ld-footer { margin-top: 24px; padding: 0 4px; font-size: 12.25px; color: var(--ld-faint); }
+
+/* Reset demo data — restart from a clean pipeline before a run. */
+.ld-reset { margin-top: 14px; padding: 0 4px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ld-reset .trigger { font: 500 12.5px/1 'Libre Franklin', system-ui, sans-serif; color: var(--ld-soft); background: transparent; border: 1px solid var(--ld-line); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+.ld-reset .trigger:hover { color: var(--ld-ink); border-color: var(--ld-faint); background: #fff; }
+.ld-reset span { font-size: 12.5px; color: var(--ld-soft); }
+.ld-reset .go { font: 600 12.5px/1 'Libre Franklin', system-ui, sans-serif; color: #fff; background: var(--ld-brand); border: none; border-radius: 8px; padding: 7px 13px; cursor: pointer; }
+.ld-reset .go:hover { filter: brightness(1.06); }
+.ld-reset .cancel { font: 500 12.5px/1 'Libre Franklin', system-ui, sans-serif; color: var(--ld-soft); background: transparent; border: none; padding: 7px 8px; cursor: pointer; }
+.ld-reset .cancel:hover { color: var(--ld-ink); }
+
+/* ── Placeholder shell ── */
+.ld-shell { display: flex; align-items: center; justify-content: center; padding: 24px; }
+.ld-shell-card { position: relative; z-index: 1; max-width: 430px; width: 100%; text-align: center; padding: 40px 32px; border-radius: 18px; background: var(--ld-panel); border: 1px solid var(--ld-line); box-shadow: 0 1px 2px rgba(16,26,40,.04), 0 20px 50px -24px rgba(16,26,40,.22); }
+.ld-shell-ic { width: 58px; height: 58px; border-radius: 16px; display: flex; align-items: center; justify-content: center; color: var(--a); background: color-mix(in srgb, var(--a) 11%, #fff); border: 1px solid color-mix(in srgb, var(--a) 20%, #fff); margin: 0 auto 18px; }
+.ld-shell-name { font: 700 22px/1.2 'Libre Franklin', system-ui, sans-serif; letter-spacing: -.02em; color: var(--ld-ink); margin: 0 0 6px; }
+.ld-shell-role { font-size: 13px; color: var(--ld-soft); margin-bottom: 18px; }
+.ld-shell-chip { display: inline-flex; align-items: center; gap: 8px; font: 600 12px/1 'Libre Franklin', sans-serif; color: var(--a); background: color-mix(in srgb, var(--a) 10%, #fff); border: 1px solid color-mix(in srgb, var(--a) 20%, #fff); border-radius: 999px; padding: 8px 14px; margin-bottom: 16px; }
+.ld-shell-chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--a); }
+.ld-shell-url { font: 500 12.5px/1 ui-monospace, Menlo, monospace; color: var(--ld-faint); margin-bottom: 24px; }
+.ld-shell-back { display: inline-flex; align-items: center; gap: 7px; font: 600 13px/1 'Libre Franklin', sans-serif; color: var(--ld-brand); text-decoration: none; padding: 10px 16px; border-radius: 10px; border: 1px solid var(--ld-line); }
+.ld-shell-back:hover { background: var(--ld-ground); }
+
+@media (max-width: 560px) { .ld-inner { padding: 44px 18px 60px; } .ld-url { display: none; } }
+@media (prefers-reduced-motion: reduce) { .ld-person, .ld-row, .ld-chev { transition: none !important; } }

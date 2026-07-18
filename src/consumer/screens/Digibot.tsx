@@ -1,6 +1,6 @@
 // Scripted assistant ("Aura Assistant" / digibot-style). No AI backend, no login
 // — keyword-matched canned responses, quick-reply chips, service cards, a guided
-// card-block flow, FAQs, feedback, and deep-links into the app. Localised (NCBA).
+// card-block flow, FAQs, feedback, and deep-links into the app. Localised (Stanbic IBTC).
 import { useEffect, useRef, useState } from 'react';
 import { C, FONT_HEAD, FONT_BODY } from '../theme';
 import Icon from '../icons';
@@ -35,8 +35,8 @@ function respond(intent: string): Block[] {
       return [{ balances: true, text: 'Here are your balances. Anything else?', replies: [{ label: 'Send money', do: 'send' }, { label: 'Pay a bill', do: 'paybill' }] }];
     case 'send':
       return [{ text: 'Sure — how would you like to send money?', replies: [
-        { label: 'Send via M-PESA', do: 'nav:transfer:sendmoney' },
-        { label: 'PesaLink', do: 'nav:transfer:pesalink' },
+        { label: 'Send via Mobile Wallet', do: 'nav:transfer:sendmoney' },
+        { label: 'NIP Transfer', do: 'nav:transfer:pesalink' },
         { label: 'To my own account', do: 'nav:transfer:ownaccount' },
       ] }];
     case 'paybill':
@@ -52,7 +52,7 @@ function respond(intent: string): Block[] {
       return [{ text: 'Which card would you like to block?', cards: cards.map((c) => ({ label: `${c.name} ···· ${c.last4}`, do: 'blockdone' })) }];
     case 'blockdone':
       return [{
-        text: `Done — your card has been blocked and a replacement is on its way (3–5 business days). Reference NCBA${Math.floor(Math.random() * 1e6).toString(36).toUpperCase()}.`,
+        text: `Done — your card has been blocked and a replacement is on its way (3–5 business days). Reference Stanbic IBTC${Math.floor(Math.random() * 1e6).toString(36).toUpperCase()}.`,
         feedback: true, replies: [{ label: 'Anything else', do: 'menu' }],
       }];
     case 'pin':
@@ -63,19 +63,19 @@ function respond(intent: string): Block[] {
       }];
     case 'loan':
       return [{
-        text: 'You can get quick cash with Fuliza overdraft, an M-Shwari loan, or a personal loan at competitive rates.',
+        text: 'You can get quick cash with Overdraft, an EasySave loan, or a personal loan at competitive rates.',
         ai: true, feedback: true,
-        replies: [{ label: 'Apply for a loan', do: 'applyloan' }, { label: 'About Fuliza', do: 'fuliza' }],
+        replies: [{ label: 'Apply for a loan', do: 'applyloan' }, { label: 'About Overdraft', do: 'fuliza' }],
         faqs: ['What are the current loan rates?', 'How is my loan limit calculated?', 'How do I repay early?'],
       }];
     case 'fuliza':
-      return [{ text: 'Fuliza lets you complete M-PESA payments even with insufficient funds. Your available limit is KES 8,800 and it auto-repays from your next deposit.', feedback: true, replies: [{ label: 'Back to menu', do: 'menu' }] }];
+      return [{ text: 'Overdraft lets you complete Mobile Wallet payments even with insufficient funds. Your available limit is NGN 8,800 and it auto-repays from your next deposit.', feedback: true, replies: [{ label: 'Back to menu', do: 'menu' }] }];
     case 'applyloan':
       return [{ text: 'Great — loan applications are handled in the Apply section. I can take you there.', replies: [{ label: 'Open Apply', do: 'nav:more' }, { label: 'Back to menu', do: 'menu' }] }];
     case 'statement':
       return [{ text: 'Your May 2026 eStatement is ready, and your recent transactions are up to date.', replies: [{ label: 'View transactions', do: 'nav:transactions' }] }];
     case 'support':
-      return [{ text: 'Our contact centre is available 24/7:\n📞 +254 711 056 444\n✉️ contact@ncba.co.ke', replies: [{ label: 'Back to menu', do: 'menu' }] }];
+      return [{ text: 'Our contact centre is available 24/7:\n📞 +234 802 336 1244\n✉️ contact@ncba.co.ke', replies: [{ label: 'Back to menu', do: 'menu' }] }];
     case 'menu':
       return [{ text: 'What else can I help you with?', replies: SUGGESTIONS }];
     default:
@@ -100,7 +100,7 @@ const TOPICS: Action[] = [
   { label: 'Payments & transfers', do: 'send' },
   { label: 'Cards', do: 'replace' },
   { label: 'Accounts & balances', do: 'balance' },
-  { label: 'Loans & Fuliza', do: 'loan' },
+  { label: 'Loans & Overdraft', do: 'loan' },
   { label: 'General help', do: 'support' },
 ];
 
@@ -236,7 +236,7 @@ function BotBlock({ block, onAction }: { block: Block; onAction: (a: Action) => 
 function Balances() {
   const rows = [
     ...depositAccounts.filter((a) => a.kind !== 'fixed').map((a) => ({ name: a.name, bal: a.balance })),
-    { name: 'M-PESA', bal: mpesa.balance },
+    { name: 'Mobile Wallet', bal: mpesa.balance },
   ];
   return (
     <div style={{ marginTop: 10, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden' }}>

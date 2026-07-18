@@ -1,0 +1,25 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Web-shell frame reset. index.css turns #root into a 390px phone bezel on wide
+   screens; desktop surfaces (launcher, ops, kafka, finacle, admin, *-web) set
+   html[data-shell="web"] to neutralise that and render full-width & scrollable.
+   ───────────────────────────────────────────────────────────────────────────── */
+html[data-shell="web"],
+html[data-shell="web"] body {
+  overflow: auto;
+  height: auto;
+  min-height: 100%;
+  background: #eef2f7;
+}
+html[data-shell="web"] body { display: block; }
+html[data-shell="web"] body::before { display: none !important; }
+html[data-shell="web"] #root {
+  width: 100% !important;
+  height: auto !important;
+  min-height: 100dvh;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
+html[data-shell="web"] #root::before,
+html[data-shell="web"] #root::after { display: none !important; }

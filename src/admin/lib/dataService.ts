@@ -29,9 +29,58 @@ const SINGLETON_KEY = 'current';
 // Keep a safety margin under the 4000-char NVARCHAR limit. JSON.stringify
 // outputs are escaped already so chunks are byte-safe.
 const CHUNK_SIZE = 3800;
-// Hard cap on how many chunks we'll fetch in one read (enough for ~3.6 MB
-// of config — far more than we expect).
-const MAX_CHUNKS = 100;
+// Hard cap on how many chunk records we'll fetch in one read. Generous so that a
+// large config plus any transient old-version orphans (see saveAuraConfig) are
+// all returned and the newest complete version can be reassembled.
+const MAX_CHUNKS = 500;
+// Every Data Fabric request is bounded so a stalled network can't hang "Publishing…"
+// forever — it aborts and surfaces an error the user can retry.
+const REQUEST_TIMEOUT_MS = 20000;
+
+async function fetchWithTimeout(url: string, init: RequestInit): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * From a Key's chunk records (which may include leftovers from more than one
+ * version), reassemble the HIGHEST version whose chunks concatenate into valid
+ * JSON. So a half-written newer version is skipped in favour of the last good
+ * one, and mixed versions never corrupt the read.
+ */
+/** All raw chunk records for a Key, parseable or not — so a publish can clean up
+ *  EVERYTHING that was there (including orphans from a prior interrupted publish),
+ *  not just the version it managed to read. Best-effort: [] if the read fails. */
+async function fetchRawRecordsForKey(creds: AdminTenantCredentials, key: string): Promise<AuraConfigChunkRecord[]> {
+  try {
+    const url = `${entityServiceUrl(creds, 'read')}?$top=${MAX_CHUNKS}`;
+    const res = await fetchWithTimeout(url, { headers: authHeader(creds) });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { value?: AuraConfigChunkRecord[] };
+    return (data.value ?? []).filter((r) => r.Key === key);
+  } catch { return []; }
+}
+
+function reassembleLatestValid(recs: AuraConfigChunkRecord[]): { parsed: unknown; chunks: AuraConfigChunkRecord[] } | null {
+  const byVersion = new Map<number, AuraConfigChunkRecord[]>();
+  for (const r of recs) {
+    const v = r.Version ?? 0;
+    if (!byVersion.has(v)) byVersion.set(v, []);
+    byVersion.get(v)!.push(r);
+  }
+  for (const v of [...byVersion.keys()].sort((a, b) => b - a)) {
+    const chunks = byVersion.get(v)!.slice().sort((a, b) => (a.ChunkIndex ?? 0) - (b.ChunkIndex ?? 0));
+    const fullJson = chunks.map((c) => c.ConfigJson).join('');
+    try { return { parsed: JSON.parse(fullJson), chunks }; }
+    catch { /* incomplete/corrupt version — fall through to the next lower one */ }
+  }
+  return null;
+}
 
 export interface AuraConfigChunkRecord {
   Id: string;
@@ -86,25 +135,21 @@ export async function fetchAuraConfig(creds: AdminTenantCredentials, key: string
       return { kind: 'error', message: `HTTP ${res.status}: ${text.slice(0, 240)}` };
     }
     const data = (await res.json()) as { totalRecordCount?: number; value?: AuraConfigChunkRecord[] };
-    const chunks = (data.value ?? [])
-      .filter((r) => r.Key === key)
-      .sort((a, b) => (a.ChunkIndex ?? 0) - (b.ChunkIndex ?? 0));
-    if (chunks.length === 0) return { kind: 'not-found' };
-    const fullJson = chunks.map((c) => c.ConfigJson).join('');
-    let parsed: unknown;
-    try { parsed = JSON.parse(fullJson); }
-    catch { return { kind: 'error', message: 'Stored ConfigJson chunks did not concatenate into valid JSON.' }; }
-    const head = chunks[0];
+    const recs = (data.value ?? []).filter((r) => r.Key === key);
+    if (recs.length === 0) return { kind: 'not-found' };
+    const best = reassembleLatestValid(recs);
+    if (!best) return { kind: 'error', message: 'Stored ConfigJson chunks did not concatenate into valid JSON.' };
+    const head = best.chunks[0];
     return {
       kind: 'ok',
       meta: {
         Version: head.Version,
         LastSavedAt: head.LastSavedAt,
         LastSavedBy: head.LastSavedBy,
-        ChunkCount: chunks.length,
-        chunks,
+        ChunkCount: best.chunks.length,
+        chunks: best.chunks,
       },
-      config: migrate(parsed),
+      config: migrate(best.parsed),
     };
   } catch (e) {
     return { kind: 'error', message: e instanceof Error ? e.message : String(e) };
@@ -154,18 +199,17 @@ export async function listDataFabricConfigs(creds: AdminTenantCredentials): Prom
     const entries: DataFabricConfigEntry[] = [];
     const corruptKeys: string[] = [];
     for (const [key, recs] of byKey) {
-      const chunks = recs.sort((a, b) => (a.ChunkIndex ?? 0) - (b.ChunkIndex ?? 0));
-      const fullJson = chunks.map((c) => c.ConfigJson).join('');
-      let parsed: unknown;
-      try { parsed = JSON.parse(fullJson); }
-      catch { corruptKeys.push(key); continue; }
-      const head = chunks[0];
-      const config = migrate(parsed);
+      // Reassemble the newest version that parses — so leftover chunks from an
+      // interrupted publish don't make an otherwise-good config read as corrupt.
+      const best = reassembleLatestValid(recs);
+      if (!best) { corruptKeys.push(key); continue; }
+      const head = best.chunks[0];
+      const config = migrate(best.parsed);
       entries.push({
         key,
         name: config.branding.appName || key,
         config,
-        meta: { Version: head.Version, LastSavedAt: head.LastSavedAt, LastSavedBy: head.LastSavedBy, ChunkCount: chunks.length, chunks },
+        meta: { Version: head.Version, LastSavedAt: head.LastSavedAt, LastSavedBy: head.LastSavedBy, ChunkCount: best.chunks.length, chunks: best.chunks },
       });
     }
     entries.sort((a, b) => a.name.localeCompare(b.name));
@@ -310,70 +354,69 @@ export async function saveAuraConfig(
   };
 
   try {
-    // Step 1 — delete every chunk from the previous version so we don't
-    // accidentally leave orphaned chunks if the new config has fewer of them.
-    if (existing && existing.chunks.length > 0) {
-      const ids = existing.chunks.map((c) => c.Id);
-      const delRes = await fetch(entityServiceUrl(creds, 'delete'), {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(ids),
-      });
-      if (delRes.status === 401 || delRes.status === 403) {
-        return await unauthorizedResult(delRes);
-      }
-      if (!delRes.ok) {
-        const text = await delRes.text().catch(() => '');
-        return { kind: 'error', message: `Delete-before-update failed: HTTP ${delRes.status}${text ? `: ${text.slice(0, 200)}` : ''}` };
+    const json = JSON.stringify(config);
+    const chunks = splitIntoChunks(json);
+    const now = new Date().toISOString();
+
+    // Snapshot EVERY record currently under this Key (parseable or not). We write a
+    // version above whatever is there, then delete all of these — so orphans left
+    // by a prior interrupted publish get cleaned up and can't collide with a future
+    // version. Best-effort read; fall back to the version we were handed.
+    const priorRecords = await fetchRawRecordsForKey(creds, key);
+    const maxPriorVersion = priorRecords.reduce((m, r) => Math.max(m, r.Version ?? 0), existing?.Version ?? 0);
+    const nextVersion = maxPriorVersion + 1;
+
+    // Step 1 — insert the NEW version's chunks FIRST, in parallel batches. Order
+    // matters: writing the new version before deleting the old means an interrupt
+    // (a hang, a mid-publish refresh) leaves the previous version fully intact and
+    // readable — never a half-written corrupt set. Reads pick the newest version
+    // that parses (reassembleLatestValid), so a partial new version is ignored.
+    const insertedChunks: AuraConfigChunkRecord[] = new Array(chunks.length);
+    const BATCH = 8;
+    for (let start = 0; start < chunks.length; start += BATCH) {
+      const batch = chunks.slice(start, start + BATCH);
+      const settled = await Promise.all(batch.map(async (chunk, j) => {
+        const i = start + j;
+        const res = await fetchWithTimeout(entityServiceUrl(creds, 'insert'), {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ Key: key, ConfigJson: chunk, ChunkIndex: i, Version: nextVersion, LastSavedAt: now, LastSavedBy: updatedBy }),
+        });
+        return { i, res };
+      }));
+      for (const { i, res } of settled) {
+        if (res.status === 401 || res.status === 403) return await unauthorizedResult(res);
+        if (res.status === 404) return { kind: 'entity-missing' };
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          return { kind: 'error', message: `Insert chunk ${i + 1}/${chunks.length} failed: HTTP ${res.status}${text ? `: ${text.slice(0, 200)}` : ''}` };
+        }
+        insertedChunks[i] = (await res.json()) as AuraConfigChunkRecord;
       }
     }
 
-    // Step 2 — split config into chunks and POST them sequentially.
-    const json = JSON.stringify(config);
-    const chunks = splitIntoChunks(json);
-    const nextVersion = (existing?.Version ?? 0) + 1;
-    const now = new Date().toISOString();
-    const insertedChunks: AuraConfigChunkRecord[] = [];
-
-    for (let i = 0; i < chunks.length; i++) {
-      const body = {
-        Key: key,
-        ConfigJson: chunks[i],
-        ChunkIndex: i,
-        Version: nextVersion,
-        LastSavedAt: now,
-        LastSavedBy: updatedBy,
-      };
-      const res = await fetch(entityServiceUrl(creds, 'insert'), {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-      });
-      if (res.status === 401 || res.status === 403) return await unauthorizedResult(res);
-      if (res.status === 404) return { kind: 'entity-missing' };
-      if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        return {
-          kind: 'error',
-          message: `Insert chunk ${i + 1}/${chunks.length} failed: HTTP ${res.status}${text ? `: ${text.slice(0, 200)}` : ''}`,
-        };
-      }
-      const inserted = (await res.json()) as AuraConfigChunkRecord;
-      insertedChunks.push(inserted);
+    // Step 2 — the new version is fully written; delete every prior record for the
+    // Key (old versions AND orphans from earlier failures). Non-fatal if it fails:
+    // they're all a lower Version, so reads ignore them and the next publish clears
+    // them. Deleting in batches keeps the request body small.
+    const oldIds = priorRecords.map((r) => r.Id);
+    for (let s = 0; s < oldIds.length; s += 50) {
+      try {
+        await fetchWithTimeout(entityServiceUrl(creds, 'delete'), {
+          method: 'POST', headers, body: JSON.stringify(oldIds.slice(s, s + 50)),
+        });
+      } catch { /* leftover old chunks are ignored on read (lower version) */ }
     }
 
     return {
       kind: 'ok',
-      meta: {
-        Version: nextVersion,
-        LastSavedAt: now,
-        LastSavedBy: updatedBy,
-        ChunkCount: chunks.length,
-        chunks: insertedChunks,
-      },
+      meta: { Version: nextVersion, LastSavedAt: now, LastSavedBy: updatedBy, ChunkCount: chunks.length, chunks: insertedChunks },
     };
   } catch (e) {
-    return { kind: 'error', message: e instanceof Error ? e.message : String(e) };
+    const msg = e instanceof Error && e.name === 'AbortError'
+      ? 'Data Fabric request timed out. Check the tenant connection and try Publish again.'
+      : (e instanceof Error ? e.message : String(e));
+    return { kind: 'error', message: msg };
   }
 }
 

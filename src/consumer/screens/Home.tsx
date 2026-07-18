@@ -12,6 +12,29 @@ const TREND = [792, 805, 788, 831, 856, 844, 870, 909]; // demo balance trend (0
 
 export default function HomeScreen() {
   const [tab, setTab] = useState<'accounts' | 'insights'>('accounts');
+  const { web } = useNav();
+
+  // Internet banking: the balance and what you can do with it sit beside your
+  // money, instead of the customer scrolling a phone column on a wide screen.
+  if (web) {
+    return (
+      <div style={{ padding: '22px 16px 32px' }}>
+        <Greeting />
+        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 0.85fr) minmax(0, 1.15fr)', gap: 20, alignItems: 'start', marginTop: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+            <BalanceHero />
+            <QuickActions />
+            <Extras />
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <SegTabs tabs={[{ id: 'accounts', label: 'Accounts' }, { id: 'insights', label: 'Insights' }]} active={tab} onChange={setTab} />
+            {tab === 'accounts' ? <Accounts /> : <Insights />}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ padding: '4px 16px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
       <Greeting />
@@ -59,7 +82,7 @@ function BalanceHero() {
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 8, gap: 12 }}>
           <div>
             <div style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 32, letterSpacing: -0.8, fontVariantNumeric: 'tabular-nums' }}>
-              {nav.hideBalances ? 'KES ••••••' : money(depositsTotal + mpesa.balance)}
+              {nav.hideBalances ? 'NGN ••••••' : money(depositsTotal + mpesa.balance)}
             </div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, background: 'rgba(255,255,255,0.16)', borderRadius: 999, padding: '4px 10px', fontSize: 12.5, fontWeight: 600 }}>
               <Icon name="wealth" size={13} color="#fff" /> +2.4% this month
@@ -108,17 +131,34 @@ const ACCENT: Record<string, string> = {
 
 function Accounts() {
   const nav = useNav();
+  const { web } = useNav();
+  const accounts = [
+    ...depositAccounts,
+    { id: 'mpesa', name: 'Mobile Wallet', number: mpesa.number, balance: mpesa.balance, kind: 'mpesa' as Account['kind'] },
+  ];
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      {/* Account carousel */}
+      {/* Your money. The phone swipes a carousel; on a laptop there's room to
+          show every account at once, so nothing hides off the right edge. */}
       <div>
         <SecLabel right={<SeeAll onClick={() => nav.resetTo('more')} />}>Your money</SecLabel>
-        <div style={{ display: 'flex', gap: 12, overflowX: 'auto', padding: '2px 0 6px', margin: '0 -16px', scrollbarWidth: 'none' }}>
-          <span style={{ width: 4, flexShrink: 0 }} />
-          {depositAccounts.map((a) => <AccountCard key={a.id} a={a} onClick={() => nav.push({ name: 'account', title: a.name, params: { id: a.id } })} />)}
-          <AccountCard a={{ id: 'mpesa', name: 'M-PESA', number: mpesa.number, balance: mpesa.balance, kind: 'mpesa' as Account['kind'] }} onClick={() => nav.push({ name: 'mpesa', title: 'M-PESA' })} />
-          <span style={{ width: 4, flexShrink: 0 }} />
-        </div>
+        {web ? (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(190px, 1fr))', gap: 12, padding: '2px 0 6px' }}>
+            {accounts.map((a) => (
+              <AccountCard key={a.id} a={a} wide
+                onClick={() => nav.push(a.id === 'mpesa' ? { name: 'mpesa', title: 'Mobile Wallet' } : { name: 'account', title: a.name, params: { id: a.id } })} />
+            ))}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 12, overflowX: 'auto', padding: '2px 0 6px', margin: '0 -16px', scrollbarWidth: 'none' }}>
+            <span style={{ width: 4, flexShrink: 0 }} />
+            {accounts.map((a) => (
+              <AccountCard key={a.id} a={a}
+                onClick={() => nav.push(a.id === 'mpesa' ? { name: 'mpesa', title: 'Mobile Wallet' } : { name: 'account', title: a.name, params: { id: a.id } })} />
+            ))}
+            <span style={{ width: 4, flexShrink: 0 }} />
+          </div>
+        )}
       </div>
 
       {/* Cards */}
@@ -134,21 +174,29 @@ function Accounts() {
         </div>
       </div>
 
-      {/* Extras */}
-      <Card>
-        <MiniRow icon="leaf" tint={C.good} title="Go Green" subtitle="Track your footprint, plant a tree" badge={<Tag tone="good">New</Tag>} />
-        <div style={{ height: 1, background: C.hairline, margin: '0 18px' }} />
-        <MiniRow icon="wealth" tint={C.brand} title="Net worth" subtitle="Across all your accounts" right={<Amount value={netWorth} size={16} />} />
-      </Card>
+      {/* Extras. On the web these move up into the left column beside the
+          balance, so this renders only on the phone. */}
+      {!web && <Extras />}
     </div>
   );
 }
 
-function AccountCard({ a, onClick }: { a: Account; onClick?: () => void }) {
+function Extras() {
+  return (
+    <Card>
+      <MiniRow icon="leaf" tint={C.good} title="Go Green" subtitle="Track your footprint, plant a tree" badge={<Tag tone="good">New</Tag>} />
+      <div style={{ height: 1, background: C.hairline, margin: '0 18px' }} />
+      <MiniRow icon="wealth" tint={C.brand} title="Net worth" subtitle="Across all your accounts" right={<Amount value={netWorth} size={16} />} />
+    </Card>
+  );
+}
+
+function AccountCard({ a, onClick, wide }: { a: Account; onClick?: () => void; wide?: boolean }) {
   const icon = a.kind === 'mpesa' ? 'mpesa' : a.kind === 'savings' ? 'cash' : a.kind === 'fixed' ? 'lock' : a.kind === 'loop' ? 'accounts' : 'bank';
   return (
     <button type="button" onClick={onClick} style={{
-      flexShrink: 0, width: 168, textAlign: 'left', border: 'none', cursor: 'pointer', borderRadius: 20, padding: 16, color: '#fff',
+      // `wide` lets the grid size it; the carousel needs a fixed width to swipe.
+      flexShrink: 0, width: wide ? '100%' : 168, textAlign: 'left', border: 'none', cursor: 'pointer', borderRadius: 20, padding: 16, color: '#fff',
       background: ACCENT[a.kind] ?? ACCENT.current, boxShadow: SHADOW.md, position: 'relative', overflow: 'hidden',
     }}>
       <span style={{ position: 'absolute', top: -24, right: -24, width: 90, height: 90, borderRadius: 999, background: 'rgba(255,255,255,0.12)' }} />
@@ -168,7 +216,7 @@ function PaymentCard({ card }: { card: CardAccount }) {
     <div style={{ borderRadius: 20, padding: 20, color: '#fff', position: 'relative', overflow: 'hidden', background: `linear-gradient(135deg, ${card.gradient[0]}, ${card.gradient[1]})`, boxShadow: SHADOW.lg, minHeight: 176 }}>
       <span style={{ position: 'absolute', bottom: -60, right: -40, width: 200, height: 200, borderRadius: 999, background: 'rgba(255,255,255,0.06)' }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative' }}>
-        <span style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 16, letterSpacing: 0.5 }}>NCBA</span>
+        <span style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 16, letterSpacing: 0.5 }}>Stanbic IBTC</span>
         <Icon name="globe" size={20} color="rgba(255,255,255,0.7)" />
       </div>
       {/* chip */}

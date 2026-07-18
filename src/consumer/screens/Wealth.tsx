@@ -62,7 +62,7 @@ function Invest() {
         })}
       </div>
       <div style={{ display: 'flex', gap: 8 }}>
-        {[['cash', 'Cash'], ['nssf', 'NSSF'], ['usd', 'Dollar']].map(([id, label]) => (
+        {[['cash', 'Cash'], ['nssf', 'Pension (RSA)'], ['usd', 'Dollar']].map(([id, label]) => (
           <Pill key={id} active={funding === id} onClick={() => setFunding(id)}>{label}</Pill>
         ))}
       </div>
@@ -125,7 +125,7 @@ function Invest() {
             <span style={{ width: 44, height: 44, borderRadius: 999, background: `rgba(${C.brandRgb},0.12)`, color: C.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>MK</span>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 600, fontSize: 14 }}>Mwangi Kariuki</div>
-              <div style={{ fontSize: 12, color: C.textSoft }}>+254 711 028 900</div>
+              <div style={{ fontSize: 12, color: C.textSoft }}>+234 802 118 7420</div>
             </div>
             <OutlineBtn>Call</OutlineBtn>
           </div>
@@ -144,7 +144,7 @@ function Protect() {
           <span style={{ width: 46, height: 46, borderRadius: 12, background: `rgba(${C.brandRgb},0.14)`, color: C.brand, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="shield" size={24} /></span>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 14.5 }}>Free 3-month accident cover</div>
-            <div style={{ fontSize: 12.5, color: C.textSoft, marginTop: 2 }}>Activate instantly with NCBA Insurance.</div>
+            <div style={{ fontSize: 12.5, color: C.textSoft, marginTop: 2 }}>Activate instantly with Stanbic IBTC Insurance.</div>
           </div>
         </div>
       </Card>
@@ -176,9 +176,9 @@ function Protect() {
       <SectionTitle>Your policy payouts</SectionTitle>
       <Card>
         <div style={{ padding: 16 }}>
-          <Timeline color={C.brand} title="Education endowment" value="KES 2,000,000" />
+          <Timeline color={C.brand} title="Education endowment" value="NGN 2,000,000" />
           <div style={{ height: 14 }} />
-          <Timeline color="#e0a500" title="Income stream" value="KES 50,000 / month for 10 years" />
+          <Timeline color="#e0a500" title="Income stream" value="NGN 50,000 / month for 10 years" />
         </div>
       </Card>
     </>
@@ -215,14 +215,14 @@ function Retire() {
       <Card style={{ background: `rgba(${C.brandRgb},0.06)`, border: `1px solid rgba(${C.brandRgb},0.18)` }}>
         <div style={{ padding: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}><Icon name="wealth" size={18} color={C.brand} /><span style={{ fontWeight: 700, fontSize: 14, color: C.brand }}>Boost your retirement</span></div>
-          <div style={{ fontSize: 13, color: C.textSoft, lineHeight: 1.5, margin: '6px 0 12px' }}>Top up your NCBA Pension Plan and enjoy tax relief on contributions up to KES 240,000 a year.</div>
+          <div style={{ fontSize: 13, color: C.textSoft, lineHeight: 1.5, margin: '6px 0 12px' }}>Top up your Stanbic IBTC Pension Plan and enjoy tax relief on contributions up to NGN 240,000 a year.</div>
           <FilledBtn>Top up pension</FilledBtn>
         </div>
       </Card>
 
       <SectionTitle>Your income streams</SectionTitle>
       <Card>
-        {['Cash savings', 'NSSF', 'NCBA Pension Plan', 'Investments'].map((s, i) => (
+        {['Cash savings', 'Pension (RSA)', 'Stanbic IBTC Pension Plan', 'Investments'].map((s, i) => (
           <div key={s} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderTop: i > 0 ? `1px solid ${C.border}` : 'none' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Icon name="cash" size={18} color={C.brand} /><span style={{ fontSize: 14, fontWeight: 600 }}>{s}</span></span>
             <Icon name="chevronDown" size={18} color={C.textFaint} />

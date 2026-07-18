@@ -9,7 +9,7 @@ type Step = 'form' | 'review' | 'success';
 
 const FROM_OPTIONS: { id: string; name: string; sub: string; balance: number }[] = [
   ...depositAccounts.filter((a: Account) => a.kind !== 'fixed').map((a) => ({ id: a.id, name: a.name, sub: a.number, balance: a.balance })),
-  { id: 'mpesa', name: 'M-PESA', sub: mpesa.number, balance: mpesa.balance },
+  { id: 'mpesa', name: 'Mobile Wallet', sub: mpesa.number, balance: mpesa.balance },
 ];
 
 function toPlaceholder(action?: string): { label: string; placeholder: string } {
@@ -39,7 +39,7 @@ export default function TransferFlow({ route }: { route: ScreenRoute }) {
   const [note, setNote] = useState('');
   const amt = parseFloat(amount || '0') || 0;
   const fee = action === 'sendmoney' || action === 'pesalink' ? Math.min(Math.max(amt * 0.01, 0), 110) : 0;
-  const ref = `NCBA${Math.floor(Math.random() * 1e9).toString(36).toUpperCase().padStart(7, '0')}`;
+  const ref = `Stanbic IBTC${Math.floor(Math.random() * 1e9).toString(36).toUpperCase().padStart(7, '0')}`;
   const canContinue = amt > 0 && (recipient || to.trim().length > 0);
 
   const back = () => { if (step === 'review') setStep('form'); else nav.pop(); };
@@ -106,7 +106,7 @@ export default function TransferFlow({ route }: { route: ScreenRoute }) {
               <FieldLabel>Amount</FieldLabel>
               <Card>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 16px' }}>
-                  <span style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 22, color: C.textSoft }}>KES</span>
+                  <span style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 22, color: C.textSoft }}>NGN</span>
                   <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))} inputMode="decimal" placeholder="0.00" style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 28, color: C.text, minWidth: 0 }} />
                 </div>
               </Card>
@@ -125,7 +125,7 @@ export default function TransferFlow({ route }: { route: ScreenRoute }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
               <div style={{ fontSize: 13, color: C.textSoft }}>You're sending</div>
-              <div style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 34, color: C.text, marginTop: 4 }}>KES {fmt(amt)}</div>
+              <div style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 34, color: C.text, marginTop: 4 }}>NGN {fmt(amt)}</div>
             </div>
             <Card>
               <ReviewRow label="From" value={from.name} sub={from.sub} />
@@ -144,7 +144,7 @@ export default function TransferFlow({ route }: { route: ScreenRoute }) {
             <span style={{ width: 76, height: 76, borderRadius: 999, background: 'rgba(31,157,87,0.12)', color: C.good, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
               <Icon name="checkCircle" size={44} strokeWidth={1.8} />
             </span>
-            <div style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 22, color: C.text }}>KES {fmt(amt)} sent</div>
+            <div style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 22, color: C.text }}>NGN {fmt(amt)} sent</div>
             <div style={{ fontSize: 14, color: C.textSoft, marginTop: 4 }}>to {recipient ? recipient.name : to}</div>
             <Card style={{ width: '100%', marginTop: 22 }}>
               <ReviewRow label="From" value={from.name} />
@@ -194,7 +194,7 @@ export function ScanPay() {
           ))}
           <Icon name="qr" size={120} color="rgba(255,255,255,0.18)" style={{ position: 'absolute', inset: 0, margin: 'auto' }} />
         </div>
-        <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14.5, textAlign: 'center' }}>Point at a Lipa na M-PESA or PesaLink QR code</div>
+        <div style={{ color: 'rgba(255,255,255,0.85)', fontSize: 14.5, textAlign: 'center' }}>Point at a Lipa na Mobile Wallet or NIP Transfer QR code</div>
       </div>
       <div style={{ padding: '12px 16px max(env(safe-area-inset-bottom), 14px)' }}>
         <button type="button" onClick={() => nav.push({ name: 'transfer', title: 'Pay Merchant', params: { action: 'buygoods', label: 'Pay Merchant' } })} style={{ width: '100%', background: 'rgba(255,255,255,0.12)', color: '#fff', border: '1px solid rgba(255,255,255,0.2)', borderRadius: 14, padding: '14px', fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>

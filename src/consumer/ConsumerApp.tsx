@@ -6,8 +6,10 @@
 // Navigation is an internal tab + push/pop stack (see nav.tsx).
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState, type CSSProperties } from 'react';
-import { ConfigProvider, useConfig, loadLocalConfig } from '../config';
+import { ConfigProvider, useConfig, loadLocalConfig, loadCachedConfig, stanbicConfig, applyFavicon } from '../config';
+import type { TenantConnection } from '../onboarding/tenantSelection';
 import { NavContext, useNav, type TabId, type ScreenRoute } from './nav';
+import TopNav from './TopNav';
 import { C, FONT_HEAD, FONT_BODY, SHADOW, PAGE_BG } from './theme';
 import Icon from './icons';
 import { customer, notifications } from './data';
@@ -18,6 +20,8 @@ import WealthScreen from './screens/Wealth';
 import MoreScreen from './screens/More';
 import TransactionHistory from './screens/TransactionHistory';
 import Digibot from './screens/Digibot';
+import OpenAccountScreen from './screens/OpenAccount';
+import AccountOpeningFlow from '../customer/flow';
 
 const badgeDot: CSSProperties = { position: 'absolute', top: -3, right: -3, background: C.warn, color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 999, minWidth: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px', border: `2px solid ${C.card}` };
 
@@ -50,7 +54,8 @@ function ConsumerBrandBridge() {
     const srgb = hexToRgb(sec); if (srgb) root.style.setProperty('--brand-secondary-rgb', srgb);
     root.setAttribute('data-theme', 'light');
     if (branding.appName) document.title = `${branding.appName} — Banking`;
-  }, [branding.primaryColor, branding.secondaryColor, branding.appName]);
+    applyFavicon(branding.favicon, branding.appName, branding.deepBlue || branding.primaryColor);
+  }, [branding.primaryColor, branding.secondaryColor, branding.appName, branding.favicon, branding.deepBlue]);
   return null;
 }
 
@@ -95,9 +100,12 @@ function AppHeader() {
 }
 
 // ── Bottom navigation ────────────────────────────────────────────────────────
+// 'open' sits in the centre as a raised brand action — the account-opening
+// entry point — with the four banking tabs either side of it.
 const TABS: { id: TabId; label: string; icon: string }[] = [
   { id: 'home', label: 'Home', icon: 'home' },
-  { id: 'pay', label: 'Pay & Transfer', icon: 'pay' },
+  { id: 'pay', label: 'Pay', icon: 'pay' },
+  { id: 'open', label: 'Open', icon: 'plus' },
   { id: 'wealth', label: 'Wealth', icon: 'wealth' },
   { id: 'more', label: 'More', icon: 'more' },
 ];
@@ -105,9 +113,29 @@ function BottomNav() {
   const nav = useNav();
   return (
     <div style={{ flexShrink: 0, padding: '8px 14px max(env(safe-area-inset-bottom), 12px)' }}>
-      <div style={{ background: C.card, borderRadius: 24, boxShadow: SHADOW.lg, display: 'flex', padding: 6 }}>
+      <div style={{ background: C.card, borderRadius: 24, boxShadow: SHADOW.lg, display: 'flex', padding: 6, alignItems: 'center' }}>
         {TABS.map((t) => {
           const on = nav.tab === t.id;
+          if (t.id === 'open') {
+            // Raised centre action.
+            return (
+              <button key={t.id} type="button" onClick={() => nav.resetTo(t.id)} aria-label="Open an account" style={{
+                flex: '0 0 auto', width: 58, background: 'transparent', border: 'none', cursor: 'pointer',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: 0,
+              }}>
+                <span style={{
+                  width: 46, height: 46, borderRadius: 999, marginTop: -22,
+                  background: on ? `linear-gradient(140deg, var(--brand-primary), color-mix(in srgb, var(--brand-primary) 60%, #000))` : C.brand,
+                  color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: SHADOW.brand, border: `3px solid ${C.card}`, transition: 'transform 0.18s',
+                  transform: on ? 'scale(1.06)' : 'none',
+                }}>
+                  <Icon name="plus" size={22} strokeWidth={2.6} />
+                </span>
+                <span style={{ fontSize: 10, fontWeight: on ? 700 : 500, fontFamily: FONT_BODY, color: on ? C.brand : C.textFaint, marginBottom: 4 }}>{t.label}</span>
+              </button>
+            );
+          }
           return (
             <button key={t.id} type="button" onClick={() => nav.resetTo(t.id)} style={{
               flex: 1, background: on ? `rgba(${C.brandRgb},0.10)` : 'transparent', border: 'none', cursor: 'pointer',
@@ -130,6 +158,8 @@ function SubScreen({ route }: { route: ScreenRoute }) {
   const nav = useNav();
   if (route.name === 'transfer') return <TransferFlow route={route} />;
   if (route.name === 'scan') return <ScanPay />;
+  // Account opening owns its own chrome (wizard header, progress rail, footer).
+  if (route.name === 'open-account') return <AccountOpeningFlow onExit={nav.pop} startCaseId={route.params?.id as string | undefined} />;
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: PAGE_BG }}>
       <div style={{ paddingTop: 'max(env(safe-area-inset-top), 12px)', flexShrink: 0 }}>
@@ -200,6 +230,7 @@ function TabScreen({ tab }: { tab: TabId }) {
   switch (tab) {
     case 'home': return <HomeScreen />;
     case 'pay': return <PayTransferScreen />;
+    case 'open': return <OpenAccountScreen />;
     case 'wealth': return <WealthScreen />;
     case 'more': return <MoreScreen />;
   }
@@ -209,6 +240,23 @@ function TabScreen({ tab }: { tab: TabId }) {
 function Shell() {
   const nav = useNav();
   const top = nav.stack[nav.stack.length - 1];
+
+  // Internet banking: nav across the top, content given the width it has. The
+  // phone's header + bottom bar are thumb furniture and don't belong on a laptop.
+  if (nav.web) {
+    return (
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: PAGE_BG, fontFamily: FONT_BODY, color: C.text, position: 'relative' }}>
+        <TopNav />
+        <div style={{ flex: 1, overflowY: 'auto' }}>
+          <div style={{ maxWidth: 1180, margin: '0 auto', padding: '0 8px' }}>
+            {top ? <SubScreen route={top} /> : <TabScreen tab={nav.tab} />}
+          </div>
+        </div>
+        {nav.digibotOpen && <Digibot />}
+      </div>
+    );
+  }
+
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: PAGE_BG, fontFamily: FONT_BODY, color: C.text, position: 'relative' }}>
       {top ? (
@@ -227,16 +275,40 @@ function Shell() {
   );
 }
 
+// Same tenant connection the enterprise app derives from env — lets the consumer
+// app read the config the enterprise app cached from Data Fabric. Duplicated
+// (rather than imported from App.tsx) to keep this chunk isolated.
+function envConnection(): TenantConnection {
+  return {
+    orgName: import.meta.env.VITE_UIPATH_ORG_NAME,
+    tenantName: import.meta.env.VITE_UIPATH_TENANT_NAME,
+    oauthClientId: import.meta.env.VITE_UIPATH_CLIENT_ID,
+    baseUrl: import.meta.env.VITE_UIPATH_BASE_URL,
+    redirectUri: '',
+    scope: import.meta.env.VITE_UIPATH_SCOPES || '',
+    setAt: '',
+  };
+}
+
 // ── Root ─────────────────────────────────────────────────────────────────────
-export default function ConsumerApp() {
-  const initial = useMemo(() => loadLocalConfig() ?? undefined, []);
+export default function ConsumerApp({ shell = 'mobile' }: { shell?: 'mobile' | 'web' } = {}) {
+  // Resolve branding exactly like the enterprise app: the active local profile
+  // first, then the Data-Fabric config it cached. Where the enterprise app falls
+  // back to the bundled Aura default, this one falls back to Stanbic — the data
+  // and the account-opening journey are Stanbic/Nigeria. An admin profile still
+  // wins, so white-labelling is intact.
+  const initial = useMemo(
+    () => loadLocalConfig() ?? loadCachedConfig(envConnection()) ?? stanbicConfig,
+    [],
+  );
   const [tab, setTab] = useState<TabId>('home');
   const [stack, setStack] = useState<ScreenRoute[]>([]);
   const [digibotOpen, setDigibotOpen] = useState(false);
   const [hideBalances, setHideBalances] = useState(false);
 
+  const web = shell === 'web';
   const api = useMemo(() => ({
-    tab, stack, digibotOpen, hideBalances,
+    tab, stack, digibotOpen, hideBalances, web,
     setTab,
     push: (s: ScreenRoute) => setStack((st) => [...st, s]),
     pop: () => setStack((st) => st.slice(0, -1)),
@@ -244,7 +316,7 @@ export default function ConsumerApp() {
     openDigibot: () => setDigibotOpen(true),
     closeDigibot: () => setDigibotOpen(false),
     toggleBalances: () => setHideBalances((v) => !v),
-  }), [tab, stack, digibotOpen, hideBalances]);
+  }), [tab, stack, digibotOpen, hideBalances, web]);
 
   // Greeting persona available app-wide via data.customer; nothing else needed.
   void customer;

@@ -1,0 +1,1479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Account Opening — Stanbic IBTC</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #012169;
+    --navy-2: #0a3182;
+    --navy-3: #0A2240;
+    --blue: #0033A1;
+    --blue-hover: #002374;
+    --sky: #0091DA;
+    --on-navy: #cdd9f0;
+    --on-navy-dim: #7c93c9;
+
+    --ink: #17171a;
+    --ink-2: #6f6f69;
+    --ink-3: #9a9a94;
+    --ink-4: #a4a49e;
+    --page: #f6f6f3;
+    --rail: #fbfbf9;
+    --line: #e6e6e0;
+    --line-2: #e2e2db;
+    --line-3: #f2f2ec;
+
+    --green: #16a34a;
+    --green-bg: #f0f9f3;
+    --red: #dc2626;
+    --red-ink: #b91c1c;
+    --red-deep: #7f1d1d;
+    --red-bg: #fdf3f3;
+    --red-line: #f4c9c9;
+    --amber: #d97706;
+    --amber-ink: #b45309;
+    --amber-bg: #fdf6e8;
+    --amber-line: #f3e2bd;
+    --gray-dot: #c4c4bd;
+
+    --num: 'Libre Franklin', sans-serif;
+    --col: 1520px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Libre Franklin', system-ui, sans-serif;
+    color: var(--ink);
+    background: var(--page);
+    font-size: 14px;
+    -webkit-font-smoothing: antialiased;
+  }
+  button, input { font-family: inherit; }
+  button { cursor: pointer; border: none; background: none; color: inherit; }
+  .num { font-family: var(--num); font-variant-numeric: tabular-nums; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  :focus-visible { outline: 2px solid var(--sky); outline-offset: 2px; border-radius: 4px; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: #d5d5cf; border-radius: 6px; border: 2px solid transparent; background-clip: content-box; }
+  @keyframes pulseDot { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  @keyframes toastIn { from { opacity: 0; transform: translate(-50%, 8px); } to { opacity: 1; transform: translate(-50%, 0); } }
+  @media (prefers-reduced-motion: reduce) { *, *::before { animation: none !important; transition: none !important; } }
+
+  .shell { display: grid; grid-template-columns: 248px minmax(0, 1fr); height: 100vh; }
+  .scrim { position: fixed; inset: 0; background: rgba(1, 33, 105, .13); z-index: 55; opacity: 0; pointer-events: none; transition: opacity .18s ease; }
+  .shell:not(.nopanel) .scrim { opacity: 1; pointer-events: auto; }
+
+  /* ---------- sidebar ---------- */
+  .side { background: var(--navy); color: var(--on-navy); display: flex; flex-direction: column; }
+  .side .logo { display: flex; align-items: center; gap: 10px; padding: 18px 18px 16px; }
+  .side .glyph { width: 30px; height: 30px; border-radius: 8px; background: var(--sky); display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 15px; }
+  .side .logo b { font-weight: 600; font-size: 15px; color: #fff; letter-spacing: -0.01em; }
+  .side .logo em { display: block; font-style: normal; font-size: 10.5px; color: var(--on-navy-dim); letter-spacing: 0.04em; }
+  .side .scroll { flex: 1; overflow-y: auto; padding: 8px 12px; }
+  .side h2 { font-family: var(--num); font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; color: var(--on-navy-dim); padding: 14px 8px 6px; display: flex; align-items: baseline; }
+  .side h2 .flow { margin-left: auto; letter-spacing: 0; font-weight: 400; font-size: 10px; color: #5f7ab5; text-transform: none; }
+  .side .sep { height: 1px; background: var(--navy-2); margin: 10px 8px 4px; }
+
+  /* Pipeline funnel — the queues drawn as a flow with volume, so where work is
+     pooling is visible without reading the numbers. */
+  .funnel { position: relative; }
+  .funnel::before { content: ""; position: absolute; left: 11px; top: 15px; bottom: 15px; width: 2px; background: #1c3d80; }
+  .nav.stage { display: grid; grid-template-columns: 8px minmax(0, 1fr) 70px 20px; align-items: center; gap: 9px; padding: 7px 8px; }
+  .nav.stage span.d { width: 8px; height: 8px; border-radius: 50%; background: #1c3d80; position: relative; z-index: 1; }
+  .nav.stage span.t { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .nav.stage span.v { height: 9px; border-radius: 4px; background: #0a3182; overflow: hidden; }
+  .nav.stage span.v i { display: block; height: 100%; border-radius: 4px; background: #93a9d8; }
+  .nav.stage span.c { text-align: right; font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 11.5px; color: var(--on-navy-dim); }
+  .nav.stage.hot span.t { color: #fff; font-weight: 600; }
+  .nav.stage.hot span.c { color: #fff; font-weight: 700; }
+  .nav.stage.zero span.t, .nav.stage.zero span.c { color: #5f7ab5; }
+
+  /* Upstream health — derived from the cases, never typed in. */
+  .up { padding: 0 8px; }
+  .up div { display: flex; align-items: center; gap: 9px; padding: 5px 0; }
+  .up div i { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+  .up div b { font-size: 12.5px; font-weight: 400; color: var(--on-navy); }
+  .up div em { margin-left: auto; font-style: normal; font-size: 10.5px; color: #5f7ab5; }
+  .nav { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 8px; border-radius: 8px; font-size: 13.5px; color: var(--on-navy); }
+  .nav:hover { background: var(--navy-2); }
+  .nav[aria-current="true"] { background: var(--navy-2); color: #fff; font-weight: 600; }
+  .nav .ic { width: 16px; height: 16px; display: grid; place-items: center; opacity: .85; flex: 0 0 auto; }
+  .nav .ic svg { width: 15px; height: 15px; }
+  .nav .badge { margin-left: auto; font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 11px; padding: 1px 6px; border-radius: 5px; background: rgba(255,255,255,.1); color: var(--on-navy); }
+  .nav .badge.hot { background: var(--red); color: #fff; font-weight: 600; }
+  .nav .badge.new { background: var(--sky); color: #fff; font-weight: 600; }
+  /* Links out. The rail is otherwise buttons, so an <a> needs the reset — and the
+     arrow marks it as leaving this console before anyone clicks it. */
+  a.nav { text-decoration: none; color: var(--on-navy); }
+  a.nav:hover { color: #fff; }
+  .nav .ext { margin-left: auto; display: grid; place-items: center; opacity: .5; flex: 0 0 auto; }
+  .nav .ext svg { width: 13px; height: 13px; }
+  a.nav:hover .ext { opacity: .95; }
+  .side .foot { padding: 14px 18px; border-top: 1px solid var(--navy-2); color: var(--on-navy-dim); font-size: 13px; cursor: pointer; }
+  .side .foot:hover { color: #fff; }
+
+  /* Role switcher — mirrors the branch desk's (src/employee/RoleSwitch.tsx).
+     The two tools share a design language because they are one workspace; this
+     is what makes that read as intentional instead of as a duplicate app. */
+  .role { position: relative; border-top: 1px solid var(--navy-2); border-bottom: 1px solid var(--navy-2); }
+  .role-btn { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 11px 18px; }
+  .role-btn:hover { background: var(--navy-2); }
+  .role-btn .t { flex: 1; min-width: 0; }
+  .role-btn .t b { display: block; font-size: 13.5px; font-weight: 600; color: #fff; letter-spacing: -0.01em; }
+  .role-btn .t em { display: block; font-style: normal; font-size: 10.5px; letter-spacing: 0.04em; color: var(--on-navy-dim); margin-top: 2px; text-transform: uppercase; }
+  .role-btn .cv { color: var(--on-navy-dim); display: grid; place-items: center; flex: 0 0 auto; transform: rotate(90deg); transition: transform .15s ease; }
+  .role-btn .cv svg { width: 14px; height: 14px; }
+  .role-btn[aria-expanded="true"] .cv { transform: rotate(-90deg); }
+  .roles { position: absolute; top: calc(100% + 4px); left: 10px; right: 10px; z-index: 60;
+    background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 18px 44px -10px rgba(0,0,0,.5); }
+  .roles .hd { font-family: var(--num); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-4); padding: 9px 12px 5px; }
+  .role-i { display: flex; align-items: flex-start; gap: 9px; padding: 9px 12px; text-decoration: none; color: inherit; border-top: 1px solid var(--line-3); }
+  .role-i:hover { background: #fafaf7; }
+  .role-i .ck { width: 14px; flex: 0 0 auto; color: var(--blue); margin-top: 1px; font-size: 12px; font-weight: 700; }
+  .role-i .t { min-width: 0; }
+  .role-i .t b { display: block; font-size: 13px; font-weight: 600; color: var(--ink); }
+  .role-i.on .t b { color: var(--blue); }
+  .role-i .t span { display: block; font-size: 11.5px; line-height: 1.45; color: var(--ink-2); margin-top: 2px; }
+
+  /* ---------- main ---------- */
+  .main { display: flex; flex-direction: column; overflow: hidden; background: var(--page); container-type: inline-size; }
+  .util { display: flex; align-items: center; gap: 16px; padding: 12px 24px; border-bottom: 1px solid var(--line); background: var(--rail); }
+  .find { position: relative; flex: 1; max-width: 520px; }
+  .find span { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #a8a8a2; display: grid; place-items: center; }
+  .find span svg { width: 15px; height: 15px; }
+  .find input { width: 100%; padding: 9px 12px 9px 34px; border: 1px solid var(--line-2); border-radius: 9px; background: #fff; font-size: 13.5px; outline: none; color: var(--ink); }
+  .live { margin-left: auto; display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--green); font-weight: 600; }
+  .live i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); animation: pulseDot 2s infinite; }
+  .me { width: 34px; height: 34px; border-radius: 50%; background: var(--navy-3); color: #fff; display: grid; place-items: center; font-weight: 600; font-size: 13px; }
+
+  /* triage bar */
+  .triage { display: block; padding: 12px 24px; }
+  .tin { max-width: var(--col); margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+  .triage.red { background: var(--red-bg); border-bottom: 1px solid var(--red-line); }
+  .triage.green { background: var(--green-bg); border-bottom: 1px solid #cfe9d9; }
+  .triage .pip { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; color: #fff; font-size: 14px; font-weight: 700; }
+  .triage.red .pip { background: var(--red); }
+  .triage.green .pip { background: var(--green); }
+  .triage .hl { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  .triage .sb { font-size: 12.5px; margin-top: 1px; }
+  .triage.red .hl { color: var(--red-ink); } .triage.red .sb { color: var(--red-deep); }
+  .triage.green .hl { color: #15803d; } .triage.green .sb { color: #166534; }
+  .triage .go { padding: 9px 15px; border-radius: 9px; font-weight: 600; font-size: 13px; color: #fff; white-space: nowrap; }
+  .triage.red .go { background: var(--red); }
+  .triage.green .go { background: var(--green); }
+  .triage .go:hover { filter: brightness(1.08); }
+
+  /* health strip */
+  .health { display: flex; padding: 14px 24px 10px; max-width: calc(var(--col) + 48px); margin: 0 auto; width: 100%; }
+  .stat { flex: 1; padding-right: 18px; }
+  .stat + .stat { border-left: 1px solid var(--line); padding-left: 18px; }
+  .stat .k { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: #7c7c76; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat .k i { width: 8px; height: 8px; border-radius: 50%; }
+  .stat .v { display: flex; align-items: baseline; gap: 5px; margin-top: 6px; }
+  .stat .v b { font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; }
+  .stat .v s { text-decoration: none; font-size: 13px; color: var(--ink-3); font-weight: 500; }
+
+  .body { flex: 1; overflow-y: auto; padding: 8px 24px 24px; }
+  .qhead { display: flex; align-items: center; justify-content: space-between; padding: 8px 0 10px; }
+  .qhead h1 { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+  .qhead .n { font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 13px; color: #a0a09a; margin-left: 8px; font-weight: 400; }
+  .segs { display: flex; background: #ecece7; border-radius: 9px; padding: 3px; }
+  .segs button { padding: 5px 11px; border-radius: 7px; font-size: 12.5px; font-weight: 500; color: var(--ink-2); }
+  .segs button[aria-pressed="true"] { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+
+  h2.eyebrow { font-family: var(--num); font-size: 10.5px; font-weight: 600; letter-spacing: 0.12em; color: var(--ink-4); margin: 16px 0 9px; }
+
+  .rowbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 0 8px; margin-top: 8px; background: var(--page); }
+  .rowbar-t { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+  .rowbar-t .n { font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 400; color: var(--ink-3); margin-left: 8px; }
+  .cols { position: sticky; top: 46px; z-index: 4; background: var(--page); }
+
+  /* cause cards */
+  .col { max-width: var(--col); margin: 0 auto; }
+  .causes { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 560px), 1fr)); gap: 10px; align-items: start; }
+  .cause { background: #fff; border: 1px solid var(--line-2); border-radius: 12px; padding: 14px 16px; display: flex; gap: 12px; }
+  .cause .ic { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; flex: 0 0 auto; font-size: 13px; font-weight: 700; }
+  .cause .ic.red { background: var(--red-bg); color: var(--red); border: 1px solid var(--red-line); }
+  .cause .ic.amber { background: var(--amber-bg); color: var(--amber-ink); border: 1px solid var(--amber-line); }
+  .cause .ic.gray { background: #f2f2ec; color: var(--ink-2); border: 1px solid var(--line); }
+  .cause .t { font-size: 14.5px; font-weight: 600; letter-spacing: -0.01em; }
+  .cause .d { font-size: 13px; color: var(--ink-2); margin-top: 2px; line-height: 1.45; }
+  .tags { display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
+  .tag { font-size: 11.5px; padding: 2px 8px; border-radius: 5px; background: #f2f2ec; color: var(--ink-2); font-weight: 500; }
+  .tag.red { background: var(--red-bg); color: var(--red-ink); }
+  .tag.amber { background: var(--amber-bg); color: var(--amber-ink); }
+  .acts { display: flex; gap: 8px; margin-top: 12px; }
+  .btn { border: 1px solid var(--line-2); border-radius: 8px; padding: 7px 13px; font-size: 12.5px; font-weight: 600; background: #fff; color: var(--ink); }
+  .btn:hover { background: #f3f3ee; }
+  .btn:active { transform: scale(.985); }
+  .btn.pri { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .btn.pri:hover { background: var(--blue-hover); }
+  .btn.warn { background: var(--red); border-color: var(--red); color: #fff; }
+  .btn.warn:hover { filter: brightness(1.06); }
+  .btn.ghost-red { border: none; color: var(--red); background: transparent; }
+  .btn.ghost-red:hover { background: #fdf1f1; }
+
+  /* signature: rule promotion */
+  .promo { background: var(--navy); border-radius: 14px; padding: 18px 20px; margin-bottom: 10px; color: var(--on-navy); position: relative; overflow: hidden; }
+  .promo::after { content: ""; position: absolute; right: -40px; top: -40px; width: 180px; height: 180px; border-radius: 50%; background: rgba(0,145,218,.14); }
+  .promo-in { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; position: relative; z-index: 1; }
+  @media (min-width: 1120px) { .promo-in { grid-template-columns: minmax(0, 1fr) auto; gap: 40px; align-items: center; } }
+  .promo .kicker { font-family: var(--num); font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; color: var(--sky); }
+  .promo h3 { font-size: 17px; font-weight: 600; color: #fff; letter-spacing: -0.02em; margin: 7px 0 6px; max-width: 46ch; }
+  .promo p { font-size: 13px; color: var(--on-navy); line-height: 1.5; max-width: 62ch; }
+  .promo .ev { display: flex; gap: 26px; margin-bottom: 14px; }
+  .promo .ev div b { display: block; font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
+  .promo .ev div span { font-size: 11.5px; color: var(--on-navy-dim); }
+  .promo .cta { display: flex; gap: 9px; align-items: center; position: relative; z-index: 1; }
+  .promo .btn-sky { background: var(--sky); color: #fff; border: none; border-radius: 9px; padding: 9px 15px; font-size: 13px; font-weight: 600; }
+  .promo .btn-sky:hover { filter: brightness(1.08); }
+  .promo .btn-line { border: 1px solid rgba(255,255,255,.28); border-radius: 9px; padding: 9px 15px; font-size: 13px; font-weight: 600; color: #fff; background: transparent; }
+  .promo .btn-line:hover { background: rgba(255,255,255,.08); }
+
+  /* rows */
+  .cols { display: grid; grid-template-columns: 112px 1.5fr 132px 122px 96px 92px 40px; gap: 10px; align-items: center; padding: 6px 8px; font-family: var(--num); font-size: 10.5px; letter-spacing: 0.1em; color: var(--ink-4); border-bottom: 1px solid var(--line); }
+  .cols div:last-child { text-align: right; }
+  .row { display: grid; grid-template-columns: 112px 1.5fr 132px 122px 96px 92px 40px; gap: 10px; align-items: center; width: 100%; text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line-3); border-radius: 0; }
+  .row:hover { background: #f1f1ec; }
+  .row[aria-selected="true"] { background: #eef2fa; box-shadow: inset 2px 0 0 var(--blue); }
+  .row .id { font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--ink-2); }
+  .who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  .ava { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 10.5px; font-weight: 700; color: #fff; flex: 0 0 auto; }
+  .who .nm { min-width: 0; }
+  .who .nm b { display: block; font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .who .nm span { display: block; font-size: 11.5px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .state { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 500; padding: 3px 9px; border-radius: 6px; white-space: nowrap; }
+  .state i { width: 6px; height: 6px; border-radius: 50%; }
+  .checks { display: flex; align-items: center; gap: 4px; }
+  .checks i { width: 7px; height: 7px; border-radius: 50%; }
+  .checks i.fail { width: 8px; height: 8px; box-shadow: 0 0 0 2px var(--red-bg); }
+  .sla { font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 12px; }
+  .sla b { display: block; font-weight: 600; }
+  .sla .track { display: block; width: 100%; height: 3px; border-radius: 2px; background: var(--line); margin-top: 3px; overflow: hidden; }
+  .sla .track i { display: block; height: 3px; border-radius: 2px; }
+  .asg { display: flex; align-items: center; gap: 7px; font-size: 12.5px; min-width: 0; }
+  .asg .mini { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 9px; font-weight: 700; color: #fff; flex: 0 0 auto; }
+  .age { font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 12px; color: #a0a09a; text-align: right; }
+
+  .keys { display: flex; align-items: center; gap: 16px; padding: 8px 24px; border-top: 1px solid var(--line); background: var(--rail); font-size: 11.5px; color: var(--ink-3); }
+
+  @container (max-width: 940px) {
+    .cols, .row { grid-template-columns: minmax(0, 1.4fr) 118px 92px 86px 84px 34px; }
+    .cols div:first-child, .row .id { display: none; }
+  }
+  @container (max-width: 780px) {
+    .cols, .row { grid-template-columns: minmax(0, 1.4fr) 118px 86px 34px; }
+    .cols div:nth-child(4), .cols div:nth-child(6), .row .checks, .row .asg { display: none; }
+  }
+  .keys span { display: flex; align-items: center; gap: 6px; }
+  kbd { font-family: var(--num); background: #ecece7; border: 1px solid #dcdcd5; border-radius: 4px; padding: 1px 6px; font-size: 11px; }
+
+  /* rules view */
+  .rule { background: #fff; border: 1px solid var(--line-2); border-radius: 12px; padding: 14px 16px; margin-bottom: 9px; display: flex; align-items: flex-start; gap: 12px; }
+  .rule .t { font-size: 14px; font-weight: 600; }
+  .rule .c { font-family: var(--num); font-size: 12.5px; color: var(--ink-2); margin-top: 3px; background: #f6f6f3; border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; display: inline-block; }
+  .rule .m { display: flex; gap: 22px; margin-top: 10px; }
+  .rule .m div b { display: block; font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 17px; font-weight: 700; }
+  .rule .m div span { font-size: 11px; color: var(--ink-3); }
+
+  /* ---------- cockpit: centred review modal ---------- */
+  .cock { position: fixed; top: 50%; left: 50%; z-index: 60;
+    width: min(1320px, 96vw); max-height: min(820px, 92vh);
+    display: flex; flex-direction: column; background: #fff; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 32px 80px rgba(1, 33, 105, .3);
+    opacity: 0; visibility: hidden; transform: translate(-50%, -50%) scale(.985);
+    transition: opacity .16s ease, transform .16s ease, visibility 0s .16s; }
+  .shell:not(.nopanel) .cock { opacity: 1; visibility: visible; transform: translate(-50%, -50%) scale(1);
+    transition: opacity .16s ease, transform .16s ease, visibility 0s 0s; }
+
+  .mhead { display: flex; align-items: center; gap: 13px; padding: 16px 20px; border-bottom: 1px solid var(--line); flex: 0 0 auto; }
+  .mhead .ava { width: 40px; height: 40px; font-size: 13px; }
+  .mhead h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+  .mhead .cid { font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 11.5px; color: #8a8a85; }
+  .kindtag { font-family: var(--num); font-size: 10px; font-weight: 600; letter-spacing: .08em; background: var(--navy); color: #fff; padding: 2px 7px; border-radius: 4px; margin-left: 8px; }
+  .mhead .pills { display: flex; gap: 7px; margin-left: 18px; flex-wrap: wrap; }
+  .stepper { margin-left: auto; display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+  .stepper .n { font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--ink-2); min-width: 62px; text-align: center; }
+  .stepper button, .mhead .x { width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--line-2); color: var(--ink-2); display: grid; place-items: center; font-size: 14px; background: #fff; }
+  .stepper button:hover:not(:disabled), .mhead .x:hover { background: #f3f3ee; color: var(--ink); }
+  .stepper button:disabled { opacity: .35; cursor: default; }
+  .mhead .x { margin-left: 10px; }
+
+  .minirail { display: inline-flex; align-items: flex-start; padding: 5px 12px; border-radius: 8px; background: #f6f6f3; border: 1px solid var(--line); }
+  .minirail .st { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+  .minirail .st i { width: 9px; height: 9px; border-radius: 50%; background: #d8d8d1; }
+  .minirail .st i.stop { width: 11px; height: 11px; margin: -1px 0; }
+  .minirail .st b { font-size: 11.5px; font-weight: 500; color: var(--ink-3); white-space: nowrap; }
+  .minirail .cx { width: 20px; height: 2px; background: #e2e2db; margin-top: 3.5px; flex: 0 0 auto; }
+
+  .mbody { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1.05fr) minmax(0, .85fr); }
+  .mcol { padding: 20px 24px; min-width: 0; overflow-y: auto; }
+  .mcol + .mcol { border-left: 1px solid var(--line); }
+
+  .cock h2.eyebrow { font-size: 12.5px; letter-spacing: .1em; margin: 20px 0 10px; }
+  .cock .prob .h { font-size: 14px; }
+  .cock .prob .d { font-size: 15.5px; line-height: 1.5; margin: 10px 0 14px; }
+  .cock .ev-diff div { padding: 10px 12px; }
+  .cock .ev-diff .k { font-size: 12px; }
+  .cock .ev-diff .v { font-size: 19px; }
+  .cock .ev-gauge .lab { font-size: 12px; }
+  .cock .clist .c { padding: 10px 4px; }
+  .cock .clist .c .n { font-size: 15px; }
+  .cock .clist .c .i { width: 20px; height: 20px; font-size: 11px; }
+  .cock .clist .c .st, .cock .clist .c a { font-size: 13.5px; }
+  .cock .risk .hdr b { font-size: 14px; }
+  .cock .risk .f { font-size: 14.5px; padding: 5px 0; }
+  .cock .trail .e { font-size: 14.5px; padding: 4px 0; }
+  .cock .trail .e time { flex-basis: 42px; }
+  .cock .fields > div { padding: 9px 0; }
+  .cock .fields .k { font-size: 14.5px; }
+  .cock .fields .v { font-size: 15px; }
+  .cockbar .pair .btn { font-size: 14px; padding: 10px 16px; }
+  .cockbar .note { font-size: 13.5px; }
+  .mhead h2 { font-size: 25px; }
+  .mhead .cid { font-size: 13px; }
+  .cock .pill { font-size: 13px; padding: 4px 11px; }
+
+  .cock .pills { display: flex; flex-wrap: wrap; gap: 7px; }
+
+  @media (max-width: 1100px) {
+    .cock { width: min(600px, 94vw); max-height: 90vh; }
+    .mbody { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }
+    .mcol { overflow: visible; }
+    .mcol + .mcol { border-left: none; border-top: 1px solid var(--line); }
+    .mhead { flex-wrap: wrap; }
+    .mhead .pills { margin-left: 0; order: 3; width: 100%; }
+    .minirail { width: 100%; justify-content: space-between; }
+    .minirail .cx { width: auto; flex: 1 1 auto; min-width: 10px; }
+    .cockbar { flex-direction: column; align-items: stretch; }
+    .cockbar .pair { margin-left: 0; flex-wrap: wrap; }
+    .cockbar .pair .btn { flex: 1; text-align: center; }
+  }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 600; padding: 3px 9px; border-radius: 6px; }
+  .pill i { width: 6px; height: 6px; border-radius: 50%; }
+
+  .prob { border: 1px solid var(--red-line); background: var(--red-bg); border-radius: 12px; padding: 14px 15px; margin-bottom: 18px; }
+  .prob.amber { border-color: var(--amber-line); background: var(--amber-bg); }
+  .prob .h { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; letter-spacing: .03em; text-transform: uppercase; color: var(--red-ink); }
+  .prob.amber .h { color: var(--amber-ink); }
+  .prob .d { font-size: 13.5px; color: var(--red-deep); margin: 8px 0 12px; line-height: 1.45; }
+  .prob.amber .d { color: #78350f; }
+  .ev-diff { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+  .ev-diff div { background: #fff; border-radius: 8px; padding: 8px 10px; min-width: 0; }
+  .ev-diff .k { font-size: 10.5px; color: var(--ink-3); }
+  .ev-diff .v { font-family: var(--num); font-size: 13.5px; font-weight: 500; margin-top: 2px; overflow-wrap: anywhere; }
+  .hi-bad { background: #fde3e3; color: var(--red-ink); padding: 0 2px; border-radius: 2px; }
+  .hi-good { background: #dcf3e6; color: #15803d; padding: 0 2px; border-radius: 2px; }
+  .ev-gauge { background: #fff; border-radius: 8px; padding: 9px 11px; margin-bottom: 12px; }
+  .ev-gauge .lab { font-size: 10.5px; color: var(--ink-3); }
+  .ev-gauge .track { position: relative; height: 6px; border-radius: 3px; background: #eee; margin: 8px 0 4px; }
+  .ev-gauge .track u { display: block; height: 100%; border-radius: 3px; background: var(--red); }
+  .ev-gauge .track s { position: absolute; top: -4px; width: 2px; height: 14px; background: var(--ink); }
+  .ev-gauge .sc { display: flex; justify-content: space-between; font-family: var(--num); font-size: 10px; color: var(--ink-3); }
+
+  .clist { margin-bottom: 22px; }
+  .clist .c { display: flex; align-items: center; justify-content: space-between; padding: 8px 4px; border-bottom: 1px solid var(--line-3); }
+  .clist .c .l { display: flex; align-items: center; gap: 10px; }
+  .clist .c .i { width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: #fff; }
+  .clist .c .n { font-size: 13.5px; font-weight: 500; }
+  .clist .c .r { display: flex; align-items: center; gap: 10px; }
+  .clist .c .st { font-size: 12px; font-weight: 500; }
+  .clist .c a { font-size: 12px; font-weight: 500; color: var(--blue); cursor: pointer; }
+
+  .risk .f { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--ink-2); padding: 4px 0; }
+  .risk .f b { font-family: var(--num); font-variant-numeric: tabular-nums; font-weight: 600; color: var(--ink); }
+  .trail .e { display: flex; gap: 10px; font-size: 12.5px; color: var(--ink-2); padding: 3px 0; }
+  .trail .e time { font-family: var(--num); font-variant-numeric: tabular-nums; color: var(--ink-4); flex: 0 0 34px; }
+
+  .fields > div { display: grid; grid-template-columns: 90px 1fr; gap: 10px; padding: 7px 0; border-bottom: 1px solid #f5f5ef; }
+  .fields .k { font-size: 13px; color: var(--ink-3); }
+  .fields .v { font-size: 13.5px; }
+
+  .cockbar { flex: 0 0 auto; padding: 12px 20px; border-top: 1px solid var(--line); background: var(--rail); display: flex; align-items: center; gap: 14px; }
+  .cockbar .note { font-size: 12px; color: var(--amber-ink); background: var(--amber-bg); border: 1px solid var(--amber-line); border-radius: 8px; padding: 7px 11px; display: flex; gap: 7px; min-width: 0; }
+  .cockbar .pair { display: flex; gap: 8px; margin-left: auto; flex: 0 0 auto; }
+  .cockbar .pair .btn { padding: 9px 14px; white-space: nowrap; }
+
+  .veil { position: fixed; inset: 0; background: rgba(1, 33, 105, .45); z-index: 200; display: none; align-items: center; justify-content: center; padding: 28px; }
+  .veil.on { display: flex; }
+  .modal { background: #fff; border-radius: 14px; width: min(900px, 100%); max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 64px rgba(0,0,0,.3); }
+  .modal .mh { padding: 18px 22px 14px; border-bottom: 1px solid var(--line); display: flex; align-items: flex-start; gap: 12px; }
+  .modal .mh h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+  .modal .mh p { font-size: 13px; color: var(--ink-2); margin-top: 3px; }
+  .modal .mh .x { margin-left: auto; width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--line-2); color: #8a8a85; display: grid; place-items: center; font-size: 15px; flex: 0 0 auto; }
+  .modal .mh .x:hover { background: #f3f3ee; }
+  .modal .mb { flex: 1; overflow-y: auto; padding: 18px 22px; }
+  .modal .mf { border-top: 1px solid var(--line); background: var(--rail); padding: 14px 22px; display: flex; align-items: center; gap: 14px; }
+
+  .finding { border: 1px solid var(--amber-line); background: var(--amber-bg); border-radius: 10px; padding: 12px 14px; margin-bottom: 18px; }
+  .finding b { display: block; font-size: 13.5px; color: var(--amber-ink); margin-bottom: 4px; }
+  .finding span { font-size: 13px; color: #78350f; line-height: 1.5; }
+
+  .hist { display: flex; align-items: flex-end; gap: 6px; height: 96px; margin: 6px 0 4px; }
+  .hist .b { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 5px; height: 100%; }
+  .hist .b u { width: 100%; border-radius: 5px 5px 0 0; background: var(--blue); display: block; }
+  .hist .b.empty u { background: repeating-linear-gradient(45deg, #f0f0eb, #f0f0eb 4px, #e4e4dd 4px, #e4e4dd 8px); border: 1px dashed var(--line-2); }
+  .hist .b.out u { background: #c9d4ea; }
+  .hist .b b { font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 12px; font-weight: 700; }
+  .hist .b.empty b { color: var(--amber-ink); }
+  .axis { display: flex; gap: 6px; }
+  .axis span { flex: 1; text-align: center; font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 10.5px; color: var(--ink-3); }
+  .axis span.mark { color: var(--blue); font-weight: 700; }
+
+  .thr { display: flex; align-items: center; gap: 12px; margin: 16px 0 20px; }
+  .thr label { font-size: 12.5px; color: var(--ink-2); font-weight: 500; white-space: nowrap; }
+  .thr input { flex: 1; accent-color: var(--blue); }
+  .thr output { font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 18px; font-weight: 700; min-width: 48px; }
+
+  .etab { width: 100%; border-collapse: collapse; }
+  .etab th { text-align: left; font-family: var(--num); font-size: 10px; letter-spacing: .1em; color: var(--ink-4); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: #fff; }
+  .etab td { padding: 7px 8px; border-bottom: 1px solid var(--line-3); font-size: 12.5px; vertical-align: middle; }
+  .etab tr.out td { opacity: .42; }
+  .etab .mono { font-family: var(--num); font-variant-numeric: tabular-nums; }
+  .etab .arrow { color: var(--ink-3); }
+  .etab .cov { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 4px; }
+  .etab .cov.in { background: #e7f0ff; color: var(--blue); }
+  .etab .cov.no { background: #f2f2ec; color: var(--ink-3); }
+
+  .toast { position: fixed; bottom: 24px; left: 50%; transform: translate(-50%, 0); background: var(--navy); color: #fff; padding: 11px 18px; border-radius: 10px; font-size: 13.5px; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,.22); z-index: 100; display: none; align-items: center; gap: 9px; }
+  .toast.on { display: flex; animation: toastIn .2s ease; }
+  .empty { text-align: center; color: var(--ink-3); font-size: 13px; padding: 60px 20px; }
+
+  @media (max-width: 1180px) { .shell { grid-template-columns: 1fr; height: auto; } }
+</style>
+</head>
+<body>
+<div class="shell" id="shell">
+
+  <nav class="side" aria-label="Views">
+    <div class="logo">
+      <div class="glyph">S</div>
+      <div><b>Account Opening</b><em>STANBIC IBTC · STAGING</em></div>
+    </div>
+    <!-- Role switcher. Same block as the branch desk: one workspace, two jobs.
+         target="_top" because this console is framed by /ops — without it the
+         desk would load inside the iframe. -->
+    <div class="role" id="role">
+      <button class="role-btn" id="role-btn" aria-expanded="false" aria-haspopup="menu">
+        <span class="t"><b>Operations analyst</b><em>Exception triage</em></span>
+        <span class="cv"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+      </button>
+      <div class="roles" id="roles" hidden role="menu">
+        <div class="hd">Same workspace — different job</div>
+        <a class="role-i" href="/employee-web" target="_top" role="menuitem">
+          <span class="ck"></span>
+          <span class="t"><b>Relationship Manager</b><span>Open accounts, chase your own pipeline, approve, and look after your clients.</span></span>
+        </a>
+        <a class="role-i on" href="/ops" target="_top" role="menuitem">
+          <span class="ck">✓</span>
+          <span class="t"><b>Operations analyst</b><span>Clear stuck cases across the whole bank by cause, in bulk, and write rules so they stop.</span></span>
+        </a>
+      </div>
+    </div>
+    <div class="scroll">
+      <h2>VIEWS</h2>
+      <button class="nav" data-view="attention" aria-current="true"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.2 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.2a2 2 0 0 0-3.4 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>Needs attention<span class="badge hot" id="b-att">0</span></button>
+      <button class="nav" data-view="all"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg></span>All cases<span class="badge" id="b-all">0</span></button>
+      <button class="nav" data-view="mine"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>Assigned to me<span class="badge" id="b-mine">0</span></button>
+      <button class="nav" data-view="unassigned"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4"/><line x1="17" y1="8" x2="22" y2="13"/><line x1="22" y1="8" x2="17" y2="13"/></svg></span>Unassigned<span class="badge" id="b-unass">0</span></button>
+      <h2>AUTOMATION</h2>
+      <button class="nav" data-view="rules"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg></span>Rules<span class="badge new" id="b-rules">1</span></button>
+      <h2>PIPELINE<span class="flow" id="inflight"></span></h2>
+      <div class="funnel" id="funnel"></div>
+
+      <div class="sep"></div>
+      <button class="nav" data-view="q-exc"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span>Exceptions<span class="badge hot" id="b-exc">0</span></button>
+      <button class="nav" data-view="q-bulk"><span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="M3.3 7 12 12l8.7-5"/><path d="M12 22V12"/></svg></span>Bulk failures<span class="badge hot" id="b-bulk">0</span></button>
+
+      <h2>UPSTREAM</h2>
+      <div class="up" id="upstream"></div>
+
+      <h2>TOOLS</h2>
+      <!-- The FaceID Verify Console: the system of record behind the Liveness row
+           above. A separate product with its own screens, so it opens in its own
+           tab rather than being framed inside this one. target="_blank" is enough
+           from here — unlike the role links, a new tab escapes the /ops iframe by
+           definition. rel=noopener: never hand another origin a handle to us. -->
+      <a class="nav" href="https://mea.staging.uipath.host/faceid-verify-console" target="_blank" rel="noopener noreferrer">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="11" r="2.5"/><path d="M8 16a4 4 0 0 1 8 0"/></svg></span>
+        FaceID console
+        <span class="ext" aria-label="opens in a new tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-8 8"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></span>
+      </a>
+    </div>
+    <div class="foot" id="foot">← Launcher</div>
+  </nav>
+
+  <main class="main">
+    <div class="util">
+      <div class="find"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span><input id="q" placeholder="Search all applications…" aria-label="Search all applications" /></div>
+      <div class="live"><i></i>Live</div>
+      <div class="me">OA</div>
+    </div>
+
+    <div id="triage"></div>
+    <div class="health" id="health"></div>
+
+    <div class="body" id="body"></div>
+
+    <div class="keys">
+      <span><kbd>J / K</kbd> navigate</span>
+      <span><kbd>A</kbd> accept</span>
+      <span><kbd>R</kbd> re-run</span>
+      <span><kbd>E</kbd> escalate</span>
+      <span><kbd>X</kbd> reject</span>
+      <span><kbd>Esc</kbd> close</span>
+    </div>
+  </main>
+
+  <div class="scrim" id="scrim" aria-hidden="true"></div>
+  <aside class="cock" id="cock" aria-live="polite"></aside>
+</div>
+
+<div class="veil" id="veil" role="dialog" aria-modal="true" aria-labelledby="evtitle"></div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const AVA = ["#0033A1", "#3B6FB6", "#0A2240", "#0060A9", "#0091DA", "#5A82C2", "#334E7B"];
+const CHECK_META = [
+  { key: "nin", label: "NIN verification" },
+  { key: "bvn", label: "BVN match" },
+  { key: "liveness", label: "Liveness / selfie" },
+  { key: "docs", label: "Documents" },
+  { key: "aml", label: "AML screening" },
+  { key: "dupe", label: "Duplicate check" }
+];
+const STEPS = ["Captured", "Validate", "Verified", "Created", "Active"];
+
+const CAUSES = {
+  nimc_timeout: { title: "NIMC gateway timeout", icon: "!", tone: "red",
+    detail: "stalled at the NIN check between 14:02 and 14:20. The gateway recovered at 14:31.",
+    tags: ["Infrastructure, not data"], bulk: "Retry NIN check on all" },
+  name_mismatch: { title: "NIN name mismatch", icon: "?", tone: "amber",
+    detail: "where the name on the form differs from NIMC by one or two characters.",
+    tags: ["Needs a human call"], bulk: null },
+  liveness_low: { title: "Liveness below threshold", icon: "?", tone: "amber",
+    detail: "where the selfie scored under 0.60. Both were captured after 19:00.",
+    tags: ["Poor light, likely retryable"], bulk: "Request a new selfie on all" },
+  doc_stale: { title: "Proof of address out of policy", icon: "·", tone: "gray",
+    detail: "waiting on the applicant. A chaser was sent, no reply yet.",
+    tags: ["Applicant action"], bulk: "Resend chaser to all" },
+  bulk_partial: { title: "Bulk upload partly failed", icon: "▦", tone: "red",
+    detail: "with 12 of 180 rows stuck behind the same NIMC window. The other 168 are already live.",
+    tags: ["Same gateway, same window"], bulk: null },
+  // Homes for exceptions arriving live from the shared store (see the bridge
+  // block below). Every store exception must map to a known cause or causesHTML
+  // would read an undefined title.
+  bvn_check: { title: "BVN did not verify", icon: "!", tone: "red",
+    detail: "where NIBSS returned no match on the BVN. Usually a mistyped number.",
+    tags: ["Needs a customer call"], bulk: "Retry BVN check on all" },
+  needs_review: { title: "Needs a manual review", icon: "?", tone: "amber",
+    detail: "captured on the desk and stopped for a person to look at.",
+    tags: ["From the branch desk"], bulk: null }
+};
+
+const STATE_META = {
+  exception:   { label: "Exception", dot: "#dc2626", bg: "#fdf3f3", fg: "#b91c1c" },
+  validating:  { label: "Validating", dot: "#0033A1", bg: "#eef2fa", fg: "#0033A1" },
+  validated:   { label: "Validated", dot: "#0033A1", bg: "#eef2fa", fg: "#0033A1" },
+  pending_docs:{ label: "Pending documents", dot: "#d97706", bg: "#fdf6e8", fg: "#b45309" },
+  pending_liveness: { label: "Pending liveness", dot: "#d97706", bg: "#fdf6e8", fg: "#b45309" },
+  created:     { label: "Account created", dot: "#16a34a", bg: "#f0f9f3", fg: "#15803d" },
+  activated:   { label: "Fully activated", dot: "#16a34a", bg: "#f0f9f3", fg: "#15803d" }
+};
+
+function mk(o) { return o; }
+let CASES = [
+  mk({ id: "AO-2026-000007", name: "Aisha Yusuf", cause: "name_mismatch", st: "exception", sla: -11, age: 62, asg: null, risk: 40, step: 1,
+    reason: "NIN name mismatch, one character",
+    checks: { nin: "fail", bvn: "pass", liveness: "pass", docs: "pass", aml: "pass", dupe: "pass" },
+    checkText: { nin: "Mismatch 0.94", bvn: "Verified", liveness: "0.91", docs: "3 of 3", aml: "No hits", dupe: "New" },
+    problem: { title: "NIN name mismatch", detail: "NIMC holds a different spelling. Date of birth, phone and address all match exactly.",
+      kind: "diff", left: ["Application form", "Aisha Yusu", "ff", ""], right: ["NIMC, authoritative", "Aisha Yusu", "", "f"] },
+    factors: [["Name mismatch below threshold", 25], ["Sokoto, medium risk region", 10], ["New customer, no history", 5]],
+    trail: [["14:02", "Captured from WhatsApp, 6 fields extracted"], ["14:03", "BVN verified against NIBSS, 1.2s"],
+            ["14:04", "NIMC returned a name variant, stopped for review"], ["14:04", "Queued unassigned"]],
+    fields: [["Phone", "08134567897"], ["Email", "aisha.yusuf@example.com"], ["BVN", "22212345677"], ["NIN", "10123456787"], ["Address", "7 Sultan Rd, Sokoto"], ["Tier", "Tier 3"]],
+    primary: "Accept NIMC name and continue", alt: "Keep form name", block: "Finacle create is blocked until the name is resolved." }),
+
+  mk({ id: "AO-2026-000014", name: "Halima Sani", cause: "name_mismatch", st: "exception", sla: -4, age: 52, asg: null, risk: 35, step: 1,
+    reason: "NIN name mismatch, doubled consonant",
+    checks: { nin: "fail", bvn: "pass", liveness: "pass", docs: "pass", aml: "pass", dupe: "pass" },
+    checkText: { nin: "Mismatch 0.92", bvn: "Verified", liveness: "0.88", docs: "3 of 3", aml: "No hits", dupe: "New" },
+    problem: { title: "NIN name mismatch", detail: "NIMC holds a doubled consonant. Date of birth and BVN match exactly.",
+      kind: "diff", left: ["Application form", "Halima ", "Sani", ""], right: ["NIMC, authoritative", "Halima ", "", "Sanni"] },
+    factors: [["Name mismatch below threshold", 25], ["New customer, no history", 5]],
+    trail: [["14:23", "Captured from branch tablet"], ["14:24", "BVN verified against NIBSS, 0.9s"], ["14:24", "NIMC returned a name variant, stopped for review"]],
+    fields: [["Phone", "08023341190"], ["Email", "h.sani@example.com"], ["BVN", "22298110432"], ["NIN", "10884321907"], ["Address", "14 Ahmadu Bello Way, Kaduna"], ["Tier", "Tier 3"]],
+    primary: "Accept NIMC name and continue", alt: "Keep form name", block: "Finacle create is blocked until the name is resolved." }),
+
+  mk({ id: "AO-2026-000017", name: "Chinedu Eze", cause: "name_mismatch", st: "exception", sla: 22, age: 38, asg: "Ruth", risk: 30, step: 1,
+    reason: "NIN middle name absent on the form",
+    checks: { nin: "fail", bvn: "pass", liveness: "pass", docs: "pass", aml: "pass", dupe: "pass" },
+    checkText: { nin: "Mismatch 0.93", bvn: "Verified", liveness: "0.95", docs: "3 of 3", aml: "No hits", dupe: "New" },
+    problem: { title: "NIN name mismatch", detail: "The form omits a middle name that NIMC holds. Everything else matches.",
+      kind: "diff", left: ["Application form", "Chinedu ", "", "Eze"], right: ["NIMC, authoritative", "Chinedu ", "", "Obinna Eze"] },
+    factors: [["Name mismatch below threshold", 25], ["New customer, no history", 5]],
+    trail: [["14:37", "Captured from WhatsApp, 6 fields extracted"], ["14:38", "NIMC returned a fuller name, stopped for review"]],
+    fields: [["Phone", "07066220188"], ["Email", "c.eze@example.com"], ["BVN", "22233981004"], ["NIN", "10559034112"], ["Address", "3 Awolowo Rd, Ikoyi, Lagos"], ["Tier", "Tier 3"]],
+    primary: "Accept NIMC name and continue", alt: "Keep form name", block: "Finacle create is blocked until the name is resolved." }),
+
+  mk({ id: "AO-2026-000008", name: "Blessing Okoro", cause: "liveness_low", st: "exception", sla: -96, age: 120, asg: "Ade", risk: 55, step: 1,
+    reason: "Liveness scored 0.41, below the 0.60 threshold",
+    checks: { nin: "pass", bvn: "pass", liveness: "fail", docs: "pass", aml: "pass", dupe: "pass" },
+    checkText: { nin: "Verified", bvn: "Verified", liveness: "0.41", docs: "3 of 3", aml: "No hits", dupe: "New" },
+    problem: { title: "Liveness below threshold", detail: "Captured at 19:12 in low light with heavy motion blur. Face geometry still matched the ID photo at 0.87.",
+      kind: "gauge", label: "Liveness score", value: 0.41, threshold: 0.60 },
+    factors: [["Liveness below threshold", 40], ["Captured outside branch hours", 10], ["New customer, no history", 5]],
+    trail: [["19:11", "Captured from WhatsApp, 6 fields extracted"], ["19:12", "Liveness returned 0.41, stopped for review"], ["19:12", "Assigned to Ade"]],
+    fields: [["Phone", "08099120044"], ["Email", "b.okoro@example.com"], ["BVN", "22201773456"], ["NIN", "10119923884"], ["Address", "22 Aba Rd, Port Harcourt"], ["Tier", "Tier 3"]],
+    primary: "Request a new selfie", alt: "Approve manually", block: "A manual approval here needs a supervisor sign-off." }),
+
+  mk({ id: "AO-2026-000019", name: "Tolu Adebayo", cause: "liveness_low", st: "exception", sla: -7, age: 44, asg: null, risk: 50, step: 1,
+    reason: "Liveness scored 0.53, below the 0.60 threshold",
+    checks: { nin: "pass", bvn: "pass", liveness: "fail", docs: "pass", aml: "pass", dupe: "pass" },
+    checkText: { nin: "Verified", bvn: "Verified", liveness: "0.53", docs: "3 of 3", aml: "No hits", dupe: "New" },
+    problem: { title: "Liveness below threshold", detail: "Captured at 19:48 against a bright window. Face geometry matched the ID photo at 0.90.",
+      kind: "gauge", label: "Liveness score", value: 0.53, threshold: 0.60 },
+    factors: [["Liveness below threshold", 40], ["Captured outside branch hours", 10]],
+    trail: [["19:47", "Captured from WhatsApp"], ["19:48", "Liveness returned 0.53, stopped for review"]],
+    fields: [["Phone", "08145002233"], ["Email", "t.adebayo@example.com"], ["BVN", "22245998210"], ["NIN", "10772210034"], ["Address", "5 Bode Thomas, Surulere, Lagos"], ["Tier", "Tier 3"]],
+    primary: "Request a new selfie", alt: "Approve manually", block: "A manual approval here needs a supervisor sign-off." }),
+
+  mk({ id: "AO-2026-000005", name: "Fatima Bello", cause: "doc_stale", st: "pending_docs", sla: 1440, age: 300, asg: "Ruth", risk: 20, step: 1,
+    reason: "Utility bill dated 112 days ago",
+    checks: { nin: "pass", bvn: "pass", liveness: "pass", docs: "fail", aml: "pass", dupe: "pass" },
+    checkText: { nin: "Verified", bvn: "Verified", liveness: "0.93", docs: "2 of 3", aml: "No hits", dupe: "New" },
+    problem: { title: "Proof of address out of policy", detail: "Bill issued 25 March 2026, 112 days old. Policy allows 90. A chaser went out 3h ago with no reply.", kind: "none" },
+    factors: [["Stale proof of address", 15], ["New customer, no history", 5]],
+    trail: [["09:41", "Captured from branch tablet"], ["09:42", "Document classifier flagged the bill date"], ["09:42", "Chaser sent to 0803 555 0142"]],
+    fields: [["Phone", "08035550142"], ["Email", "f.bello@example.com"], ["BVN", "22219087723"], ["NIN", "10334881290"], ["Address", "9 Ibrahim Taiwo Rd, Ilorin"], ["Tier", "Tier 3"]],
+    primary: "Resend chaser", alt: "Accept anyway", block: "Accepting an out-of-policy document is logged against your user." }),
+
+  mk({ id: "AO-2026-000021", name: "Sadiq Bala", cause: "doc_stale", st: "pending_docs", sla: 780, age: 180, asg: "Ruth", risk: 20, step: 1,
+    reason: "Utility bill dated 96 days ago",
+    checks: { nin: "pass", bvn: "pass", liveness: "pass", docs: "fail", aml: "pass", dupe: "pass" },
+    checkText: { nin: "Verified", bvn: "Verified", liveness: "0.90", docs: "2 of 3", aml: "No hits", dupe: "New" },
+    problem: { title: "Proof of address out of policy", detail: "Bill issued 10 April 2026, 96 days old. Six days outside the 90 day window.", kind: "none" },
+    factors: [["Stale proof of address", 15], ["New customer, no history", 5]],
+    trail: [["11:20", "Captured from WhatsApp"], ["11:21", "Document classifier flagged the bill date"]],
+    fields: [["Phone", "09022118876"], ["Email", "s.bala@example.com"], ["BVN", "22267341009"], ["NIN", "10998112230"], ["Address", "18 Yakubu Gowon Way, Jos"], ["Tier", "Tier 3"]],
+    primary: "Resend chaser", alt: "Accept anyway", block: "Accepting an out-of-policy document is logged against your user." })
+];
+
+["Yusuf Ibrahim", "Grace Adeyinka", "Musa Danjuma", "Peace Eze", "Ifeanyi Obi", "Zainab Lawal"].forEach(function (n, i) {
+  const at = ["14:02", "14:05", "14:09", "14:12", "14:16", "14:20"][i];
+  CASES.push(mk({
+    id: "AO-2026-0000" + (30 + i), name: n, cause: "nimc_timeout", st: "exception",
+    sla: [-42, -31, -18, 9, 26, 51][i], age: [61, 58, 55, 47, 39, 31][i], asg: null, risk: 15, step: 1,
+    reason: "NIN check timed out, the gateway did not answer",
+    checks: { nin: "fail", bvn: "pass", liveness: "pass", docs: "pass", aml: "pass", dupe: "pass" },
+    checkText: { nin: "Timeout", bvn: "Verified", liveness: "0.90", docs: "3 of 3", aml: "No hits", dupe: "New" },
+    problem: { title: "The gateway failed, the applicant did not", detail: "NIMC returned HTTP 504 after 30s at " + at + ". Six cases hit the same window. The gateway has been healthy since 14:31, so a retry should clear this.", kind: "none" },
+    factors: [["Upstream check incomplete", 15]],
+    trail: [["—", "Captured, BVN verified against NIBSS"], [at, "NIN check attempted, gateway returned 504"], ["14:31", "Gateway healthy again"]],
+    fields: [["Phone", "080" + (10000000 + i * 137711)], ["Email", n.split(" ")[0].toLowerCase() + "@example.com"], ["BVN", "2221" + (1000000 + i * 91733)], ["NIN", "1011" + (1000000 + i * 55219)], ["Address", "Lagos, Nigeria"], ["Tier", "Tier 3"]],
+    primary: "Retry the NIN check", alt: "Escalate to ops", block: "The applicant has done nothing wrong here."
+  }));
+});
+
+CASES.push(mk({
+  id: "AO-2026-BULK-004", kind: "BULK", name: "Ashaka Cement payroll", cause: "bulk_partial",
+  st: "exception", sla: -58, age: 95, asg: null, risk: 25, step: 1,
+  reason: "12 of 180 rows failed, all at the NIN check",
+  checks: { nin: "fail", bvn: "pass", liveness: "pass", docs: "pass", aml: "pass", dupe: "fail" },
+  checkText: { nin: "12 failed", bvn: "180 verified", liveness: "180 passed", docs: "180 complete", aml: "No hits", dupe: "3 existing" },
+  problem: { title: "12 of 180 rows failed at the same step", kind: "none",
+    detail: "All twelve hit the NIMC gateway between 14:02 and 14:20, the same window that stalled the single cases. 168 rows went through and those accounts are live. The gateway recovered at 14:31, so a retry on the twelve should clear them." },
+  factors: [["Upstream check incomplete", 15], ["3 rows match existing customers", 10]],
+  trail: [["13:58", "File received from the corporate portal, 180 rows"], ["14:00", "BVN verified for all 180 against NIBSS"],
+          ["14:02", "NIN checks began, 12 returned HTTP 504"], ["14:31", "Gateway healthy again"]],
+  fields: [["File", "ashaka_payroll_jul.csv"], ["Uploaded by", "Corporate onboarding"], ["Rows", "180"],
+           ["Succeeded", "168"], ["Failed", "12"], ["Duplicates", "3"]],
+  primary: "Retry the 12 failed rows", alt: "Download the failures",
+  block: "168 accounts are already live. Only the 12 failed rows are affected."
+}));
+
+let DONE = [
+  { id: "AO-2026-000001", name: "Amara Okafor", st: "activated", sla: null, age: 2880, asg: "Ruth", risk: 12, step: 4 },
+  { id: "AO-2026-000002", name: "Tunde Adeyemi", st: "created", sla: null, age: 180, asg: "Ruth", risk: 18, step: 3 },
+  { id: "AO-2026-000003", name: "Ngozi Eze", st: "validated", sla: -43, age: 57, asg: "Ruth", risk: 22, step: 2 },
+  { id: "AO-2026-000004", name: "Chidi Balogun", st: "pending_liveness", sla: 1440, age: 60, asg: "Ruth", risk: 15, step: 1 },
+  { id: "AO-2026-000006", name: "Emeka Nwosu", st: "validating", sla: -10, age: 39, asg: "Ruth", risk: 19, step: 1 }
+].map(function (d) {
+  return Object.assign({ cause: null, reason: STATE_META[d.st].label, checks: { nin: "pass", bvn: "pass", liveness: "pass", docs: "pass", aml: "pass", dupe: "pass" },
+    checkText: { nin: "Verified", bvn: "Verified", liveness: "0.9", docs: "3 of 3", aml: "No hits", dupe: "New" },
+    problem: null, factors: [["Clean run", 0]], trail: [["—", "Processed end to end with no human touch"]],
+    fields: [["Phone", "08000000000"], ["Email", "—"], ["BVN", "—"], ["NIN", "—"], ["Address", "—"], ["Tier", "Tier 3"]],
+    primary: "Open in Finacle", alt: "View audit", block: null }, d);
+});
+
+let RULES = [
+  { id: "r1", live: true, name: "Accept NIMC name when match is 0.95 or better and date of birth agrees",
+    cond: "nin.nameMatch >= 0.95 AND applicant.dob == nimc.dob → accept nimc.name",
+    since: "12 May 2026", deflected: 284, hours: 71 },
+  { id: "r2", live: true, name: "Retry the NIN check automatically on a gateway 5xx",
+    cond: "nin.error.status >= 500 → retry up to 3 times, 60s apart",
+    since: "2 June 2026", deflected: 1102, hours: 18 }
+];
+
+let PROMO = {
+  id: "p1", shown: true, threshold: 0.91,
+  headline: "Ruth has accepted the NIMC spelling on every name mismatch that reached her. Forty-seven times out of forty-seven.",
+  body: "Six weeks, no reversal, no complaint. The live rule stops at 0.95, so all forty-seven of these landed on a person and were waved through by hand. That is a policy nobody has written down yet.",
+  stats: [["47 / 47", "accepted, six weeks"], ["4 / day", "would stop arriving"], ["~62h", "returned a year"]]
+};
+
+const EVIDENCE = (function () {
+  let s = 4712;
+  const rnd = function () { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff; };
+  const first = ["Aisha", "Chinedu", "Halima", "Emeka", "Ngozi", "Musa", "Grace", "Tunde", "Zainab", "Ifeanyi", "Folake", "Sadiq", "Amara", "Yusuf", "Peace", "Bola", "Idris", "Chiamaka"];
+  const last = [["Yusuf", "Yusuff"], ["Sani", "Sanni"], ["Bello", "Bellow"], ["Okoro", "Okorow"], ["Eze", "Ezeh"], ["Adeyinka", "Adeyika"], ["Danjuma", "Danjumah"], ["Lawal", "Lawwal"], ["Obi", "Obhi"], ["Balogun", "Balogon"], ["Adebayo", "Adebayoh"], ["Nwosu", "Nwoso"], ["Okafor", "Okaffor"], ["Ibrahim", "Ibrahaim"]];
+  const who = ["Ruth", "Ruth", "Ruth", "Ruth", "Ade"];
+  const out = [];
+  for (let i = 0; i < 47; i++) {
+    const ln = last[Math.floor(rnd() * last.length)];
+    const flip = rnd() > 0.5;
+    const day = 12 + Math.floor(rnd() * 63);
+    const mth = day > 31 ? (day > 61 ? "Jul" : "Jun") : "May";
+    const dd = day > 61 ? day - 61 : day > 31 ? day - 31 : day;
+    out.push({
+      i: i + 1,
+      date: dd + " " + mth,
+      when: day,
+      name: first[Math.floor(rnd() * first.length)],
+      form: flip ? ln[1] : ln[0],
+      nimc: flip ? ln[0] : ln[1],
+      match: Math.round((0.91 + rnd() * 0.039) * 1000) / 1000,
+      by: who[Math.floor(rnd() * who.length)],
+      reversed: false
+    });
+  }
+  return out.sort(function (a, b) { return a.match - b.match; });
+})();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Bridge to the shared OnboardingStore.
+//
+// The desk and the customer app persist cases to localStorage["aof_cases"]; this
+// console runs in a same-origin iframe over the SAME localStorage. So a case an
+// RM captures — or one that fails validation — appears here live, and resolving
+// it here writes back so the RM's case moves. No server, no API: the origin's
+// localStorage IS the shared store, and the `storage` event propagates changes
+// between the two documents.
+//
+// The console keeps its own rich seeded cases (they power the cockpit and the
+// 47-decision explorer); store cases are merged ON TOP, and win on id collisions.
+// ─────────────────────────────────────────────────────────────────────────────
+const STORE_KEY = "aof_cases";
+const EVENTS_KEY = "aof_events";
+
+// Snapshot the hand-authored seed so a resolve never permanently loses a seeded
+// case we then can't re-derive. Store cases are tagged src:"store" and re-merged
+// from scratch on every sync.
+const SEED_CASES = CASES.slice();
+const SEED_DONE = DONE.slice();
+const resolvedSeedIds = new Set();   // seeded ids the analyst has cleared
+
+function readStore() {
+  try { return JSON.parse(localStorage.getItem(STORE_KEY) || "[]"); } catch (e) { return []; }
+}
+function writeStore(cases, events) {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(cases));
+    if (events) localStorage.setItem(EVENTS_KEY, JSON.stringify(events.slice(0, 300)));
+  } catch (e) { /* quota / unavailable */ }
+}
+
+// UPPER_SNAKE lifecycle → this console's lowercase states.
+const ST_MAP = {
+  PRE_REGISTERED: "validating", VALIDATION_IN_PROGRESS: "validating", VALIDATED: "validated",
+  ACCOUNT_CREATED: "created", PENDING_DOCUMENTS: "pending_docs", PENDING_LIVENESS: "pending_liveness",
+  FULLY_ACTIVATED: "activated", EXCEPTION: "exception"
+};
+const STEP_MAP = { validating: 1, validated: 2, created: 3, activated: 4, pending_docs: 1, pending_liveness: 1, exception: 1 };
+
+function vstat(c, kind) { const v = (c.validations || []).find(function (x) { return x.kind === kind; }); return v ? v.status : "pending"; }
+function toCheck(s) { return s === "passed" ? "pass" : (s === "failed" || s === "timeout") ? "fail" : "pending"; }
+function checkText(s) { return s === "passed" ? "Verified" : s === "timeout" ? "Timeout" : s === "failed" ? "No match" : s === "running" ? "Running" : s === "retrying" ? "Retrying" : "Pending"; }
+
+// Which cause card does this exception belong under?
+function deriveCause(c) {
+  const nin = vstat(c, "NIN"), bvn = vstat(c, "BVN"), live = vstat(c, "LIVENESS");
+  if (nin === "timeout") return "nimc_timeout";
+  if (nin === "failed") return "name_mismatch";
+  if (bvn === "failed" || bvn === "timeout") return "bvn_check";
+  if (live === "failed" || live === "timeout") return "liveness_low";
+  if (c.state === "PENDING_DOCUMENTS") return "doc_stale";
+  return "needs_review";
+}
+
+// A store case → this console's case shape. Rich fields are derived best-effort;
+// the timeline is real (the store records every event), so the agent trail is true.
+function mapStoreCase(c) {
+  const st = ST_MAP[c.state] || "validating";
+  const cause = st === "exception" ? deriveCause(c) : null;
+  const failed = (c.validations || []).filter(function (v) { return v.status === "failed" || v.status === "timeout"; });
+  const ageMin = Math.max(0, Math.round((Date.now() - new Date(c.createdAt).getTime()) / 60000));
+  const trail = (c.timeline || []).slice().reverse().map(function (e) {
+    const t = new Date(e.at); const hh = String(t.getHours()).padStart(2, "0"), mm = String(t.getMinutes()).padStart(2, "0");
+    return [hh + ":" + mm, e.message];
+  });
+  const reason = cause === "nimc_timeout" ? "NIN check timed out at the gateway"
+    : cause === "name_mismatch" ? "NIN did not match NIMC"
+    : cause === "bvn_check" ? "BVN did not verify with NIBSS"
+    : cause === "liveness_low" ? "Liveness below threshold"
+    : cause === "doc_stale" ? "Proof of address outstanding"
+    : cause ? "Captured on the desk, needs review" : (STATE_META[st] ? STATE_META[st].label : st);
+  return {
+    src: "store", id: c.id, name: ((c.firstName || "") + " " + (c.lastName || "")).trim() || "Unnamed applicant",
+    cause: cause, st: st, sla: st === "exception" ? -(ageMin) : (st === "validating" ? 30 - ageMin : 1440),
+    age: ageMin, asg: c.source === "rm" ? null : null, risk: st === "exception" ? 35 : 15, step: STEP_MAP[st] || 1,
+    reason: reason,
+    checks: { nin: toCheck(vstat(c, "NIN")), bvn: toCheck(vstat(c, "BVN")), liveness: toCheck(vstat(c, "LIVENESS")),
+      docs: c.state === "PENDING_DOCUMENTS" ? "fail" : "pass", aml: toCheck(vstat(c, "AML")),
+      dupe: (c.duplicate === "existing" || c.duplicate === "potential-duplicate") ? "fail" : "pass" },
+    checkText: { nin: checkText(vstat(c, "NIN")), bvn: checkText(vstat(c, "BVN")), liveness: checkText(vstat(c, "LIVENESS")),
+      docs: c.state === "PENDING_DOCUMENTS" ? "Outstanding" : "Complete", aml: checkText(vstat(c, "AML")),
+      dupe: c.duplicate === "existing" ? "Existing" : c.duplicate === "potential-duplicate" ? "Possible" : "New" },
+    problem: cause ? { title: (CAUSES[cause] ? CAUSES[cause].title : "Needs review"), kind: "none",
+      detail: "Captured on the branch desk" + (failed.length ? " · " + failed.map(function (v) { return v.kind; }).join(", ") + " did not pass" : "") + ". Live from the shared store." } : null,
+    factors: [[reason, st === "exception" ? 25 : 5]],
+    trail: trail.length ? trail : [["—", "Captured on the branch desk"]],
+    fields: [["Phone", c.phone || "—"], ["Email", c.email || "—"], ["BVN", c.bvn || "—"], ["NIN", c.nin || "—"], ["Address", c.address || "—"], ["Source", c.source || "—"]],
+    primary: cause === "bvn_check" ? "Retry the BVN check" : cause === "nimc_timeout" ? "Retry the NIN check" : cause === "liveness_low" ? "Request a new selfie" : "Accept and continue",
+    alt: "Escalate to a supervisor",
+    block: "Resolving here writes back to the customer's application.",
+    _account: c.accountNumber || null, _cif: c.cif || null
+  };
+}
+
+// Rebuild CASES/DONE = (seed, minus resolved & minus store-collisions) ∪ (store).
+function syncFromStore() {
+  const store = readStore();
+  const storeIds = new Set(store.map(function (c) { return c.id; }));
+  const liveCases = [], liveDone = [];
+  store.forEach(function (c) {
+    const m = mapStoreCase(c);
+    if (m.st === "exception") liveCases.push(m); else liveDone.push(m);
+  });
+  // Seeded cases the store doesn't own and the analyst hasn't cleared.
+  const seededCases = SEED_CASES.filter(function (c) { return !storeIds.has(c.id) && !resolvedSeedIds.has(c.id); });
+  const seededDone = SEED_DONE.filter(function (c) { return !storeIds.has(c.id); });
+  CASES = liveCases.concat(seededCases);
+  DONE = liveDone.concat(seededDone);
+}
+
+// Write a resolution back to the shared store: clear the failed checks and move
+// the case forward, so the desk and the customer see it advance. Mirrors what the
+// validation robots would do on a successful retry.
+function resolveStoreCase(id, action) {
+  const cases = readStore();
+  const c = cases.find(function (x) { return x.id === id; });
+  if (!c) return false;
+  const now = new Date().toISOString();
+  (c.validations || []).forEach(function (v) { if (v.status === "failed" || v.status === "timeout") { v.status = "passed"; v.attempts = (v.attempts || 0) + 1; v.updatedAt = now; v.detail = "Cleared in Operations"; } });
+  // All mandatory checks pass now → the account can be created.
+  c.cif = c.cif || ("1" + String(Math.floor(new Date(c.createdAt).getTime() / 1000)).slice(-8));
+  c.accountNumber = c.accountNumber || ("00" + String(9000000000 + (parseInt(String(c.id).replace(/\D/g, ""), 10) || 0)).slice(-8));
+  c.state = "ACCOUNT_CREATED";
+  c.updatedAt = now;
+  const ev = { id: "ev-ops-" + Math.floor(new Date(now).getTime()).toString(36), caseId: c.id, topic: "account-created",
+    message: "Resolved in Operations (" + action + ") — checks cleared, Finacle account created", at: now };
+  c.timeline = [ev].concat(c.timeline || []);
+  const events = (function () { try { return JSON.parse(localStorage.getItem(EVENTS_KEY) || "[]"); } catch (e) { return []; } })();
+  events.unshift(ev);
+  writeStore(cases, events);   // fires `storage` in the parent SPA → desk refreshes
+  return true;
+}
+
+let view = "attention";
+let sort = "urgency";
+let selected = null;
+let panelOpen = false;
+const el = function (id) { return document.getElementById(id); };
+const esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]; }); };
+function initials(n) { return n.split(" ").map(function (p) { return p[0]; }).join("").slice(0, 2); }
+function avaColor(n) { var s = 0; for (var i = 0; i < n.length; i++) s += n.charCodeAt(i) * (i + 3); return AVA[s % AVA.length]; }
+function slaText(m) {
+  if (m === null) return "—";
+  const a = Math.abs(m);
+  const s = a < 60 ? a + "m" : a >= 1440 ? Math.round(a / 1440) + "d" : Math.floor(a / 60) + "h " + (a % 60) + "m";
+  return m < 0 ? s + " over" : s + " left";
+}
+function slaColor(m) { return m === null ? "#a0a09a" : m < 0 ? "#dc2626" : m <= 60 ? "#d97706" : "#6f6f69"; }
+function slaFill(m) { return m === null ? 0 : m < 0 ? 100 : Math.max(5, Math.min(100, 100 - (m / 1440) * 100)); }
+function checkColor(v) { return v === "pass" ? "#16a34a" : v === "fail" ? "#dc2626" : v === "pending" ? "#d97706" : "#c4c4bd"; }
+
+function pool() {
+  if (view === "all") return CASES.concat(DONE);
+  if (view === "mine") return CASES.concat(DONE).filter(function (x) { return x.asg === "Ruth"; });
+  if (view === "unassigned") return CASES.concat(DONE).filter(function (x) { return !x.asg; });
+  if (view === "q-nin") return CASES.filter(function (x) { return x.checks.nin !== "pass"; });
+  if (view === "q-bvn") return CASES.filter(function (x) { return x.checks.bvn !== "pass"; });
+  if (view === "q-live") return CASES.filter(function (x) { return x.checks.liveness !== "pass"; }).concat(DONE.filter(function (x) { return x.st === "pending_liveness"; }));
+  if (view === "q-docs") return CASES.filter(function (x) { return x.checks.docs !== "pass"; });
+  if (view === "q-fin") return CASES.concat(DONE).filter(function (x) { return x.st === "validated"; });
+  if (view === "q-exc") return CASES.filter(function (x) { return x.st === "exception"; });
+  if (view === "q-bulk") return CASES.filter(function (x) { return x.kind === "BULK"; });
+  return CASES;
+}
+function list() {
+  const q = el("q").value.trim().toLowerCase();
+  let L = pool();
+  if (q) L = L.filter(function (x) { return (x.name + " " + x.id + " " + x.reason).toLowerCase().indexOf(q) > -1; });
+  const by = {
+    urgency: function (a, b) { return (a.sla === null ? 99999 : a.sla) - (b.sla === null ? 99999 : b.sla); },
+    risk: function (a, b) { return b.risk - a.risk; },
+    age: function (a, b) { return b.age - a.age; },
+    name: function (a, b) { return a.name.localeCompare(b.name); }
+  };
+  return L.slice().sort(by[sort]);
+}
+
+/* The pipeline stages, in the order work flows through them. Each one is still a
+   view — the funnel is the queue list, drawn so you can see where work pools. */
+const STAGES = [
+  { k: "NIN", v: "q-nin" }, { k: "BVN", v: "q-bvn" }, { k: "Liveness", v: "q-live" },
+  { k: "Documents", v: "q-docs" }, { k: "Finacle", v: "q-fin" }
+];
+
+function countFor(v) { const keep = view; view = v; const n = pool().length; view = keep; return n; }
+function fmtAge(m) { return m >= 1440 ? Math.round(m / 1440) + "d" : m >= 60 ? Math.round(m / 60) + "h" : m + "m"; }
+
+/* Upstream health is derived, never typed in. NIMC's recovery time is read out of
+   the agent trail; NIBSS is judged by whether any BVN check failed; Finacle by
+   whether it has actually created an account recently. */
+function upstream() {
+  const trails = CASES.concat(DONE).reduce(function (a, c) { return a.concat(c.trail || []); }, []);
+  const recovery = trails.filter(function (t) { return /healthy again/i.test(t[1]); })[0];
+  const ninDown = CASES.some(function (c) { return c.checkText && /timeout/i.test(c.checkText.nin); });
+  const bvnBad = CASES.some(function (c) { return c.checks.bvn !== "pass"; });
+  const created = DONE.filter(function (c) { return c.step >= 3; }).sort(function (a, b) { return a.age - b.age; })[0];
+  return [
+    { n: "NIMC", tone: ninDown ? "#f0b429" : "#3fbf7f", s: ninDown && recovery ? "recovered " + recovery[0] : ninDown ? "degraded" : "healthy" },
+    { n: "NIBSS", tone: bvnBad ? "#dc2626" : "#3fbf7f", s: bvnBad ? "degraded" : "healthy" },
+    { n: "Liveness", tone: "#3fbf7f", s: "healthy" },
+    { n: "Finacle", tone: created ? "#3fbf7f" : "#5f7ab5", s: created ? "last create " + fmtAge(created.age) : "no calls yet" }
+  ];
+}
+
+function renderCounts() {
+  el("b-att").textContent = CASES.length;
+  el("b-all").textContent = CASES.length + DONE.length;
+  el("b-mine").textContent = CASES.concat(DONE).filter(function (x) { return x.asg === "Ruth"; }).length;
+  el("b-rules").textContent = PROMO.shown ? 1 : 0;
+  el("b-rules").style.display = PROMO.shown ? "" : "none";
+  el("b-unass").textContent = countFor("unassigned");
+  el("b-exc").textContent = countFor("q-exc");
+  el("b-bulk").textContent = countFor("q-bulk");
+
+  const vols = STAGES.map(function (s) { return countFor(s.v); });
+  const peak = Math.max.apply(null, vols) || 1;
+  const total = CASES.length;
+  el("inflight").textContent = total + " in flight";
+
+  /* "hot" marks the stage that is both the biggest and holding a real share of
+     the pipeline — the place work is actually pooling, not just the max of five
+     small numbers. */
+  el("funnel").innerHTML = STAGES.map(function (s, i) {
+    const n = vols[i];
+    const share = total ? n / total : 0;
+    const pooling = n === peak && n > 0 && share >= 0.4;
+    const cls = "nav stage" + (pooling ? " hot" : "") + (n === 0 ? " zero" : "");
+    const fill = n ? Math.max(6, Math.round((n / peak) * 100)) : 0;
+    /* Read the current stage off `view` rather than leaving it to the click
+       handler: this markup is rebuilt on every render, so an attribute set on the
+       clicked node would be wiped the moment the counts refresh. */
+    return '<button class="' + cls + '" data-view="' + s.v + '" aria-current="' + (view === s.v) + '" aria-label="' + s.k + ", " + n + ' waiting">' +
+      '<span class="d"' + (pooling ? ' style="background:#dc2626"' : n ? ' style="background:#93a9d8"' : "") + "></span>" +
+      '<span class="t">' + s.k + "</span>" +
+      '<span class="v">' + (n ? '<i style="width:' + fill + "%" + (pooling ? ";background:#dc2626" : "") + '"></i>' : "") + "</span>" +
+      '<span class="c">' + n + "</span></button>";
+  }).join("");
+
+  el("upstream").innerHTML = upstream().map(function (u) {
+    return '<div><i style="background:' + u.tone + '"></i><b>' + u.n + "</b><em>" + u.s + "</em></div>";
+  }).join("");
+}
+
+function renderTriage() {
+  const worst = CASES.slice().sort(function (a, b) { return a.sla - b.sla; })[0];
+  const over = CASES.filter(function (x) { return x.sla < 0; }).length;
+  if (!worst || over === 0) {
+    el("triage").innerHTML = '<div class="triage green"><div class="tin"><div style="display:flex;align-items:center;gap:14px">' +
+      '<span class="pip">✓</span><div><div class="hl">Nothing is breaching</div>' +
+      '<div class="sb">' + CASES.length + " open, all inside SLA. Good time to look at the rule below.</div></div></div>" +
+      '<button class="go" data-goto="rules">Review automation →</button></div></div>';
+    return;
+  }
+  const biggest = Object.entries(CASES.reduce(function (a, x) { a[x.cause] = (a[x.cause] || 0) + 1; return a; }, {}))
+    .sort(function (a, b) { return b[1] - a[1]; })[0];
+  el("triage").innerHTML = '<div class="triage red"><div class="tin"><div style="display:flex;align-items:center;gap:14px">' +
+    '<span class="pip">▲</span><div><div class="hl">' + over + " case" + (over > 1 ? "s are" : " is") + " past SLA, worst is " + slaText(worst.sla) + '</div>' +
+    '<div class="sb">' + biggest[1] + " of them share one cause: " + esc(CAUSES[biggest[0]].title.toLowerCase()) + ". Clear the cause, not the cases.</div></div></div>" +
+    '<button class="go" data-open="' + worst.id + '">Open ' + esc(worst.name.split(" ")[0]) + " →</button></div></div>";
+}
+
+function renderHealth() {
+  const total = CASES.length + DONE.length;
+  const stp = Math.round((DONE.filter(function (d) { return d.step >= 3; }).length / total) * 100);
+  const breach = CASES.filter(function (x) { return x.sla !== null && x.sla < 0; }).length;
+  const unass = CASES.filter(function (x) { return !x.asg; }).length;
+  const stats = [
+    ["#16a34a", "Straight-through", stp + "%", "target 80", stp >= 80 ? "#16a34a" : "#dc2626"],
+    ["#dc2626", "Past SLA", String(breach), "of " + CASES.length + " open", breach ? "#dc2626" : "#17171a"],
+    ["#d97706", "Unassigned", String(unass), "waiting", unass ? "#d97706" : "#17171a"],
+    ["#0091DA", "Hours returned, week", "412", "+38", "#17171a"]
+  ];
+  el("health").innerHTML = stats.map(function (s) {
+    return '<div class="stat"><div class="k"><i style="background:' + s[0] + '"></i>' + s[1] + "</div>" +
+      '<div class="v"><b style="color:' + s[4] + '">' + s[2] + "</b><s>" + s[3] + "</s></div></div>";
+  }).join("");
+}
+
+function openMatches(t) {
+  return CASES.filter(function (c) { return c.cause === "name_mismatch" && c.problem && c.checkText &&
+    parseFloat(String(c.checkText.nin).replace(/[^0-9.]/g, "")) >= t; });
+}
+function condText(t) { return "nin.nameMatch >= " + t.toFixed(2) + " AND applicant.dob == nimc.dob → accept nimc.name"; }
+
+function renderEvidence() {
+  const t = PROMO.threshold;
+  const covered = EVIDENCE.filter(function (e) { return e.match >= t; }).length;
+  const lowest = EVIDENCE[0].match;
+  const lowestBand = Math.floor(lowest * 100) / 100;
+  const openNow = openMatches(t).length;
+  const openTotal = CASES.filter(function (c) { return c.cause === "name_mismatch"; }).length;
+
+  const bins = [0.90, 0.91, 0.92, 0.93, 0.94].map(function (b) {
+    return { b: b, n: EVIDENCE.filter(function (e) { return e.match >= b && e.match < b + 0.01; }).length };
+  });
+  const peak = Math.max.apply(null, bins.map(function (x) { return x.n; })) || 1;
+  const hist = '<div class="hist">' + bins.map(function (x) {
+    const cls = x.n === 0 ? " empty" : x.b < t ? " out" : "";
+    const h = x.n === 0 ? 10 : Math.max(8, Math.round((x.n / peak) * 78));
+    return '<div class="b' + cls + '"><b>' + x.n + '</b><u style="height:' + h + 'px"></u></div>';
+  }).join("") + "</div>" +
+  '<div class="axis">' + bins.map(function (x) {
+    return '<span class="' + (Math.abs(x.b - t) < 0.005 ? "mark" : "") + '">' + x.b.toFixed(2) + (Math.abs(x.b - t) < 0.005 ? " ▲" : "") + "</span>";
+  }).join("") + "</div>";
+
+  const finding = t < lowestBand ?
+    '<div class="finding"><b>The evidence does not reach this far down</b><span>The weakest match anyone has ever accepted is ' +
+    lowest.toFixed(3) + ". Nothing has ever been decided in the " + t.toFixed(2) + " to " + lowestBand.toFixed(2) +
+    " band, so a rule set here would automate cases no reviewer has actually seen, on the assumption they would have said yes. Set it at " +
+    lowestBand.toFixed(2) + " and the rule stands on " + covered + " real decisions instead. It still clears all " + openTotal +
+    " cases open right now, so the caution costs nothing today.</span></div>"
+    : '<div class="finding" style="border-color:#cfe9d9;background:#f0f9f3"><b style="color:#15803d">Every case this rule would touch has a precedent</b><span style="color:#166534">' +
+      covered + " of 47 accepted decisions sit at or above " + t.toFixed(2) + ", and the weakest ever accepted was " + lowest.toFixed(3) +
+      ". The rule automates nothing a reviewer has not already done by hand, repeatedly, without a single reversal." +
+      (covered < 47 ? " The " + (47 - covered) + " weaker ones keep coming to a person." : "") + "</span></div>";
+
+  const rows = EVIDENCE.map(function (e) {
+    const inn = e.match >= t;
+    return '<tr class="' + (inn ? "" : "out") + '"><td class="mono" style="color:#a4a49e">' + e.i + "</td>" +
+      '<td class="mono">' + e.date + "</td><td>" + esc(e.name) + "</td>" +
+      "<td>" + esc(e.form) + ' <span class="arrow">→</span> <b>' + esc(e.nimc) + "</b></td>" +
+      '<td class="mono"><b>' + e.match.toFixed(3) + "</b></td>" +
+      "<td>" + e.by + "</td><td>Accepted NIMC</td>" +
+      '<td><span class="cov ' + (inn ? "in" : "no") + '">' + (inn ? "COVERED" : "still manual") + "</span></td></tr>";
+  }).join("");
+
+  el("veil").innerHTML = '<div class="modal">' +
+    '<div class="mh"><div><h2 id="evtitle">Every name mismatch decision, 12 May to 14 July</h2>' +
+    "<p>47 decisions, 47 accepted the NIMC spelling, 0 reversed. Sorted by match score, weakest first.</p></div>" +
+    '<button class="x" data-ev-close="1" aria-label="Close">✕</button></div>' +
+    '<div class="mb">' + finding +
+    '<h2 class="eyebrow" style="margin-top:0">WHERE THE 47 DECISIONS SIT</h2>' + hist +
+    '<div class="thr"><label for="thr">Rule threshold</label>' +
+    '<input type="range" id="thr" min="0.90" max="0.95" step="0.01" value="' + t.toFixed(2) + '" />' +
+    "<output>" + t.toFixed(2) + "</output></div>" +
+    '<p style="font-size:12.5px;color:#6f6f69;margin:-8px 0 18px">Covers <b>' + covered + " of 47</b> past decisions and <b>" +
+    openNow + " of " + openTotal + "</b> open cases. Condition: <span class='mono' style='background:#f6f6f3;border:1px solid #e6e6e0;border-radius:5px;padding:2px 6px'>" + condText(t) + "</span></p>" +
+    '<table class="etab"><thead><tr><th>#</th><th>DATE</th><th>APPLICANT</th><th>FORM → NIMC</th><th>MATCH</th><th>BY</th><th>DECISION</th><th>UNDER RULE</th></tr></thead><tbody>' +
+    rows + "</tbody></table></div>" +
+    '<div class="mf"><button class="btn pri" data-ev-promote="1">Promote at ' + t.toFixed(2) + "</button>" +
+    '<button class="btn" data-ev-close="1">Close</button>' +
+    '<span style="margin-left:auto;font-size:12px;color:#9a9a94">A single reversal pauses the rule and routes the cases back.</span></div></div>';
+
+  const slider = el("thr");
+  if (slider) slider.addEventListener("input", function (e) {
+    PROMO.threshold = parseFloat(e.target.value);
+    renderEvidence();
+    const s2 = el("thr"); if (s2) s2.focus();
+  });
+}
+function openEvidence() { el("veil").classList.add("on"); renderEvidence(); }
+function closeEvidence() { el("veil").classList.remove("on"); el("veil").innerHTML = ""; }
+
+function promote() {
+  const t = PROMO.threshold;
+  RULES.unshift({ id: "r3", live: true,
+    name: "Accept the NIMC name when the match is " + t.toFixed(2) + " or better and the date of birth agrees",
+    cond: condText(t), since: "today", deflected: 0, hours: 0 });
+  PROMO.shown = false;
+  closeEvidence();
+  const ids = openMatches(t).map(function (c) { return c.id; });
+  resolve(ids, "Rule live at " + t.toFixed(2) + ". " + ids.length + " open cases cleared, about 4 a day stop arriving.");
+}
+
+function promoHTML() {
+  if (!PROMO.shown) return "";
+  return '<section class="promo"><div class="promo-in">' +
+    '<div><div class="kicker">PATTERN FOUND</div>' +
+    "<h3>" + esc(PROMO.headline) + "</h3>" +
+    "<p>" + esc(PROMO.body) + "</p></div>" +
+    '<div><div class="ev">' + PROMO.stats.map(function (s) { return "<div><b>" + s[0] + "</b><span>" + s[1] + "</span></div>"; }).join("") + "</div>" +
+    '<div class="cta"><button class="btn-sky" data-promo-see="1">Review the 47 decisions</button>' +
+    '<button class="btn-line" data-promo-no="1">Not yet</button></div></div>' +
+    "</div></section>";
+}
+
+function causesHTML() {
+  const L = list().filter(function (x) { return x.cause; });
+  if (!L.length) return "";
+  const g = {};
+  L.forEach(function (x) { (g[x.cause] = g[x.cause] || []).push(x); });
+  const keys = Object.keys(g).sort(function (a, b) { return g[b].length - g[a].length; });
+  return '<h2 class="eyebrow">ROOT CAUSES</h2><div class="causes">' + keys.map(function (k) {
+    const grp = g[k], m = CAUSES[k];
+    const breach = grp.filter(function (x) { return x.sla < 0; }).length;
+    const tags = (breach ? '<span class="tag red">' + breach + " past SLA</span>" : "") +
+      m.tags.map(function (t) { return '<span class="tag">' + t + "</span>"; }).join("");
+    const bulk = m.bulk ? '<button class="btn ' + (m.tone === "red" ? "warn" : "pri") + '" data-bulk="' + k + '">' + m.bulk + " (" + grp.length + ")</button>" : "";
+    return '<article class="cause"><div class="ic ' + m.tone + '">' + m.icon + '</div><div style="flex:1;min-width:0">' +
+      '<div class="t">' + m.title + '</div><div class="d">' + grp.length + " case" + (grp.length > 1 ? "s" : "") + " " + m.detail + "</div>" +
+      '<div class="tags">' + tags + '</div><div class="acts">' + bulk +
+      '<button class="btn" data-first="' + k + '">Review one by one</button></div></div></article>';
+  }).join("") + "</div>";
+}
+
+const VIEW_TITLES = { attention: "Needs attention", all: "All cases", mine: "Assigned to me", unassigned: "Unassigned",
+  "q-nin": "Pending NIN", "q-bvn": "Pending BVN", "q-live": "Pending liveness", "q-docs": "Pending documents",
+  "q-fin": "Pending Finacle", "q-exc": "Exceptions", "q-bulk": "Bulk failures" };
+
+function rowbarHTML() {
+  const segs = [["urgency", "Urgency"], ["risk", "Risk"], ["age", "Age"], ["name", "Name"]].map(function (s) {
+    return '<button data-sort="' + s[0] + '" aria-pressed="' + (sort === s[0]) + '">' + s[1] + "</button>";
+  }).join("");
+  const label = view === "attention" ? "Individual cases" : VIEW_TITLES[view];
+  return '<div class="rowbar"><h2 class="rowbar-t">' + label +
+    '<span class="n" id="rowcount">' + list().length + " shown, sorted by " + sort + "</span></h2>" +
+    '<div class="segs">' + segs + "</div></div>";
+}
+
+function rowsHTML() {
+  const L = list();
+  if (!L.length) return '<p class="empty">Nothing here. This queue is clear.</p>';
+  if (selected && !L.some(function (x) { return x.id === selected; })) selected = L[0].id;
+  const head = '<div class="cols"><div>APPLICATION</div><div>CUSTOMER</div><div>STATE</div><div>CHECKS</div><div>SLA</div><div>ASSIGNEE</div><div>AGE</div></div>';
+  return head + L.map(function (x) {
+    const sm = STATE_META[x.st];
+    const dots = CHECK_META.map(function (c) {
+      const v = x.checks[c.key];
+      return '<i class="' + (v === "fail" ? "fail" : "") + '" style="background:' + checkColor(v) + '" title="' + c.label + ": " + (x.checkText ? x.checkText[c.key] : v) + '"></i>';
+    }).join("");
+    return '<button class="row" role="option" data-id="' + x.id + '" aria-selected="' + (x.id === selected) + '">' +
+      '<span class="id">' + x.id.replace("AO-2026-", "") + "</span>" +
+      '<span class="who"><span class="ava" style="background:' + avaColor(x.name) + '">' + initials(x.name) + "</span>" +
+      '<span class="nm"><b>' + esc(x.name) + "</b><span>" + esc(x.reason) + "</span></span></span>" +
+      '<span><span class="state" style="background:' + sm.bg + ";color:" + sm.fg + '"><i style="background:' + sm.dot + '"></i>' + sm.label + "</span></span>" +
+      '<span class="checks" aria-label="checks">' + dots + "</span>" +
+      '<span class="sla" style="color:' + slaColor(x.sla) + '"><b>' + slaText(x.sla) + "</b>" +
+      (x.sla === null ? "" : '<span class="track"><i style="width:' + slaFill(x.sla) + "%;background:" + slaColor(x.sla) + '"></i></span>') + "</span>" +
+      '<span class="asg">' + (x.asg ? '<span class="mini" style="background:' + avaColor(x.asg) + '">' + initials(x.asg) + "</span>" + x.asg
+        : '<span style="color:#d97706;font-weight:600">Unassigned</span>') + "</span>" +
+      '<span class="age">' + (x.age >= 1440 ? Math.round(x.age / 1440) + "d" : x.age >= 60 ? Math.round(x.age / 60) + "h" : x.age + "m") + "</span></button>";
+  }).join("");
+}
+
+function rulesHTML() {
+  const cards = RULES.map(function (r) {
+    return '<article class="rule"><div class="ic" style="width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:#f0f9f3;color:#16a34a;border:1px solid #cfe9d9;font-weight:700">✓</div>' +
+      '<div style="flex:1;min-width:0"><div class="t">' + esc(r.name) + '</div><div class="c">' + esc(r.cond) + "</div>" +
+      '<div class="m"><div><b>' + r.deflected.toLocaleString() + "</b><span>cases deflected</span></div>" +
+      "<div><b>" + r.hours + "h</b><span>reviewer time returned</span></div>" +
+      "<div><b>0</b><span>reversals</span></div></div></div>" +
+      '<button class="btn" data-pause="' + r.id + '">Pause</button></article>';
+  }).join("");
+  return '<h2 class="eyebrow">CANDIDATE</h2>' + (PROMO.shown ? promoHTML() : '<p class="empty">No candidates right now. Rules are proposed when a reviewer makes the same call 30 times without a reversal.</p>') +
+    '<h2 class="eyebrow">LIVE RULES</h2>' + cards +
+    '<p style="font-size:12.5px;color:#9a9a94;margin-top:12px;max-width:70ch">Every rule was a decision a reviewer made by hand until it stopped being interesting. Rules are reversible, they log every case they touch, and a single reversal pauses one automatically.</p>';
+}
+
+function panelVisible() { return !!(panelOpen && selected && view !== "rules"); }
+
+function renderRowsOnly() {
+  const holder = el("rowsList");
+  if (!holder) { renderBody(); return; }
+  holder.innerHTML = rowsHTML();
+  document.querySelectorAll("[data-sort]").forEach(function (b) {
+    b.setAttribute("aria-pressed", String(b.dataset.sort === sort));
+  });
+  const rc = el("rowcount");
+  if (rc) rc.textContent = list().length + " shown, sorted by " + sort;
+}
+
+function renderBody() {
+  const b = el("body");
+  const keepScroll = b.scrollTop;
+  if (view === "rules") {
+    b.innerHTML = '<div class="col"><div class="qhead"><h1>Automation<span class="n">2 live, 1 candidate</span></h1></div>' + rulesHTML() + "</div>";
+    panelOpen = false;
+    el("shell").classList.add("nopanel");
+    el("cock").innerHTML = "";
+    return;
+  }
+  el("shell").classList.toggle("nopanel", !panelVisible());
+  b.innerHTML = '<div class="col"><div class="qhead"><h1>' + VIEW_TITLES[view] + "</h1></div>" +
+    (view === "attention" ? promoHTML() + causesHTML() : "") +
+    rowbarHTML() +
+    '<div id="rowsList">' + rowsHTML() + "</div></div>";
+  b.scrollTop = keepScroll;
+}
+
+function renderCock() {
+  if (view === "rules") { el("cock").innerHTML = ""; return; }
+  const L = list();
+  const x = L.filter(function (c) { return c.id === selected; })[0];
+  if (!x) { el("cock").innerHTML = ""; return; }
+  let ev = "";
+  if (x.problem && x.problem.kind === "diff") {
+    const p = x.problem;
+    ev = '<div class="ev-diff">' + [p.left, p.right].map(function (s) {
+      return "<div><div class='k'>" + s[0] + "</div><div class='v'>" + esc(s[1]) +
+        (s[2] ? '<span class="hi-bad">' + esc(s[2]) + "</span>" : "") +
+        (s[3] ? '<span class="hi-good">' + esc(s[3]) + "</span>" : "") + "</div></div>";
+    }).join("") + "</div>";
+  } else if (x.problem && x.problem.kind === "gauge") {
+    const p = x.problem;
+    ev = '<div class="ev-gauge"><div class="lab">' + p.label + " " + p.value.toFixed(2) + ", threshold " + p.threshold.toFixed(2) + "</div>" +
+      '<div class="track"><u style="width:' + Math.round(p.value * 100) + '%"></u><s style="left:' + Math.round(p.threshold * 100) + '%"></s></div>' +
+      '<div class="sc"><span>0.00</span><span>1.00</span></div></div>';
+  }
+
+  const probTone = x.cause && CAUSES[x.cause] && CAUSES[x.cause].tone === "red" ? "" : " amber";
+  const probCard = x.problem ? '<div class="prob' + probTone + '">' +
+    '<div class="h"><span>▲</span>' + esc(x.problem.title) + "</div>" +
+    '<div class="d">' + esc(x.problem.detail) + "</div>" + ev + "</div>" : "";
+
+  const GREEN = "#16a34a", RED = "#dc2626", BLUE = "#0033A1";
+  const settled = x.st === "activated" || x.st === "created" || x.st === "validated";
+  const stopped = x.st === "exception";
+  function stepTone(i) {
+    if (i < x.step || (i === x.step && settled)) return GREEN;
+    if (i === x.step) return stopped ? RED : BLUE;
+    return "";
+  }
+  let mini = '<span class="minirail" role="img" aria-label="' +
+    (stopped ? "Stopped at " + STEPS[x.step] : "At " + STEPS[x.step]) + ", step " + (x.step + 1) + " of " + STEPS.length +
+    ". Complete: " + (x.step ? STEPS.slice(0, x.step).join(", ") : "none") + '.">';
+  STEPS.forEach(function (s, i) {
+    if (i) {
+      const linked = stepTone(i - 1) === GREEN;
+      mini += '<span class="cx"' + (linked ? ' style="background:' + GREEN + '"' : "") + "></span>";
+    }
+    const tone = stepTone(i);
+    const isStop = tone === RED;
+    mini += '<span class="st"><i class="' + (isStop ? "stop" : "") + '"' + (tone ? ' style="background:' + tone + '"' : "") + "></i>" +
+      "<b" + (tone ? ' style="color:' + (isStop ? RED : "var(--ink)") + ";font-weight:" + (i === x.step ? 600 : 500) + '"' : "") + ">" + s + "</b></span>";
+  });
+  mini += "</span>";
+
+  const checks = '<div class="clist">' + CHECK_META.map(function (c) {
+    const v = x.checks[c.key];
+    const col = checkColor(v);
+    const mark = v === "pass" ? "✓" : v === "fail" ? "!" : "·";
+    return '<div class="c"><div class="l"><span class="i" style="background:' + col + '">' + mark + '</span><span class="n">' + c.label + "</span></div>" +
+      '<div class="r"><span class="st" style="color:' + (v === "pass" ? "#6f6f69" : col) + '">' + (x.checkText ? x.checkText[c.key] : v) + "</span>" +
+      (v !== "pass" ? '<a data-rerun="' + c.key + '">re-run</a>' : "") + "</div></div>";
+  }).join("") + "</div>";
+
+  const band = x.risk < 30 ? "low" : x.risk < 50 ? "medium" : "high";
+  const risk = '<h2 class="eyebrow" style="margin-top:0">RISK ' + x.risk + " · " + band.toUpperCase() + ', AUTO-APPROVE BELOW 30</h2><div class="risk">' +
+    x.factors.map(function (f) { return '<div class="f"><span>' + f[0] + "</span><b>+" + f[1] + "</b></div>"; }).join("") + "</div>";
+
+  const trail = '<h2 class="eyebrow">AGENT TRAIL</h2><div class="trail">' +
+    x.trail.map(function (t) { return '<div class="e"><time>' + t[0] + "</time><span>" + esc(t[1]) + "</span></div>"; }).join("") +
+    '<div class="e"><time>now</time><span>' + (x.asg ? "Assigned to " + x.asg : "Unassigned, waiting " + (x.age >= 60 ? Math.round(x.age / 60) + "h" : x.age + "m")) + "</span></div></div>";
+
+  const fields = '<h2 class="eyebrow">APPLICANT</h2><div class="fields">' +
+    x.fields.map(function (f) { return "<div><span class='k'>" + f[0] + "</span><span class='v'>" + esc(f[1]) + "</span></div>"; }).join("") + "</div>";
+
+  const i = L.findIndex(function (c) { return c.id === selected; });
+  const stepper = '<div class="stepper">' +
+    '<button data-nav="-1" aria-label="Previous case"' + (i <= 0 ? " disabled" : "") + '>‹</button>' +
+    '<span class="n">' + (i + 1) + " of " + L.length + "</span>" +
+    '<button data-nav="1" aria-label="Next case"' + (i >= L.length - 1 ? " disabled" : "") + '>›</button>' +
+    '<button class="x" data-close="1" aria-label="Close, Esc">✕</button></div>';
+
+  el("cock").innerHTML =
+    '<div class="mhead"><span class="ava" style="background:' + avaColor(x.name) + '">' + initials(x.name) + "</span>" +
+      '<div><h2>' + esc(x.name) + '</h2><span class="cid">' + x.id +
+        (x.kind === "BULK" ? '<span class="kindtag">BULK · 180 ROWS</span>' : "") + "</span></div>" +
+      '<div class="pills">' + mini +
+      (x.sla !== null ? '<span class="pill" style="background:' + (x.sla < 0 ? "#fdf3f3;color:#b91c1c" : "#fdf6e8;color:#b45309") + '">SLA ' + slaText(x.sla) + "</span>" : "") +
+      '<span class="pill" style="background:#f2f2ec;color:#6f6f69">Risk ' + x.risk + "</span></div>" +
+      stepper + "</div>" +
+
+    '<div class="mbody">' +
+      '<div class="mcol"><h2 class="eyebrow" style="margin-top:0">THE PROBLEM</h2>' + probCard + trail + "</div>" +
+      '<div class="mcol"><h2 class="eyebrow" style="margin-top:0">CHECKS</h2>' + checks + risk + "</div>" +
+      '<div class="mcol">' + fields + "</div>" +
+    "</div>" +
+
+    '<div class="cockbar">' + (x.block ? '<div class="note"><span>⚠</span>' + esc(x.block) + "</div>" : '<span></span>') +
+      '<div class="pair"><button class="btn ghost-red" data-act="Reject application">Reject</button>' +
+      '<button class="btn" data-act="' + esc(x.alt) + '">' + esc(x.alt) + "</button>" +
+      '<button class="btn pri" data-act="' + esc(x.primary) + '">' + esc(x.primary) + "</button></div></div>";
+}
+
+function render() { renderCounts(); renderTriage(); renderHealth(); renderBody(); renderCock(); }
+
+let tt;
+function toast(msg, icon, color) {
+  const t = el("toast");
+  t.innerHTML = '<span style="color:' + (color || "#0091DA") + '">' + (icon || "✓") + "</span>" + esc(msg);
+  t.classList.add("on");
+  clearTimeout(tt);
+  tt = setTimeout(function () { t.classList.remove("on"); }, 2600);
+}
+function resolve(ids, msg) {
+  const before = list();
+  const at = before.findIndex(function (c) { return c.id === selected; });
+  const decidedOpen = selected && ids.indexOf(selected) > -1;
+  // A store-backed case is resolved by writing back to the shared store (which
+  // moves the RM's case); a seeded case is just cleared from this console.
+  const pooled = CASES.concat(DONE);
+  ids.forEach(function (id) {
+    const c = pooled.find(function (x) { return x.id === id; });
+    if (c && c.src === "store") resolveStoreCase(id, msg);
+    else resolvedSeedIds.add(id);
+  });
+  syncFromStore();
+  if (decidedOpen) {
+    const after = list();
+    selected = after.length ? after[Math.min(at, after.length - 1)].id : null;
+    if (!selected) panelOpen = false;
+  }
+  render();
+  toast(msg);
+}
+
+function moveSel(delta) {
+  const L = list();
+  const i = L.findIndex(function (c) { return c.id === selected; });
+  const j = i < 0 ? 0 : i + delta;
+  if (!L[j]) return;
+  selected = L[j].id;
+  panelOpen = true;
+  render();
+}
+
+document.addEventListener("click", function (e) {
+  const t = e.target;
+  if (!t || !t.closest) return;
+  const step = t.closest("[data-nav]");
+  if (step) { moveSel(parseInt(step.dataset.nav, 10)); return; }
+  const nav = t.closest("[data-view]");
+  if (nav) {
+    view = nav.dataset.view;
+    panelOpen = false;
+    selected = null;
+    document.querySelectorAll("[data-view]").forEach(function (b) { b.setAttribute("aria-current", String(b === nav)); });
+    render(); return;
+  }
+  const go = t.closest("[data-goto]");
+  if (go) { document.querySelector('[data-view="' + go.dataset.goto + '"]').click(); return; }
+  const so = t.closest("[data-sort]");
+  if (so) { sort = so.dataset.sort; renderRowsOnly(); return; }
+  const row = t.closest("[data-id]");
+  if (row) { selected = row.dataset.id; panelOpen = true; render(); return; }
+  const op = t.closest("[data-open]");
+  if (op) { selected = op.dataset.open; panelOpen = true; view = "attention"; document.querySelectorAll("[data-view]").forEach(function (b) { b.setAttribute("aria-current", String(b.dataset.view === "attention")); }); render(); return; }
+  const bulk = t.closest("[data-bulk]");
+  if (bulk) {
+    const k = bulk.dataset.bulk;
+    const ids = list().filter(function (c) { return c.cause === k; }).map(function (c) { return c.id; });
+    resolve(ids, CAUSES[k].bulk.replace(" on all", "").replace(" to all", "") + " → " + ids.length + " cases back in the flow");
+    return;
+  }
+  const first = t.closest("[data-first]");
+  if (first) {
+    const c = list().filter(function (x) { return x.cause === first.dataset.first; })[0];
+    if (c) { selected = c.id; panelOpen = true; render(); }
+    return;
+  }
+  if (t.closest("[data-promote]") || t.closest("[data-ev-promote]")) { promote(); return; }
+  if (t.closest("[data-promo-see]")) { openEvidence(); return; }
+  if (t.closest("[data-ev-close]")) { closeEvidence(); return; }
+  if (t === el("veil")) { closeEvidence(); return; }
+  if (t.closest("[data-promo-no]")) { PROMO.shown = false; render(); toast("Parked. It will come back if the pattern holds.", "·"); return; }
+  const pause = t.closest("[data-pause]");
+  if (pause) { RULES = RULES.filter(function (r) { return r.id !== pause.dataset.pause; }); render(); toast("Rule paused. Those cases route to reviewers again.", "✓", "#d97706"); return; }
+  const rr = t.closest("[data-rerun]");
+  if (rr) { toast("Re-running " + rr.dataset.rerun.toUpperCase() + " check…", "↻"); return; }
+  if (t.closest("[data-close]") || t === el("scrim")) { panelOpen = false; render(); return; }
+  if (t.closest("#foot")) { try { window.top.location.href = "/"; } catch (err) { window.location.href = "/"; } return; }
+  // Role switcher: toggle on the button, close on any click outside it. Links
+  // inside carry target="_top" so they escape the /ops iframe.
+  if (t.closest("#role-btn")) {
+    const menu = el("roles"), btn = el("role-btn");
+    const willOpen = menu.hidden;
+    menu.hidden = !willOpen;
+    btn.setAttribute("aria-expanded", String(willOpen));
+    return;
+  }
+  if (!t.closest("#roles")) {
+    const menu = el("roles");
+    if (menu && !menu.hidden) { menu.hidden = true; el("role-btn").setAttribute("aria-expanded", "false"); }
+  }
+  const act = t.closest("[data-act]");
+  if (act) {
+    const label = act.dataset.act;
+    if (label === "Reprocess") { toast("Reprocessing " + selected + "…", "↻"); return; }
+    resolve([selected], label + " → " + selected);
+  }
+});
+
+el("q").addEventListener("input", render);
+
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape" && el("veil").classList.contains("on")) { closeEvidence(); return; }
+  if (el("veil").classList.contains("on")) return;
+  if (e.target.tagName === "INPUT") { if (e.key === "Escape") e.target.blur(); return; }
+  if (view === "rules") return;
+  const L = list();
+  const i = L.findIndex(function (x) { return x.id === selected; });
+  const k = e.key.toLowerCase();
+  if (k === "j") { moveSel(1); }
+  else if (k === "k") { moveSel(-1); }
+  else if (k === "escape") { panelOpen = false; render(); }
+  else if (L[i]) {
+    if (k === "a") resolve([L[i].id], L[i].primary + " → " + L[i].id);
+    else if (k === "r") toast("Re-running checks on " + L[i].id + "…", "↻");
+    else if (k === "e") resolve([L[i].id], "Escalated → " + L[i].id);
+    else if (k === "x") resolve([L[i].id], "Rejected → " + L[i].id);
+  }
+});
+
+// Merge live store cases in, then paint. And keep listening: when the desk or
+// customer app writes to the shared store, this iframe (a different document)
+// gets a `storage` event — re-sync and re-render so a case captured or advanced
+// elsewhere appears here live, with no reload.
+syncFromStore();
+window.addEventListener("storage", function (e) {
+  if (e.key !== STORE_KEY && e.key !== EVENTS_KEY && e.key !== null) return;
+  syncFromStore();
+  render();
+});
+
+render();
+</script>
+</body>
+</html>

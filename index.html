@@ -2,11 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <!-- Static default, shown for a moment before JS runs. The live tab icon is
+         driven by the tenant branding (admin → Branding → Browser tab) and set by
+         the brand bridges via applyFavicon — auto-generated from the app name when
+         no favicon is uploaded. -->
+    <link rel="icon" type="image/svg+xml" href="./app-favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <title>Aura AI</title>
+    <!-- Neutral placeholder; each surface sets the real title from branding.appName. -->
+    <title>Account Opening</title>
     <!--
       Critical-video bootstrap. Runs BEFORE the JS bundle loads, so video
       bytes are downloading in parallel with the bundle. We fetch each video
@@ -72,6 +77,12 @@
          WKWebView never falls back to Arial. -->
     <link rel="preload" as="font" type="font/woff2" href="./fonts/Poppins-600.woff2" crossorigin />
     <link rel="preload" as="font" type="font/woff2" href="./fonts/Inter.woff2" crossorigin />
+    <!-- Libre Franklin: the desk shell (/employee-web) shares the Operations
+         Workbench's typography so the two read as one product. Same source the
+         Ops console already uses; falls back to Inter if it can't be fetched. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="root"></div>

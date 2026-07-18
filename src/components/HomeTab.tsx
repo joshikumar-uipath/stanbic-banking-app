@@ -9,6 +9,7 @@ import VideoEl from './VideoEl';
 import { useConfig, LOGO_SIZES } from '../config';
 import { branchPulse, customers, money } from '../customersData';
 import { approvalsPulse } from '../approvalsData';
+import { store } from '../onboarding';
 import { Avatar, Icn } from './customerUi';
 import type { AgentActionItem as AgentAction, AgentRunResult } from '../config';
 import type { AgentRunContext } from '../types';
@@ -27,6 +28,28 @@ interface SpeechRecognitionEvent {
   results: { [i: number]: { [i: number]: { transcript: string }; isFinal: boolean }; length: number };
 }
 
+/** Live counts for the Home "Open an account" card, straight off the shared store. */
+function useOpeningPulse() {
+  const [pulse, setPulse] = useState({ open: 0, waiting: 0 });
+  useEffect(() => {
+    let alive = true;
+    const refresh = () => {
+      void store.list().then((all) => {
+        if (!alive) return;
+        const mine = all.filter((c) => c.source === 'rm' || c.source === 'branch');
+        setPulse({
+          open: mine.filter((c) => c.state !== 'FULLY_ACTIVATED').length,
+          waiting: mine.filter((c) => c.state === 'PENDING_LIVENESS' || c.state === 'PENDING_DOCUMENTS').length,
+        });
+      });
+    };
+    refresh();
+    const un = store.subscribe(refresh);
+    return () => { alive = false; un(); };
+  }, []);
+  return pulse;
+}
+
 
 
 
@@ -42,11 +65,13 @@ interface Props {
   onNavigateToExplore?: (capability: string) => void;
   onOpenCustomers?: () => void;
   onOpenApprovals?: () => void;
+  onOpenAccount?: () => void;
 }
 
-export default function HomeTab({ conversationalAgent, selectedAgent, onSelectAgent, onStartChat, userName, homeNavPressCount, onNavigateToTasks, onNavigateToExplore, onOpenCustomers, onOpenApprovals }: Props) {
+export default function HomeTab({ conversationalAgent, selectedAgent, onSelectAgent, onStartChat, userName, homeNavPressCount, onNavigateToTasks, onNavigateToExplore, onOpenCustomers, onOpenApprovals, onOpenAccount }: Props) {
   const { t, tr, theme } = useTheme();
   const { branding, demoContent, homeShowcase } = useConfig();
+  const openingPulse = useOpeningPulse();
   const orbSrc = theme === 'light' ? ORB_LIGHT : ORB_DARK;
   const orbBlobSrc = useVideoBlob(orbSrc);
   const { sdk } = useAuth();
@@ -1086,6 +1111,35 @@ export default function HomeTab({ conversationalAgent, selectedAgent, onSelectAg
                 })}
               </div>
             </div>
+          </div>
+        );
+      })()}
+
+      {/* Open an account — assisted capture launcher */}
+      {onOpenAccount && (() => {
+        const op = openingPulse;
+        return (
+          <div className="px-4 pb-5 relative z-10 flex-shrink-0">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-1 h-5 rounded-full" style={{ background: 'var(--brand-primary)', boxShadow: '0 0 8px rgba(var(--brand-primary-rgb),0.7)' }} />
+                <p className="font-bold" style={{ fontSize: 16, color: t.textPrimary, letterSpacing: -0.3 }}>Open an account</p>
+              </div>
+              <span className="text-xs font-medium" style={{ color: 'rgba(var(--brand-primary-rgb),0.6)' }}>{tr.tapToView}</span>
+            </div>
+            <button type="button" onClick={onOpenAccount} className="w-full text-left" style={{ background: t.bgCard, border: `1px solid ${t.border}`, borderRadius: 18, padding: 16, display: 'flex', alignItems: 'center', gap: 14 }}>
+              <span style={{ width: 46, height: 46, borderRadius: 14, flexShrink: 0, background: 'var(--brand-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 5px 14px rgba(var(--brand-primary-rgb),0.4)' }}>
+                <Icn name="idcard" size={24} color="#fff" strokeWidth={2} />
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14.5, fontWeight: 700, color: t.textPrimary }}>{op.open > 0 ? `${op.open} applications in progress` : 'Start a new application'}</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 5, fontSize: 12, color: t.textMuted }}>
+                  <span>Capture in minutes</span>
+                  {op.waiting > 0 && <span style={{ color: '#E0904A', fontWeight: 600 }}>{op.waiting} awaiting KYC</span>}
+                </div>
+              </div>
+              <Icn name="chevron" size={18} color={t.chevron} />
+            </button>
           </div>
         );
       })()}

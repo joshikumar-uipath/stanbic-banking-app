@@ -1,0 +1,205 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Customer App — the applicant experience for the Account Opening Factory.
+   /customer-mobile · /customer-web (Initiate)   ·   /kyc/:token (Complete)
+   Stanbic navy/sky, light & airy. Scoped under .cx; loaded only on these routes.
+   ───────────────────────────────────────────────────────────────────────────── */
+.cx {
+  /* Brand follows the host app's white-label vars (set by ConsumerBrandBridge),
+     with Stanbic fallbacks for the standalone /kyc link. */
+  --blue: var(--brand-primary, #0033A1);
+  --blue-2: color-mix(in srgb, var(--brand-primary, #0033A1) 78%, #000);
+  --sky: var(--brand-secondary, #0091DA);
+  --navy: color-mix(in srgb, var(--brand-primary, #012169) 62%, #000);
+  --navy-2: #0a3182;
+  --page: #F4F6FA; --card: #FFFFFF; --wash: #F7F8FB;
+  --ink: #11181D; --soft: rgba(17,24,29,.58); --faint: rgba(17,24,29,.40);
+  --line: rgba(17,24,29,.10); --line-2: rgba(17,24,29,.06);
+  --good: #16A34A; --good-bg: #EAF7F0; --warn: #D97706; --warn-bg: #FDF6E8;
+  --crit: #DC2626; --crit-bg: #FDF3F3;
+  --r-card: 20px; --r-tile: 16px; --r-sm: 11px;
+  --f-head: 'Poppins', system-ui, sans-serif;
+  --f-body: 'Inter', system-ui, -apple-system, sans-serif;
+  height: 100%; display: flex; flex-direction: column; overflow: hidden;
+  background: var(--page); color: var(--ink);
+  font-family: var(--f-body); font-size: 14px; -webkit-font-smoothing: antialiased;
+}
+/* Resets use :where() so they carry zero specificity and never beat the
+   component classes below (a .cx button reset would otherwise wipe .cx-btn). */
+:where(.cx *, .cx *::before, .cx *::after) { box-sizing: border-box; margin: 0; padding: 0; }
+:where(.cx button) { font: inherit; color: inherit; border: none; background: none; cursor: pointer; }
+:where(.cx input, .cx textarea) { font: inherit; color: inherit; }
+.cx :focus-visible { outline: 2px solid var(--sky); outline-offset: 2px; border-radius: 6px; }
+
+/* (Removed: .cx-web-wrap, which centred the phone app as a column on /customer-web.
+   That made the web route identical to /customer-mobile in a bezel and earned it
+   nothing. /customer-web is now real internet banking — see ../consumer/TopNav.) */
+
+/* ── Screen scaffold ── */
+.cx-head { flex: 0 0 auto; padding: max(env(safe-area-inset-top), 14px) 18px 10px; background: var(--card); border-bottom: 1px solid var(--line-2); }
+.cx-head.plain { background: transparent; border-bottom: none; }
+.cx-topline { display: flex; align-items: center; gap: 10px; min-height: 34px; }
+.cx-back { width: 34px; height: 34px; border-radius: 999px; display: grid; place-items: center; color: var(--soft); flex: 0 0 auto; }
+.cx-back:hover { background: var(--wash); color: var(--ink); }
+.cx-brand { display: flex; align-items: center; gap: 9px; }
+.cx-mark { width: 28px; height: 28px; border-radius: 8px; background: var(--sky); display: grid; place-items: center; color: #fff; font: 700 14px/1 var(--f-head); flex: 0 0 auto; }
+.cx-logo { height: 24px; max-width: 132px; object-fit: contain; object-position: left center; flex: 0 0 auto; }
+.cx-brand b { font: 600 14.5px/1 var(--f-head); letter-spacing: -.01em; }
+.cx-brand em { display: block; font-style: normal; font-size: 10px; color: var(--faint); letter-spacing: .04em; margin-top: 2px; }
+.cx-body { flex: 1; overflow-y: auto; padding: 18px; }
+/* Column mode: a child marked flex:1 takes the leftover height instead of the
+   page ending in whitespace (see .cx-faceid). min-height:0 so it can shrink. */
+.cx-body.fill { display: flex; flex-direction: column; min-height: 0; }
+/* Bottom padding clears the phone bezel's curve on desktop, and the home
+   indicator on a real device. */
+.cx-foot { flex: 0 0 auto; padding: 14px 18px max(env(safe-area-inset-bottom), 28px); background: var(--card); border-top: 1px solid var(--line-2); display: flex; flex-direction: column; gap: 8px; }
+
+.cx-h1 { font: 600 24px/1.2 var(--f-head); letter-spacing: -.025em; margin-bottom: 8px; text-wrap: balance; }
+.cx-h2 { font: 600 17px/1.25 var(--f-head); letter-spacing: -.02em; }
+.cx-p { font-size: 14px; line-height: 1.55; color: var(--soft); }
+.cx-label { font: 600 10.5px/1 var(--f-body); letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+
+/* ── Buttons ── */
+.cx-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+  padding: 14px 18px; border-radius: 14px; font: 600 15px/1 var(--f-body); letter-spacing: -.01em;
+  background: var(--blue); color: #fff; transition: background .15s, transform .1s, opacity .15s; }
+.cx-btn:hover { background: var(--blue-2); }
+.cx-btn:active { transform: scale(.99); }
+.cx-btn:disabled { opacity: .4; cursor: default; }
+.cx-btn:disabled:hover { background: var(--blue); }
+.cx-btn.ghost { background: transparent; color: var(--ink); border: 1px solid var(--line); }
+.cx-btn.ghost:hover { background: var(--wash); }
+.cx-btn.sky { background: var(--sky); }
+.cx-btn.sky:hover { filter: brightness(1.06); }
+.cx-btn.sm { padding: 10px 14px; font-size: 13.5px; border-radius: 11px; width: auto; }
+.cx-link { font: 600 13.5px/1 var(--f-body); color: var(--blue); background: none; padding: 6px; }
+.cx-link:hover { text-decoration: underline; }
+
+/* ── Progress rail ── */
+.cx-rail { display: flex; gap: 5px; margin-top: 12px; }
+.cx-rail i { flex: 1; height: 3px; border-radius: 2px; background: var(--line); transition: background .3s; }
+.cx-rail i.on { background: var(--sky); }
+.cx-step-n { font: 500 11.5px/1 var(--f-body); color: var(--faint); margin-top: 9px; }
+
+/* ── Fields ── */
+.cx-field { margin-bottom: 14px; }
+.cx-field > label { display: block; font: 500 12.5px/1 var(--f-body); color: var(--soft); margin-bottom: 6px; }
+.cx-input { width: 100%; padding: 13px 14px; border: 1px solid var(--line); border-radius: 13px;
+  background: var(--card); font-size: 15px; outline: none; transition: border-color .15s, box-shadow .15s; }
+.cx-input::placeholder { color: rgba(17,24,29,.30); }
+.cx-input:focus { border-color: var(--sky); box-shadow: 0 0 0 3px rgba(0,145,218,.14); }
+.cx-input.bad { border-color: var(--crit); }
+.cx-input.bad:focus { box-shadow: 0 0 0 3px rgba(220,38,38,.12); }
+.cx-hint { font-size: 11.5px; color: var(--faint); margin-top: 5px; }
+.cx-err { font-size: 11.5px; color: var(--crit); margin-top: 5px; font-weight: 500; }
+.cx-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* ── Cards & chips ── */
+.cx-card { background: var(--card); border: 1px solid var(--line-2); border-radius: var(--r-card); padding: 16px; box-shadow: 0 1px 2px rgba(17,24,29,.03), 0 10px 26px -18px rgba(17,24,29,.18); }
+.cx-card + .cx-card { margin-top: 12px; }
+.cx-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font: 600 11.5px/1 var(--f-body); }
+.cx-chip i { width: 6px; height: 6px; border-radius: 999px; background: currentColor; }
+.cx-chip.good { background: var(--good-bg); color: var(--good); }
+.cx-chip.warn { background: var(--warn-bg); color: var(--warn); }
+.cx-chip.crit { background: var(--crit-bg); color: var(--crit); }
+.cx-chip.info { background: #EAF1FB; color: var(--blue); }
+.cx-chip.idle { background: var(--wash); color: var(--faint); }
+
+.cx-note { display: flex; gap: 10px; padding: 12px 14px; border-radius: var(--r-tile); font-size: 12.5px; line-height: 1.5; }
+.cx-note.info { background: #EAF1FB; color: #0b2f6b; }
+.cx-note.warn { background: var(--warn-bg); color: #7c4a06; }
+.cx-note.good { background: var(--good-bg); color: #0d5c30; }
+.cx-note svg { flex: 0 0 auto; margin-top: 1px; }
+
+/* ── Welcome ── */
+.cx-hero { position: relative; overflow: hidden; border-radius: 26px; padding: 26px 22px 24px;
+  background: linear-gradient(150deg, var(--blue) 0%, var(--navy) 100%); color: #fff; }
+.cx-hero::after { content: ""; position: absolute; right: -50px; top: -60px; width: 210px; height: 210px; border-radius: 50%; background: rgba(255,255,255,.12); }
+.cx-hero .k { position: relative; z-index: 1; font: 600 10.5px/1 var(--f-body); letter-spacing: .14em; text-transform: uppercase; color: rgba(255,255,255,.82); }
+.cx-hero h1 { position: relative; z-index: 1; font: 600 26px/1.18 var(--f-head); letter-spacing: -.03em; margin: 10px 0 10px; text-wrap: balance; }
+.cx-hero p { position: relative; z-index: 1; font-size: 13.5px; line-height: 1.55; color: rgba(255,255,255,.82); }
+.cx-usp { display: flex; flex-direction: column; gap: 2px; margin-top: 18px; }
+.cx-usp-row { display: flex; align-items: center; gap: 11px; padding: 11px 0; border-bottom: 1px solid var(--line-2); }
+.cx-usp-row:last-child { border-bottom: none; }
+.cx-usp-ic { width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center; background: #EAF1FB; color: var(--blue); flex: 0 0 auto; }
+.cx-usp-row b { display: block; font: 600 13.5px/1.3 var(--f-body); }
+.cx-usp-row span { display: block; font-size: 12px; color: var(--soft); margin-top: 1px; }
+
+/* ── Review list ── */
+.cx-kv { display: flex; justify-content: space-between; gap: 14px; padding: 10px 0; border-bottom: 1px solid var(--line-2); font-size: 13.5px; }
+.cx-kv:last-child { border-bottom: none; }
+.cx-kv .k { color: var(--soft); flex: 0 0 auto; }
+.cx-kv .v { font-weight: 500; text-align: right; min-width: 0; overflow-wrap: anywhere; }
+
+/* ── Received ── */
+.cx-tick { width: 76px; height: 76px; border-radius: 999px; display: grid; place-items: center; margin: 8px auto 18px;
+  background: var(--good-bg); color: var(--good); animation: cx-pop .4s cubic-bezier(.2,.8,.3,1.2); }
+@keyframes cx-pop { from { transform: scale(.5); opacity: 0; } }
+.cx-appid { font: 600 15px/1 var(--f-body); letter-spacing: .06em; color: var(--ink); background: var(--wash); border: 1px dashed var(--line); border-radius: 12px; padding: 12px; text-align: center; }
+
+/* ── Status: stepper ── */
+.cx-steps { display: flex; flex-direction: column; }
+.cx-st { display: flex; gap: 12px; position: relative; padding-bottom: 16px; }
+.cx-st::before { content: ""; position: absolute; left: 8px; top: 20px; bottom: 0; width: 2px; background: var(--line); }
+.cx-st:last-child { padding-bottom: 0; }
+.cx-st:last-child::before { display: none; }
+.cx-st.done::before { background: var(--good); }
+.cx-st .dot { width: 18px; height: 18px; border-radius: 999px; border: 2px solid var(--line); background: var(--card); flex: 0 0 auto; z-index: 1; display: grid; place-items: center; color: #fff; }
+.cx-st.done .dot { background: var(--good); border-color: var(--good); }
+.cx-st.cur .dot { border-color: var(--sky); box-shadow: 0 0 0 4px rgba(0,145,218,.16); }
+.cx-st.exc .dot { background: var(--crit); border-color: var(--crit); }
+.cx-st .tx b { display: block; font: 500 13.5px/1.3 var(--f-body); color: var(--faint); }
+.cx-st.done .tx b, .cx-st.cur .tx b { color: var(--ink); }
+.cx-st.cur .tx b { font-weight: 600; }
+.cx-st .tx span { display: block; font-size: 11.5px; color: var(--faint); margin-top: 2px; }
+.cx-spin { width: 13px; height: 13px; border-radius: 999px; border: 2px solid rgba(0,145,218,.25); border-top-color: var(--sky); animation: cx-spin .7s linear infinite; }
+@keyframes cx-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .cx-spin, .cx-tick { animation: none; } }
+
+/* checks */
+.cx-check { display: flex; align-items: center; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid var(--line-2); font-size: 13.5px; }
+.cx-check:last-child { border-bottom: none; }
+.cx-check .l { display: flex; align-items: center; gap: 9px; }
+.cx-check .ic { width: 20px; height: 20px; border-radius: 999px; display: grid; place-items: center; font-size: 10px; font-weight: 700; color: #fff; flex: 0 0 auto; }
+
+/* ── KYC ── */
+.cx-drop { border: 1.5px dashed var(--line); border-radius: var(--r-tile); padding: 18px; display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; transition: border-color .15s, background .15s; }
+.cx-drop:hover { border-color: var(--sky); background: rgba(0,145,218,.04); }
+.cx-drop.done { border-style: solid; border-color: var(--good); background: var(--good-bg); }
+.cx-drop .di { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: var(--wash); color: var(--blue); flex: 0 0 auto; }
+.cx-drop.done .di { background: #fff; color: var(--good); }
+.cx-drop b { display: block; font: 600 13.5px/1.3 var(--f-body); }
+.cx-drop span { display: block; font-size: 11.5px; color: var(--soft); margin-top: 2px; }
+.cx-drop + .cx-drop { margin-top: 10px; }
+
+/* The embedded FaceID app. It needs real vertical room — it runs a camera
+   preview and its own controls — so it takes the body rather than a letterbox.
+
+   max-width is load-bearing, not taste: FaceID draws its OWN 390×844 phone bezel
+   and only drops it under `@media (max-width: 480px)`, where it goes edge-to-edge.
+   Keep this frame under 480px and we get the frameless mode; widen it (e.g. on
+   /customer-web) and the customer gets a phone drawn inside a phone. */
+/* Fill the body rather than guess a height: FaceID's own screens are tall (the
+   result card runs to a location stamp) and a fixed box clipped them while
+   leaving dead space above the button. `.cx-body.fill` makes the column flex so
+   this can take whatever is left. */
+.cx-faceid { position: relative; width: 100%; max-width: 460px; margin: 0 auto 8px;
+  flex: 1 1 auto; min-height: 360px;
+  border-radius: 16px; overflow: hidden; border: 1px solid var(--line-2); background: var(--wash); }
+.cx-faceid iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; }
+
+.cx-face { width: 200px; height: 200px; border-radius: 999px; margin: 6px auto 16px; position: relative;
+  background: linear-gradient(160deg, #0a3182, #012169); display: grid; place-items: center; overflow: hidden; }
+.cx-face .ring { position: absolute; inset: 0; border-radius: 999px; border: 3px solid rgba(255,255,255,.18); }
+.cx-face.scan .ring { border-color: var(--sky); }
+.cx-face.ok .ring { border-color: var(--good); }
+.cx-face .beam { position: absolute; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, transparent, var(--sky), transparent); animation: cx-beam 1.5s ease-in-out infinite; }
+@keyframes cx-beam { 0% { top: 12%; } 50% { top: 86%; } 100% { top: 12%; } }
+.cx-face .glyph { color: rgba(255,255,255,.5); }
+.cx-face.ok .glyph { color: var(--good); }
+@media (prefers-reduced-motion: reduce) { .cx-face .beam { animation: none; top: 50%; } }
+.cx-score { text-align: center; font: 600 13px/1 var(--f-body); }
+
+.cx-sign { border: 1px solid var(--line); border-radius: var(--r-tile); background: var(--card); position: relative; overflow: hidden; }
+.cx-sign canvas { display: block; width: 100%; height: 180px; touch-action: none; cursor: crosshair; }
+.cx-sign .ph { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; color: var(--faint); font-size: 13px; }
+.cx-sign .base { position: absolute; left: 18px; right: 18px; bottom: 40px; border-bottom: 1px dashed var(--line); }

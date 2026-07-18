@@ -1,0 +1,322 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   The desk — /employee-web.
+   A real desktop app, not the phone in a frame. The structure, density and
+   typography come from the Operations Workbench (public/ops-console.html) so
+   the bank's two employee tools read as one product.
+   One deliberate difference: Ops hardcodes Stanbic navy; this stays white-label.
+   Every colour below derives from --brand-primary, so the admin console still
+   drives it — change the tenant and the desk changes with it.
+   Scoped under `.dk` so it can never leak into the phone.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.dk {
+  /* Brand-derived (NOT hardcoded — see note above) */
+  --d-brand: var(--brand-primary, #0033A1);
+  --d-brand-rgb: var(--brand-primary-rgb, 0, 51, 161);
+  --d-accent: var(--brand-secondary, #0091DA);
+  --d-rail: color-mix(in srgb, var(--d-brand) 62%, #000);      /* Stanbic → navy */
+  --d-rail-2: color-mix(in srgb, var(--d-brand) 78%, #000);
+  --d-on-rail: color-mix(in srgb, var(--d-brand) 18%, #fff);
+  --d-on-rail-dim: color-mix(in srgb, var(--d-brand) 42%, #fff);
+  --d-brand-hover: color-mix(in srgb, var(--d-brand) 82%, #000);
+
+  /* Neutrals — the warm paper the Ops console uses */
+  --d-ink: #17171a;
+  --d-ink-2: #6f6f69;
+  --d-ink-3: #9a9a94;
+  --d-ink-4: #a4a49e;
+  --d-page: #f6f6f3;
+  --d-surface: #fbfbf9;
+  --d-line: #e6e6e0;
+  --d-line-2: #e2e2db;
+  --d-wash: #f2f2ec;
+
+  --d-green: #16a34a; --d-green-bg: #f0f9f3; --d-green-ink: #15803d;
+  --d-red: #dc2626;   --d-red-bg: #fdf3f3;   --d-red-ink: #b91c1c; --d-red-line: #f4c9c9;
+  --d-amber: #d97706; --d-amber-bg: #fdf6e8; --d-amber-ink: #b45309; --d-amber-line: #f3e2bd;
+  --d-gray-dot: #c4c4bd;
+
+  --d-num: 'Libre Franklin', system-ui, sans-serif;
+  --d-col: 1520px;
+  --d-bar: 66px;   /* logo band and utility bar share it, so their rules line up */
+
+  height: 100dvh;
+  display: grid;
+  grid-template-columns: 228px minmax(0, 1fr);
+  overflow: hidden;
+  font-family: 'Libre Franklin', 'Inter', system-ui, sans-serif;
+  font-size: 14px;
+  color: var(--d-ink);
+  background: var(--d-page);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Zero-specificity resets so component classes always win (learned the hard way
+   on the customer app: a plain `.dk button` reset outranks `.dk-btn`). */
+:where(.dk *, .dk *::before, .dk *::after) { box-sizing: border-box; margin: 0; padding: 0; }
+:where(.dk button, .dk input) { font: inherit; color: inherit; border: none; background: none; }
+:where(.dk button) { cursor: pointer; }
+.dk :focus-visible { outline: 2px solid var(--d-accent); outline-offset: 2px; border-radius: 4px; }
+.dk .num { font-family: var(--d-num); font-variant-numeric: tabular-nums; }
+.dk ::-webkit-scrollbar { width: 10px; height: 10px; }
+.dk ::-webkit-scrollbar-thumb { background: #d5d5cf; border-radius: 6px; border: 2px solid transparent; background-clip: content-box; }
+@keyframes dkPulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .dk *, .dk *::before { animation: none !important; transition: none !important; } }
+
+/* ── Rail ── */
+.dk-side { background: var(--d-rail); color: var(--d-on-rail); display: flex; flex-direction: column; min-height: 0; }
+/* Logo band.
+   A tenant logo can be any of: transparent with DARK artwork (the common bank
+   variant, drawn for white paper), transparent with light artwork, or a solid
+   plate in the brand colour. A dark or brand-coloured band renders the first —
+   and most likely — kind invisible, so the band is white: the one background
+   every logo is guaranteed to have been designed against. A logo carrying its
+   own plate simply reads as a card on it, exactly as it does on the phone. */
+.dk-logo { display: flex; align-items: center; gap: 10px; padding: 0 18px; height: var(--d-bar); flex: 0 0 auto; }
+/* Square brand mark on a white chip so it reads against the navy rail, whether
+   it's the generated navy-initial mark or an uploaded transparent icon. */
+.dk-mark { width: 30px; height: 30px; border-radius: 8px; background: #fff; flex: 0 0 auto; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.25); }
+.dk-mark img { width: 30px; height: 30px; object-fit: contain; display: block; }
+.dk-glyph { width: 30px; height: 30px; border-radius: 8px; background: var(--d-accent); display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 15px; flex: 0 0 auto; }
+.dk-logo .wm b { display: block; font-weight: 600; font-size: 15px; color: #fff; letter-spacing: -.01em; }
+.dk-logo .wm em { display: block; font-style: normal; font-size: 10.5px; color: var(--d-on-rail-dim); letter-spacing: .04em; }
+
+/* Whose eyes am I looking through? Mirrored in public/ops-console.html, so the
+   two tools read as one platform seen from two roles. */
+.dk-app { position: relative; border-bottom: 1px solid var(--d-rail-2); flex: 0 0 auto; }
+.dk-role { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 11px 18px; }
+.dk-role:hover { background: var(--d-rail-2); }
+.dk-role .t { flex: 1; min-width: 0; }
+.dk-role .t b { display: block; font-size: 13.5px; font-weight: 600; color: #fff; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-role .t em { display: block; font-style: normal; font-size: 10.5px; letter-spacing: .04em; color: var(--d-on-rail-dim); margin-top: 2px; text-transform: uppercase; }
+.dk-role .cv { color: var(--d-on-rail-dim); display: grid; place-items: center; flex: 0 0 auto; transform: rotate(90deg); transition: transform .15s ease; }
+.dk-role .cv.up { transform: rotate(-90deg); }
+
+.dk-roles { position: absolute; top: calc(100% + 4px); left: 10px; right: 10px; z-index: 40;
+  background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 18px 44px -10px rgba(0,0,0,.5); }
+.dk-roles .hd { font-family: var(--d-num); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--d-ink-4); padding: 9px 12px 5px; }
+.dk-role-i { display: flex; align-items: flex-start; gap: 9px; padding: 9px 12px; text-decoration: none; color: inherit; border-top: 1px solid var(--d-line-3, #f2f2ec); }
+.dk-role-i:hover { background: #fafaf7; }
+.dk-role-i .ck { width: 14px; flex: 0 0 auto; color: var(--d-brand); margin-top: 2px; display: grid; place-items: center; }
+.dk-role-i .t { min-width: 0; }
+.dk-role-i .t b { display: block; font-size: 13px; font-weight: 600; color: var(--d-ink); }
+.dk-role-i.on .t b { color: var(--d-brand); }
+.dk-role-i .t span { display: block; font-size: 11.5px; line-height: 1.45; color: var(--d-ink-2); margin-top: 2px; }
+
+.dk-side .scroll { flex: 1; overflow-y: auto; padding: 8px 12px; }
+.dk-side h2 { font-family: var(--d-num); font-size: 10.5px; font-weight: 600; letter-spacing: .14em; color: var(--d-on-rail-dim); padding: 14px 8px 6px; text-transform: uppercase; }
+.dk-nav { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 8px; border-radius: 8px; font-size: 13.5px; color: var(--d-on-rail); }
+.dk-nav:hover { background: var(--d-rail-2); }
+.dk-nav[aria-current="true"] { background: var(--d-rail-2); color: #fff; font-weight: 600; }
+.dk-nav .ic { width: 16px; height: 16px; display: grid; place-items: center; opacity: .85; flex: 0 0 auto; }
+.dk-nav .lb { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-nav .badge { font-family: var(--d-num); font-variant-numeric: tabular-nums; font-size: 11px; padding: 1px 6px; border-radius: 5px; background: rgba(255,255,255,.1); color: var(--d-on-rail); flex: 0 0 auto; }
+.dk-nav .badge.hot { background: var(--d-red); color: #fff; font-weight: 600; }
+.dk-nav .badge.new { background: var(--d-accent); color: #fff; font-weight: 600; }
+.dk-side .foot { padding: 12px 14px; border-top: 1px solid var(--d-rail-2); display: flex; align-items: center; gap: 10px; }
+.dk-side .foot .av { width: 30px; height: 30px; border-radius: 50%; background: var(--d-rail-2); color: #fff; display: grid; place-items: center; font: 600 12px/1 var(--d-num); flex: 0 0 auto; }
+.dk-side .foot .who { flex: 1; min-width: 0; }
+.dk-side .foot .who b { display: block; font-size: 12.5px; font-weight: 600; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-side .foot .who span { display: block; font-size: 11px; color: var(--d-on-rail-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-side .foot .out { color: var(--d-on-rail-dim); display: grid; place-items: center; padding: 4px; border-radius: 6px; flex: 0 0 auto; }
+.dk-side .foot .out:hover { color: #fff; background: var(--d-rail-2); }
+
+/* ── Main ── */
+.dk-main { display: flex; flex-direction: column; overflow: hidden; background: var(--d-page); min-width: 0; }
+.dk-util { display: flex; align-items: center; gap: 16px; padding: 0 24px; height: var(--d-bar); border-bottom: 1px solid var(--d-line); background: var(--d-surface); flex: 0 0 auto; }
+.dk-find { position: relative; flex: 1; max-width: 520px; }
+.dk-find .s { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #a8a8a2; display: grid; place-items: center; pointer-events: none; }
+.dk-find input { width: 100%; padding: 9px 12px 9px 34px; border: 1px solid var(--d-line-2); border-radius: 9px; background: #fff; font-size: 13.5px; outline: none; color: var(--d-ink); }
+.dk-find input::placeholder { color: var(--d-ink-3); }
+/* Global find results */
+.dk-hits { position: absolute; top: calc(100% + 6px); left: 0; right: 0; z-index: 30;
+  background: #fff; border: 1px solid var(--d-line-2); border-radius: 10px; overflow: hidden;
+  box-shadow: 0 16px 40px -12px rgba(17,24,29,.28); }
+.dk-hit { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%;
+  padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--d-line-3, #f2f2ec); }
+.dk-hit:last-child { border-bottom: none; }
+.dk-hit:hover { background: #fafaf7; }
+.dk-hit .hw { min-width: 0; }
+.dk-hit .hw b { display: block; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-hit .hw span { display: block; font-family: var(--d-num); font-size: 11.5px; color: var(--d-ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-hit.none { font-size: 12.5px; color: var(--d-ink-2); cursor: default; }
+.dk-hit.none:hover { background: #fff; }
+
+.dk-live { margin-left: auto; display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--d-green); font-weight: 600; }
+.dk-live i { width: 7px; height: 7px; border-radius: 50%; background: var(--d-green); animation: dkPulse 2s infinite; }
+
+.dk-body { flex: 1; overflow-y: auto; padding: 8px 24px 28px; }
+.dk-col { max-width: var(--d-col); margin: 0 auto; }
+
+/* ── Attention bar — the Ops triage bar, for one banker ── */
+.dk-triage { padding: 12px 24px; flex: 0 0 auto; }
+.dk-triage.red { background: var(--d-red-bg); border-bottom: 1px solid var(--d-red-line); }
+.dk-triage.green { background: var(--d-green-bg); border-bottom: 1px solid #cfe9d9; }
+.dk-tin { max-width: var(--d-col); margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.dk-tin .lft { display: flex; align-items: center; gap: 12px; }
+.dk-triage .pip { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; color: #fff; font: 700 14px/1 var(--d-num); flex: 0 0 auto; }
+.dk-triage.red .pip { background: var(--d-red); }
+.dk-triage.green .pip { background: var(--d-green); }
+.dk-triage .hl { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+.dk-triage .sb { font-size: 12.5px; margin-top: 1px; }
+.dk-triage.red .hl { color: var(--d-red-ink); } .dk-triage.red .sb { color: #7f1d1d; }
+.dk-triage.green .hl { color: var(--d-green-ink); } .dk-triage.green .sb { color: #166534; }
+.dk-triage .go { padding: 9px 15px; border-radius: 9px; font-weight: 600; font-size: 13px; color: #fff; white-space: nowrap; }
+.dk-triage.red .go { background: var(--d-red); }
+.dk-triage.green .go { background: var(--d-green); }
+.dk-triage .go:hover { filter: brightness(1.08); }
+
+/* ── Health strip ── */
+.dk-health { display: flex; padding: 14px 24px 10px; max-width: calc(var(--d-col) + 48px); margin: 0 auto; width: 100%; }
+.dk-stat { flex: 1; padding-right: 18px; }
+.dk-stat + .dk-stat { border-left: 1px solid var(--d-line); padding-left: 18px; }
+/* Never let a two-word label wrap and shove the number down a line — the strip
+   must stay on one baseline across all four stats. */
+.dk-stat .k { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: #7c7c76; font-weight: 500; text-transform: uppercase; letter-spacing: .05em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dk-stat .k i { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.dk-stat .v { display: flex; align-items: baseline; gap: 5px; margin-top: 6px; }
+.dk-stat .v b { font-family: var(--d-num); font-variant-numeric: tabular-nums; font-size: 26px; font-weight: 700; letter-spacing: -.02em; }
+.dk-stat .v s { text-decoration: none; font-size: 13px; color: var(--d-ink-3); font-weight: 500; }
+
+/* ── Headings ── */
+.dk-qhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 0 10px; }
+.dk-qhead h1 { font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
+.dk-qhead .n { font-family: var(--d-num); font-variant-numeric: tabular-nums; font-size: 13px; color: #a0a09a; margin-left: 8px; font-weight: 400; }
+.dk-qhead .sub { font-size: 12.5px; color: var(--d-ink-2); margin-top: 2px; }
+.dk-eyebrow { font-family: var(--d-num); font-size: 10.5px; font-weight: 600; letter-spacing: .12em; color: var(--d-ink-4); margin: 18px 0 9px; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+.dk-eyebrow .n { color: var(--d-ink-3); letter-spacing: 0; font-weight: 400; }
+
+.dk-segs { display: flex; background: #ecece7; border-radius: 9px; padding: 3px; }
+.dk-segs button { padding: 5px 11px; border-radius: 7px; font-size: 12.5px; font-weight: 500; color: var(--d-ink-2); white-space: nowrap; }
+.dk-segs button[aria-pressed="true"] { background: #fff; color: var(--d-ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+
+/* ── Buttons ── */
+.dk-btn { border: 1px solid var(--d-line-2); border-radius: 8px; padding: 7px 13px; font-size: 12.5px; font-weight: 600; background: #fff; color: var(--d-ink); display: inline-flex; align-items: center; gap: 7px; }
+.dk-btn:hover { background: #f3f3ee; }
+.dk-btn:active { transform: scale(.985); }
+.dk-btn.pri { background: var(--d-brand); border-color: var(--d-brand); color: #fff; }
+.dk-btn.pri:hover { background: var(--d-brand-hover); }
+.dk-btn.lg { padding: 9px 16px; font-size: 13px; border-radius: 9px; }
+
+/* ── Rows — the worklist ── */
+.dk-rows { border: 1px solid var(--d-line-2); border-radius: 12px; overflow: hidden; background: #fff; }
+.dk-cols, .dk-row { display: grid; align-items: center; gap: 14px; padding: 0 14px; }
+.dk-cols { height: 34px; background: var(--d-wash); border-bottom: 1px solid var(--d-line-2);
+  font-family: var(--d-num); font-size: 10.5px; font-weight: 600; letter-spacing: .09em; color: var(--d-ink-4); text-transform: uppercase; }
+.dk-row { min-height: 52px; border-bottom: 1px solid var(--d-line-3, #f2f2ec); text-align: left; width: 100%; background: #fff; }
+.dk-row:last-child { border-bottom: none; }
+.dk-row:hover { background: #fafaf7; }
+.dk-row[aria-current="true"] { background: rgba(var(--d-brand-rgb), .05); box-shadow: inset 3px 0 0 var(--d-brand); }
+.dk-row .who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.dk-row .nm { font-size: 13.5px; font-weight: 600; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-row .rf { font-family: var(--d-num); font-variant-numeric: tabular-nums; font-size: 12px; color: var(--d-ink-3); }
+.dk-row .mu { font-size: 12.5px; color: var(--d-ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-row .ch { color: var(--d-ink-4); display: grid; place-items: center; }
+
+.dk-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: var(--d-gray-dot); }
+.dk-dot.good { background: var(--d-green); } .dk-dot.warn { background: var(--d-amber); }
+.dk-dot.crit { background: var(--d-red); }   .dk-dot.info { background: var(--d-accent); }
+.dk-dot.live { animation: dkPulse 2s infinite; }
+
+.dk-tag { font-size: 11.5px; padding: 2px 8px; border-radius: 5px; background: var(--d-wash); color: var(--d-ink-2); font-weight: 500; white-space: nowrap; display: inline-block; }
+.dk-tag.red { background: var(--d-red-bg); color: var(--d-red-ink); }
+.dk-tag.amber { background: var(--d-amber-bg); color: var(--d-amber-ink); }
+.dk-tag.green { background: var(--d-green-bg); color: var(--d-green-ink); }
+.dk-tag.info { background: rgba(var(--d-brand-rgb), .08); color: var(--d-brand); }
+
+.dk-empty { border: 1px dashed var(--d-line-2); border-radius: 12px; padding: 34px 20px; text-align: center; background: var(--d-surface); }
+.dk-empty b { display: block; font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+.dk-empty span { font-size: 12.5px; color: var(--d-ink-2); }
+
+/* ── Two-pane (Open an account) ── */
+.dk-split { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) minmax(400px, 520px); overflow: hidden; }
+.dk-split > .p { min-width: 0; overflow: hidden; display: flex; flex-direction: column; }
+.dk-split > .p.r { border-left: 1px solid var(--d-line); background: var(--d-surface); }
+@media (max-width: 1180px) {
+  .dk-split { grid-template-columns: minmax(0, 1fr); }
+  .dk-split > .p.r { display: none; }
+  .dk-split.busy > .p.l { display: none; }
+  .dk-split.busy > .p.r { display: flex; border-left: none; }
+}
+/* The capture wizard is phone-shaped by design — sit it in the pane, don't stretch it. */
+.dk-flow { flex: 1; min-height: 0; display: grid; place-items: center; padding: 20px; }
+.dk-flow > * { width: 100%; max-width: 440px; height: 100%; max-height: 760px; border-radius: 14px; overflow: hidden;
+  border: 1px solid var(--d-line-2); background: #fff; box-shadow: 0 18px 44px -22px rgba(17,24,29,.3); }
+
+/* ── Case detail (the desk's right pane) ── */
+.dk-case { height: 100%; display: flex; flex-direction: column; background: #fff; min-height: 0; }
+.dk-case-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--d-line-2); flex: 0 0 auto; }
+.dk-case-head .x { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--d-ink-3); flex: 0 0 auto; }
+.dk-case-head .x:hover { background: var(--d-wash); color: var(--d-ink); }
+.dk-case-head .x svg { transform: rotate(180deg); }
+.dk-case-head .nm { font-size: 15px; font-weight: 700; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-case-head .rf { font-size: 11.5px; color: var(--d-ink-3); margin-top: 2px; }
+.dk-case-body { flex: 1; overflow-y: auto; padding: 16px 18px 24px; }
+
+/* Next best action — the reason this pane exists. */
+.dk-nba { border: 1px solid var(--d-line-2); border-radius: 12px; padding: 14px; background: var(--d-surface); }
+.dk-nba.do { border-color: rgba(var(--d-brand-rgb), .3); background: rgba(var(--d-brand-rgb), .04); }
+.dk-nba.done { border-color: #cfe9d9; background: var(--d-green-bg); }
+.dk-nba .hd { display: flex; align-items: center; gap: 7px; font-family: var(--d-num); font-size: 10.5px; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--d-ink-4); margin-bottom: 9px; }
+.dk-nba.do .hd { color: var(--d-brand); }
+.dk-nba.done .hd { color: var(--d-green-ink); }
+.dk-nba .hd .ic { display: grid; place-items: center; }
+.dk-nba .ttl { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
+.dk-nba .why { font-size: 12.5px; line-height: 1.55; color: var(--d-ink-2); margin-top: 5px; }
+.dk-nba .acts { margin-top: 12px; }
+.dk-nba .acts .dk-btn { width: 100%; justify-content: center; }
+.dk-nba .alt { margin-top: 14px; border-top: 1px solid var(--d-line-2); padding-top: 10px; }
+.dk-nba .alt-h { font-family: var(--d-num); font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--d-ink-4); margin-bottom: 6px; }
+.dk-nba .alt-i { display: flex; align-items: flex-start; gap: 10px; width: 100%; text-align: left; padding: 8px; border-radius: 9px; color: var(--d-ink-3); }
+.dk-nba .alt-i:hover { background: #fff; color: var(--d-ink); box-shadow: 0 0 0 1px var(--d-line-2); }
+.dk-nba .alt-i .t { flex: 1; min-width: 0; }
+.dk-nba .alt-i .t b { display: block; font-size: 13px; font-weight: 600; color: var(--d-ink); }
+.dk-nba .alt-i .t span { display: block; font-size: 12px; line-height: 1.5; color: var(--d-ink-2); margin-top: 2px; }
+.dk-nba .alt-i svg { margin-top: 3px; flex: 0 0 auto; }
+
+/* Account plate */
+.dk-acct { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 12px;
+  padding: 12px 14px; border-radius: 12px; background: var(--d-rail); color: #fff; }
+.dk-acct .k { display: block; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--d-on-rail-dim); }
+.dk-acct .v { display: block; font-size: 19px; font-weight: 700; letter-spacing: .03em; margin-top: 3px; }
+.dk-acct .c { display: block; font-size: 11.5px; color: var(--d-on-rail-dim); margin-top: 2px; }
+
+/* Checks */
+.dk-checks { border: 1px solid var(--d-line-2); border-radius: 12px; overflow: hidden; }
+.dk-check { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-bottom: 1px solid var(--d-line-3, #f2f2ec); }
+.dk-check:last-child { border-bottom: none; }
+.dk-check .l { flex: 1; min-width: 0; font-size: 13px; }
+.dk-check .s { font-size: 12px; color: var(--d-ink-3); }
+.dk-check .s.good { color: var(--d-green-ink); }
+.dk-check .s.crit { color: var(--d-red-ink); font-weight: 600; }
+.dk-check .s.info { color: var(--d-brand); }
+
+/* Contact */
+.dk-kv { border: 1px solid var(--d-line-2); border-radius: 12px; overflow: hidden; }
+.dk-kv > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 12px; border-bottom: 1px solid var(--d-line-3, #f2f2ec); font-size: 13px; }
+.dk-kv > div:last-child { border-bottom: none; }
+.dk-kv span { color: var(--d-ink-2); font-size: 12.5px; }
+.dk-kv a { color: var(--d-brand); text-decoration: none; font-weight: 500; }
+.dk-kv a:hover { text-decoration: underline; }
+
+/* Timeline */
+.dk-tl { padding-left: 2px; }
+.dk-tl-i { display: flex; gap: 10px; padding: 6px 0; }
+.dk-tl-i .d { width: 7px; height: 7px; border-radius: 50%; background: var(--d-accent); margin-top: 5px; flex: 0 0 auto; }
+.dk-tl-i .t { font-size: 12.5px; line-height: 1.5; }
+.dk-tl-i .t em { display: block; font-style: normal; font-size: 11px; color: var(--d-ink-3); margin-top: 1px; }
+
+/* Toast */
+.dk-toast { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 40;
+  background: var(--d-ink); color: #fff; font-size: 13px; font-weight: 500; padding: 9px 16px; border-radius: 9px;
+  box-shadow: 0 12px 28px -8px rgba(0,0,0,.4); white-space: nowrap; }
+
+/* ── Agent surfaces (Chat / Explore / Alerts / Profile) ──
+   Not redesigned yet — they're Aura's own surfaces. Sit them in a sane column
+   rather than stretching phone layouts across a monitor. */
+.dk-hold { height: 100%; display: grid; place-items: center; padding: 20px; background: var(--d-page); }
+.dk-hold > * { width: 100%; max-width: 460px; height: 100%; max-height: 860px; border-radius: 14px; overflow: hidden;
+  border: 1px solid var(--d-line-2); box-shadow: 0 18px 44px -22px rgba(17,24,29,.3); }

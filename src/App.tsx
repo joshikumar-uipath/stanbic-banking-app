@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core';
 import './App.css';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
-import { ConfigProvider, useConfig, useConfigUpdater, useTenantConfigLoader, loadCachedConfig, loadLocalConfig, LOGO_SIZES } from './config';
+import { ConfigProvider, useConfig, useConfigUpdater, useTenantConfigLoader, loadCachedConfig, loadLocalConfig, stanbicConfig, applyFavicon, LOGO_SIZES } from './config';
 import type { TenantConnection } from './onboarding/tenantSelection';
 import type { UiPathSDKConfig } from '@uipath/uipath-typescript/core';
 import { ConversationalAgent } from '@uipath/uipath-typescript/conversational-agent';
@@ -12,6 +12,8 @@ import type { AgentGetResponse } from '@uipath/uipath-typescript/conversational-
 import HomeTab from './components/HomeTab';
 import CustomersTab from './components/CustomersTab';
 import ApprovalsTab from './components/ApprovalsTab';
+import OpenAccountTab from './components/OpenAccountTab';
+import DeskShell from './employee/DeskShell';
 import ExploreTab from './components/ExploreTab';
 import ChatHistoryTab from './components/ChatHistoryTab';
 import ChatView from './components/ChatView';
@@ -98,7 +100,11 @@ function parseToken(token: string | undefined): { firstName: string; email: stri
   }
 }
 
-function MainApp() {
+/** Which chrome the app wears. Set by the route in main.tsx — nothing else. */
+export type Shell = 'mobile' | 'web';
+
+function MainApp({ shell = 'mobile' }: { shell?: Shell }) {
+  const web = shell === 'web';
   const { sdk, isLoading, isAuthenticated, loginWithCredentials, logout, error, profile } = useAuth();
   const { isRtl, theme } = useTheme();
   const { branding } = useConfig();
@@ -182,6 +188,7 @@ function MainApp() {
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [customersOpen, setCustomersOpen] = useState(false); // Option B: Customers flow as an overlay launched from Home
   const [approvalsOpen, setApprovalsOpen] = useState(false); // Mobile Approvals — overlay launched from Home
+  const [openAccountOpen, setOpenAccountOpen] = useState(false); // Assisted account opening — overlay on the phone, a destination on the desk
   const [exploreInitialCap, setExploreInitialCap] = useState<string | null>(null);
   const [unreadAlerts, setUnreadAlerts] = useState(() => getInitialUnreadCount());
   const [homeNavPressCount, setHomeNavPressCount] = useState(0);
@@ -788,7 +795,100 @@ function MainApp() {
     );
   }
 
-  // ── Tabbed app ────────────────────────────────────────────────────
+  // ── The desk (/employee-web) ──────────────────────────────────────
+  // A real desktop app, not the phone in a frame: its own chrome, density and
+  // worklists, sharing the Operations Workbench's design language. It still
+  // renders the *same* wizard, approval sheet and Customer360 the phone does,
+  // so the two surfaces can't drift.
+  if (web) {
+    return (
+      <DeskShell
+        userName={userName}
+        userEmail={userEmail}
+        unreadAlerts={unreadAlerts}
+        onLogout={logout}
+        onAlertsSeen={() => setUnreadAlerts(0)}
+        agentSurfaces={{
+          chat: <ChatHistoryTab
+            onExplore={() => undefined}
+            conversationalAgent={conversationalAgent}
+            onOpenChat={(agent, conversationId) => { setChatAgent(agent); setChatConversationId(conversationId); }}
+          />,
+          explore: <ExploreTab
+            conversationalAgent={conversationalAgent}
+            onSelectAgent={(agent) => { setChatAgent(agent); setChatConversationId(undefined); }}
+            initialCapability={exploreInitialCap}
+          />,
+          alerts: <AlertsTab />,
+          profile: <ProfileTab userName={userName} userEmail={userEmail} onLogout={logout} />,
+        }}
+      />
+    );
+  }
+
+  // ── Tabbed app (the phone) ────────────────────────────────────────
+  const tabContent = (
+    <>
+      {activeTab === 'home' && (
+        <HomeTab
+          conversationalAgent={conversationalAgent}
+          selectedAgent={selectedAgent}
+          onSelectAgent={setSelectedAgent}
+          onStartChat={(agent, ctx) => { setChatAgent(agent); setChatContext(ctx); }}
+          onLogout={logout}
+          userName={userName}
+          homeNavPressCount={homeNavPressCount}
+          onNavigateToTasks={() => { setExploreInitialCap('tasks'); setActiveTab('explore'); }}
+          onNavigateToExplore={(cap) => { setExploreInitialCap(cap); setActiveTab('explore'); }}
+          onOpenCustomers={() => setCustomersOpen(true)}
+          onOpenApprovals={() => setApprovalsOpen(true)}
+          onOpenAccount={() => setOpenAccountOpen(true)}
+        />
+      )}
+      {activeTab === 'chat' && (
+        <ChatHistoryTab
+          onExplore={() => setActiveTab('explore')}
+          conversationalAgent={conversationalAgent}
+          onOpenChat={(agent, conversationId) => {
+            setChatAgent(agent);
+            setChatConversationId(conversationId);
+          }}
+        />
+      )}
+      {activeTab === 'explore' && (
+        <ExploreTab
+          conversationalAgent={conversationalAgent}
+          onSelectAgent={(agent) => {
+            setChatAgent(agent);
+            setChatConversationId(undefined);
+          }}
+          initialCapability={exploreInitialCap}
+        />
+      )}
+      {activeTab === 'alerts' && <AlertsTab />}
+      {activeTab === 'profile' && (
+        <ProfileTab userName={userName} userEmail={userEmail} onLogout={logout} />
+      )}
+      {/* Work surfaces launched from Home — overlay the content area; the bottom
+          nav stays so the banker can hop away mid-task. */}
+      {customersOpen && (
+        <div className="absolute inset-0 z-40">
+          <CustomersTab onClose={() => setCustomersOpen(false)} />
+        </div>
+      )}
+      {approvalsOpen && (
+        <div className="absolute inset-0 z-40">
+          <ApprovalsTab onClose={() => setApprovalsOpen(false)} />
+        </div>
+      )}
+      {openAccountOpen && (
+        <div className="absolute inset-0 z-40">
+          <OpenAccountTab onClose={() => setOpenAccountOpen(false)} />
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div className="flex flex-col h-full overflow-hidden relative" dir={isRtl ? 'rtl' : 'ltr'} style={{ background: '#000' }}>
       {/* Claim notification banner — app-wide */}
@@ -849,65 +949,14 @@ function MainApp() {
           </button>
         </div>
       )}
-      <div className="flex-1 overflow-hidden relative">
-        {activeTab === 'home' && (
-          <HomeTab
-            conversationalAgent={conversationalAgent}
-            selectedAgent={selectedAgent}
-            onSelectAgent={setSelectedAgent}
-            onStartChat={(agent, ctx) => { setChatAgent(agent); setChatContext(ctx); }}
-            onLogout={logout}
-            userName={userName}
-            homeNavPressCount={homeNavPressCount}
-            onNavigateToTasks={() => { setExploreInitialCap('tasks'); setActiveTab('explore'); }}
-            onNavigateToExplore={(cap) => { setExploreInitialCap(cap); setActiveTab('explore'); }}
-            onOpenCustomers={() => setCustomersOpen(true)}
-            onOpenApprovals={() => setApprovalsOpen(true)}
-          />
-        )}
-        {activeTab === 'chat' && (
-          <ChatHistoryTab
-            onExplore={() => setActiveTab('explore')}
-            conversationalAgent={conversationalAgent}
-            onOpenChat={(agent, conversationId) => {
-              setChatAgent(agent);
-              setChatConversationId(conversationId);
-            }}
-          />
-        )}
-        {activeTab === 'explore' && (
-          <ExploreTab
-            conversationalAgent={conversationalAgent}
-            onSelectAgent={(agent) => {
-              setChatAgent(agent);
-              setChatConversationId(undefined);
-            }}
-            initialCapability={exploreInitialCap}
-          />
-        )}
-        {activeTab === 'alerts' && <AlertsTab />}
-        {activeTab === 'profile' && (
-          <ProfileTab userName={userName} userEmail={userEmail} onLogout={logout} />
-        )}
-        {/* Option B: Customers (Key Relationships) launched from Home — overlays the
-            content area; the bottom nav stays so the manager can hop away. */}
-        {customersOpen && (
-          <div className="absolute inset-0 z-40">
-            <CustomersTab onClose={() => setCustomersOpen(false)} />
-          </div>
-        )}
-        {approvalsOpen && (
-          <div className="absolute inset-0 z-40">
-            <ApprovalsTab onClose={() => setApprovalsOpen(false)} />
-          </div>
-        )}
-      </div>
+      <div className="flex-1 overflow-hidden relative">{tabContent}</div>
       <BottomNav
         activeTab={activeTab}
         unreadAlerts={unreadAlerts}
         onTabChange={(tab) => {
           setCustomersOpen(false);
           setApprovalsOpen(false);
+          setOpenAccountOpen(false);
           if (tab === 'alerts') setUnreadAlerts(0);
           if (tab === 'home') setHomeNavPressCount(c => c + 1);
           if (tab !== 'explore') setExploreInitialCap(null);
@@ -961,7 +1010,8 @@ function BrandColorBridge() {
     const srgb = hexToRgbTriplet(secondary);
     if (srgb) root.style.setProperty('--brand-secondary-rgb', srgb);
     if (branding.appName) document.title = branding.appName;
-  }, [branding.primaryColor, branding.secondaryColor, branding.appName]);
+    applyFavicon(branding.favicon, branding.appName, branding.deepBlue || branding.primaryColor);
+  }, [branding.primaryColor, branding.secondaryColor, branding.appName, branding.favicon, branding.deepBlue]);
   return null;
 }
 
@@ -977,11 +1027,13 @@ function ConfigLoaderBridge({ connection }: { connection: TenantConnection }) {
   return null;
 }
 
-export default function App() {
+export default function App({ shell = 'mobile' }: { shell?: Shell } = {}) {
   const connection = useMemo(envConnection, []);
-  // Local (no-PAT) admin config wins; otherwise the per-tenant Data Service cache.
+  // Local (no-PAT) admin config wins; otherwise the per-tenant Data Service cache;
+  // otherwise Stanbic — matching every other surface, so a fresh browser with no
+  // saved profile shows Stanbic branding rather than the bundled Aura default.
   const local = useMemo(() => loadLocalConfig(), []);
-  const cached = useMemo(() => local ?? loadCachedConfig(connection), [local, connection]);
+  const cached = useMemo(() => local ?? loadCachedConfig(connection) ?? stanbicConfig, [local, connection]);
   return (
     <ConfigProvider initialOverride={cached}>
       <ThemeProvider>
@@ -990,7 +1042,7 @@ export default function App() {
               Data Service fetch clobber it. Otherwise load from Data Service. */}
           {!local && <ConfigLoaderBridge connection={connection} />}
           <BrandColorBridge />
-          <MainApp />
+          <MainApp shell={shell} />
         </AuthProvider>
       </ThemeProvider>
     </ConfigProvider>

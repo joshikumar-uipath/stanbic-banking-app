@@ -32,6 +32,10 @@ export interface Branding {
    *  admin (Branding) so wide vs. compact logos can be sized without re-cropping
    *  the image. Undefined → 'large' (the original size). */
   logoSize?: LogoSize;
+  /** Browser-tab icon (favicon). A data URI (uploaded in the admin) or an image
+   *  URL; a square PNG/SVG works best. Empty → the bundled default. Applied to
+   *  every surface's <link rel="icon"> by the brand bridges. */
+  favicon?: string;
 }
 
 export type LogoSize = 'small' | 'medium' | 'large';

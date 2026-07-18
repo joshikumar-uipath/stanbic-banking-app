@@ -1,0 +1,8 @@
+{
+  // Open the dev server (and any forwarded port) in the real browser, not VS
+  // Code's built-in "Simple Browser" preview. `openBrowser` = external browser.
+  "remote.portsAttributes": {
+    "5180": { "label": "Stanbic Banking App", "onAutoForward": "openBrowser" }
+  },
+  "remote.otherPortsAttributes": { "onAutoForward": "openBrowser" }
+}

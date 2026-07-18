@@ -1,5 +1,6 @@
 import { useRef } from 'react';
 import type { Branding, LogoSize } from '../../config';
+import { generatedFavicon } from '../../config';
 import { fieldLabel, fieldInput } from '../components/AdminShell';
 
 export default function BrandingTab({ branding, onChange }: { branding: Branding; onChange: (next: Branding) => void }) {
@@ -53,6 +54,19 @@ export default function BrandingTab({ branding, onChange }: { branding: Branding
           <ColorInput value={branding.deepBlue} onChange={(v) => set('deepBlue', v)} />
         </Field>
       </Row>
+
+      <SectionHeader
+        title="Browser tab"
+        subtitle="The tab title uses the App name above. Upload a tab icon (favicon) here, or leave it empty to auto-generate one from the app name."
+      />
+      <Field label="Favicon (tab icon)">
+        <FaviconInput
+          value={branding.favicon}
+          onChange={(v) => set('favicon', v)}
+          appName={branding.appName}
+          color={branding.deepBlue || branding.primaryColor}
+        />
+      </Field>
     </div>
   );
 }
@@ -178,6 +192,81 @@ function LogoInput({ value, onChange }: { value?: string; onChange: (v: string) 
       </div>
       <p style={{ fontSize: 11, color: 'rgba(24,33,38,0.5)', marginTop: 6 }}>
         PNG or SVG. Shown above the app name on the welcome screen. Leave empty for a text-only view. Save / Publish to apply.
+      </p>
+    </div>
+  );
+}
+
+// Optional favicon: upload any square-ish image → we downscale it to a tiny 128px
+// PNG so it's a proper favicon regardless of the source (a multi-res .ico, a big
+// PNG…) and the config stays small. SVGs are kept as-is (already tiny + scalable).
+// When empty, the preview shows the AUTO-GENERATED icon from the app name + colour.
+const FAVICON_PX = 128;                    // rendered size; ample for tabs + the in-app mark
+const MAX_SOURCE_BYTES = 8 * 1024 * 1024;  // just a sanity cap on the file we load
+function FaviconInput({ value, onChange, appName, color }: { value?: string; onChange: (v: string) => void; appName: string; color: string }) {
+  const ref = useRef<HTMLInputElement>(null);
+  const onFile = (file: File) => {
+    if (file.size > MAX_SOURCE_BYTES) {
+      alert('That file is very large. Please pick a normal image (PNG, SVG, or .ico).');
+      return;
+    }
+    // SVG: keep as-is — vector, already tiny, scales crisply.
+    if (file.type === 'image/svg+xml' || /\.svg$/i.test(file.name)) {
+      const reader = new FileReader();
+      reader.onload = () => onChange(String(reader.result));
+      reader.onerror = () => alert('Could not read that image file.');
+      reader.readAsDataURL(file);
+      return;
+    }
+    // Raster (PNG / JPG / WebP / .ico): draw onto a small square canvas → PNG data
+    // URI. Handles multi-resolution .ico files and shrinks anything oversized.
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = FAVICON_PX;
+        canvas.height = FAVICON_PX;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { onChange(url); return; }
+        const scale = Math.min(FAVICON_PX / img.width, FAVICON_PX / img.height) || 1;
+        const w = img.width * scale, h = img.height * scale;
+        ctx.drawImage(img, (FAVICON_PX - w) / 2, (FAVICON_PX - h) / 2, w, h);
+        onChange(canvas.toDataURL('image/png'));
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); alert('Could not read that image. Try a PNG or SVG.'); };
+    img.src = url;
+  };
+  const btn: React.CSSProperties = {
+    padding: '8px 14px', borderRadius: 8, border: '1.5px solid rgba(24,33,38,0.12)',
+    background: '#fff', fontSize: 13, fontWeight: 500, cursor: 'pointer', color: '#182126',
+  };
+  const preview = value && value.trim() ? value : generatedFavicon(appName, color);
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ width: 40, height: 40, borderRadius: 9, overflow: 'hidden', flexShrink: 0, boxShadow: '0 1px 3px rgba(24,33,38,0.18)', background: '#fff' }}>
+          <img src={preview} alt="favicon preview" width={40} height={40} style={{ display: 'block', width: 40, height: 40, objectFit: 'contain' }} />
+        </div>
+        <input
+          ref={ref}
+          type="file"
+          accept="image/png,image/svg+xml,image/webp,.svg,.png,.ico"
+          style={{ display: 'none' }}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }}
+        />
+        <button type="button" onClick={() => ref.current?.click()} style={btn}>
+          {value ? 'Replace icon' : 'Upload icon'}
+        </button>
+        {value && (
+          <button type="button" onClick={() => onChange('')} style={{ ...btn, color: '#b91c1c' }}>Use auto</button>
+        )}
+      </div>
+      <p style={{ fontSize: 11, color: 'rgba(24,33,38,0.5)', marginTop: 6 }}>
+        {value ? 'Your uploaded tab icon.' : 'Auto-generated from the app name.'} Upload any square image — PNG, SVG or .ico; large icons are shrunk to a tiny favicon automatically. Save / Publish to apply.
       </p>
     </div>
   );
