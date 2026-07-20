@@ -87,6 +87,7 @@ const TOOLS: Tool[] = [
   { key: 'kafka', name: 'Mock Kafka console', url: '/kafka', icon: 'activity', accent: DEMO, desc: 'The live event stream across the eight topics.' },
   { key: 'finacle', name: 'Mock Finacle UI', url: '/finacle', icon: 'landmark', accent: SLATE, desc: 'Core banking back office — CIFs and accounts.' },
   { key: 'comms', name: 'Notification service', url: '/comms', icon: 'message', accent: DEMO, desc: 'Every SMS and email the customer receives, per step.' },
+  { key: 'tower', name: 'Control tower', url: '/tower', icon: 'dashboard', accent: SLATE, desc: 'Throughput, straight-through rate and what breaks.' },
 ];
 
 // index.css sets a global --brand-primary; the front door has no host app to
@@ -215,6 +216,7 @@ function Shell({ route }: { route: RouteKey }) {
     kafka: { name: 'Mock Kafka Console', role: 'Presenter · demo', url: '/kafka', phase: 'Phase 1', icon: 'activity' },
     finacle: { name: 'Mock Finacle UI', role: 'Presenter · demo', url: '/finacle', phase: 'Phase 1', icon: 'landmark' },
     comms: { name: 'Notification Service', role: 'Presenter · demo', url: '/comms', phase: 'Phase 1', icon: 'message' },
+    tower: { name: 'Control Tower', role: 'Presenter · demo', url: '/tower', phase: 'Phase 1', icon: 'dashboard' },
   };
   const m = meta[route] ?? { name: route, role: '—', url: `/${route}`, phase: 'Phase 1', icon: 'dashboard' as IconName };
   return (

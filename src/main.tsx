@@ -53,6 +53,8 @@ if (route === 'admin') {
   import('./instruments/Finacle').then((mod) => render(<mod.default />))
 } else if (route === 'comms') {
   import('./instruments/Comms').then((mod) => render(<mod.default />))
+} else if (route === 'tower') {
+  import('./instruments/Tower').then((mod) => render(<mod.default />))
 } else {
   // launcher
   import('./skeleton').then((mod) => render(<mod.SkeletonRouter route={route} />))

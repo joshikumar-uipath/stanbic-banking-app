@@ -39,7 +39,7 @@ export interface OnboardingStore {
 const CASES_KEY = 'aof_cases';
 const EVENTS_KEY = 'aof_events';
 const SEED_VERSION_KEY = 'aof_seed_v';
-const SEED_VERSION = '5';   // bump to force a reseed when the demo data changes
+const SEED_VERSION = '6';   // bump to force a reseed when the demo data changes
 const SEED_AT_KEY = 'aof_seed_at';   // wall-clock of the last seed, for staleness
 // Seeded cases freeze their createdAt at seed time, so "opened 2h ago" drifts to
 // "opened 3d ago" once the seed sits overnight. A new demo sitting should start
@@ -251,13 +251,13 @@ function seed(s: MockOnboardingStore) {
     { firstName: 'Tunde', lastName: 'Adeyemi', phone: '08067654322', email: 'tunde.adeyemi@example.com', bvn: '22212345672', nin: '10123456782', address: '22 Ahmadu Bello Way, Abuja', channel: 'self', source: 'customer', state: 'ACCOUNT_CREATED', account: true, agoMin: 180 },
     { firstName: 'Ngozi', lastName: 'Eze', phone: '07051239873', email: 'ngozi.eze@example.com', bvn: '22212345673', nin: '10123456783', address: '9 Aba Rd, Port Harcourt', source: 'branch', state: 'VALIDATED', agoMin: 22 },
     { firstName: 'Chidi', lastName: 'Balogun', phone: '08039876544', email: 'chidi.balogun@example.com', bvn: '22212345674', nin: '10123456784', address: '5 Awolowo Way, Ikeja', source: 'rm', state: 'PENDING_LIVENESS', account: true, vals: { LIVENESS: 'pending' }, agoMin: 65 },
-    { firstName: 'Fatima', lastName: 'Bello', phone: '09012345675', email: 'fatima.bello@example.com', bvn: '22212345675', nin: '10123456785', address: '3 Ibrahim Rd, Kano', channel: 'bulk', source: 'rm', employer: 'NYSC', batchId: 'BATCH-001', state: 'PENDING_DOCUMENTS', account: true, agoMin: 300 },
+    { firstName: 'Fatima', lastName: 'Bello', phone: '09012345675', email: 'fatima.bello@example.com', bvn: '22212345675', nin: '10123456785', address: '3 Ibrahim Rd, Kano', channel: 'bulk', source: 'rm', employer: 'NYSC', batchId: 'BATCH-001', state: 'PENDING_DOCUMENTS', account: true, agoMin: 1800 },
     { firstName: 'Emeka', lastName: 'Nwosu', phone: '08023456786', email: 'emeka.nwosu@example.com', bvn: '22212345676', nin: '10123456786', address: '41 Chime Ave, Enugu', source: 'contact-centre', state: 'VALIDATION_IN_PROGRESS', vals: { NIN: 'running', BVN: 'passed', AML: 'running', PEP: 'pending', FRAUD: 'pending', LIVENESS: 'pending' }, agoMin: 4 },
     { firstName: 'Aisha', lastName: 'Yusuf', phone: '08134567897', email: 'aisha.yusuf@example.com', bvn: '22212345677', nin: '10123456787', address: '7 Sultan Rd, Sokoto', source: 'rm', state: 'EXCEPTION', vals: { NIN: 'timeout', BVN: 'passed', AML: 'passed', PEP: 'passed', FRAUD: 'passed', LIVENESS: 'pending' }, agoMin: 35 },
     { firstName: 'Blessing', lastName: 'Okoro', phone: '08098765438', email: 'blessing.okoro@example.com', bvn: '22212345678', nin: '10123456788', address: '12 Warri Rd, Delta', channel: 'bulk', source: 'rm', employer: 'Delta Co-op', batchId: 'BATCH-002', state: 'EXCEPTION', vals: { BVN: 'failed', NIN: 'passed', AML: 'passed', PEP: 'passed', FRAUD: 'passed', LIVENESS: 'pending' }, agoMin: 120 },
     // The two named rows above anchor the demo narrative; these fill their
     // batches out to a believable size — NYSC 10, Delta Co-op 20.
-    ...bulkRows('NYSC', 'BATCH-001', 9, 100, 300),
+    ...bulkRows('NYSC', 'BATCH-001', 9, 100, 1800),
     ...bulkRows('Delta Co-op', 'BATCH-002', 19, 200, 120),
   ];
   rows.forEach((r) => { void seedCase(s, r); });
