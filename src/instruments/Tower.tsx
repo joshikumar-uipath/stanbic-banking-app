@@ -54,20 +54,25 @@ const CHECK_LABEL: Record<string, string> = {
 // A factory line is not a set of stacked bars — material enters, travels through
 // stations, and at each one some of it falls out. Thickness is what is still
 // moving; every tributary is work that left the line and why.
-const VB_W = 1000, VB_H = 300;
-const S_TOP = 74;        // top edge of the first lane (labels ride above it)
-const S_MAX = 104;       // total thickness shared by both lanes at full intake
-const LANE_GAP = 13;     // surface gap between the two lines
-const LEAK_Y = 216;      // where tributaries land
-const SX = [26, 350, 674, 962];
+const VB_W = 1600, VB_H = 300;
+const S_TOP = 76;        // top edge of the stream (station heads ride above it)
+const S_MAX = 118;       // stream thickness at full intake
+const CH_GAP = 3;        // surface gap dividing the two channels inside the stream
+const LEAK_Y = 226;      // where tributaries land
+const SX = [40, 540, 1030, 1430];
 
-/** One lane: straight top edge, bottom edge easing down past each station. */
-function stream(th: number[], top: number): string {
+/** A band of the stream, between a top and a bottom edge that both ease. */
+function bandPath(tops: number[], bots: number[]): string {
   const last = SX.length - 1;
-  let d = `M${SX[0]},${top} L${SX[last]},${top} L${SX[last]},${top + th[last]}`;
+  let d = `M${SX[0]},${tops[0]}`;
+  for (let i = 0; i < last; i++) {
+    const xm = (SX[i] + SX[i + 1]) / 2;
+    d += ` C${xm},${tops[i]} ${xm},${tops[i + 1]} ${SX[i + 1]},${tops[i + 1]}`;
+  }
+  d += ` L${SX[last]},${bots[last]}`;
   for (let i = last; i > 0; i--) {
-    const x0 = SX[i], x1 = SX[i - 1], xm = (x0 + x1) / 2;
-    d += ` C${xm},${top + th[i]} ${xm},${top + th[i - 1]} ${x1},${top + th[i - 1]}`;
+    const xm = (SX[i] + SX[i - 1]) / 2;
+    d += ` C${xm},${bots[i]} ${xm},${bots[i - 1]} ${SX[i - 1]},${bots[i - 1]}`;
   }
   return d + ' Z';
 }
@@ -101,81 +106,72 @@ function TowerInner() {
     const from = now - cfg.hours * 3600_000;
     const s = cases.filter((c) => Date.parse(c.createdAt) >= from);
 
-    // One lane per channel, both scaled by the same intake so a thick lane really
-    // does mean more work. The question this answers: does the payroll line run
-    // cleaner than the walk-in line?
+    // One strong stream, subdivided by channel. Two parallel lanes fail when one
+    // channel is 6x the other — the small one becomes a hairline. Stacking the
+    // channels inside a single stream keeps the silhouette readable AND shows the
+    // mix: the boundary between the bands is the split.
     const failed = (c: OnboardingCase, ...k: ValidationKind[]) =>
       c.validations.some((v) => k.includes(v.kind) && (v.status === 'failed' || v.status === 'timeout'));
 
     const total = s.length;
-    const lanesIn = [
-      { key: 'bulk', label: 'Bulk payroll', arr: s.filter((c) => c.channel === 'bulk') },
-      { key: 'single', label: 'Walk-in & self-serve', arr: s.filter((c) => c.channel !== 'bulk') },
-    ].filter((l) => l.arr.length > 0);
-
     const scale = (n: number) => (total ? (n / total) * S_MAX : 0);
-    const lanesOut: {
-      key: string; label: string; top: number; n: number; th: number[]; counts: number[]; d: string;
-      leaks: { n: number; c: string; label: string; at: number }[];
-    }[] = [];
 
-    let top = S_TOP;
-    for (const l of lanesIn) {
-      const a = l.arr;
-      const leakId = a.filter((c) => failed(c, 'NIN', 'BVN')).length;
-      const afterId = a.length - leakId;
-      const leakScreen = a.filter((c) => !failed(c, 'NIN', 'BVN') && failed(c, 'AML', 'PEP', 'FRAUD')).length;
-      const afterScreen = afterId - leakScreen;
-      const open = a.filter(opened).length;
-      const leakRunning = Math.max(0, afterScreen - open);
-      const activated = a.filter((c) => c.state === 'FULLY_ACTIVATED').length;
-      const leakKyc = Math.max(0, open - activated);
-      const counts = [a.length, afterId, open, activated];
-      const th = counts.map((n) => (n > 0 ? Math.max(1.5, scale(n)) : 0));
-      lanesOut.push({
-        key: l.key, label: l.label, top, n: a.length, counts, th, d: stream(th, top),
-        leaks: [
-          { at: 0, n: leakId, c: PERSON, label: 'NIN or BVN needed a person' },
-          { at: 1, n: leakScreen, c: PERSON, label: 'Screening needed a person' },
-          { at: 1, n: leakRunning, c: DIM, label: 'Still running its checks' },
-          { at: 2, n: leakKyc, c: DIM, label: 'Open, KYC outstanding' },
-        ].filter((x) => x.n > 0),
-      });
-      top += scale(a.length) + LANE_GAP;
-    }
+    // Per channel: the count still on the line at each of the four stations.
+    const channelCounts = (arr: OnboardingCase[]) => {
+      const leakId = arr.filter((c) => failed(c, 'NIN', 'BVN')).length;
+      const afterId = arr.length - leakId;
+      const leakScreen = arr.filter((c) => !failed(c, 'NIN', 'BVN') && failed(c, 'AML', 'PEP', 'FRAUD')).length;
+      const open = arr.filter(opened).length;
+      const activated = arr.filter((c) => c.state === 'FULLY_ACTIVATED').length;
+      return { counts: [arr.length, afterId, open, activated], leakId, leakScreen,
+        leakRunning: Math.max(0, afterId - leakScreen - open), leakKyc: Math.max(0, open - activated) };
+    };
 
-    // Both lanes leak for the same reasons, so a reason gets ONE landing and one
-    // label — each lane just feeds a slice of it. Repeating the label per lane
-    // read as a duplicate rather than a split.
-    const raw = lanesOut.flatMap((lane) => lane.leaks.map((l) => ({ ...l, lane })));
-    const groups = new Map<string, { at: number; label: string; c: string; n: number; items: typeof raw }>();
-    for (const r of raw) {
-      const k = `${r.at}|${r.label}`;
-      const g = groups.get(k) ?? { at: r.at, label: r.label, c: r.c, n: 0, items: [] as typeof raw };
-      g.n += r.n; g.items.push(r); groups.set(k, g);
-    }
+    const chans = [
+      { key: 'bulk', label: 'Bulk payroll', c: '#3B82F6', arr: s.filter((c) => c.channel === 'bulk') },
+      { key: 'single', label: 'Walk-in & self-serve', c: '#5FD39A', arr: s.filter((c) => c.channel !== 'bulk') },
+    ].filter((ch) => ch.arr.length > 0).map((ch) => ({ ...ch, ...channelCounts(ch.arr) }));
 
+    // Stack the channel bands within the stream at every station: band k's top is
+    // the running sum of the bands above it, its bottom that sum plus its own value.
+    const bands = chans.map((ch, k) => {
+      const above = chans.slice(0, k);
+      const tops = SX.map((_, si) => S_TOP + scale(above.reduce((sum, c) => sum + c.counts[si], 0)) + k * CH_GAP);
+      const bots = tops.map((t, si) => t + scale(ch.counts[si]));
+      return { ...ch, tops, bots, d: bandPath(tops, bots) };
+    });
+
+    // Tributaries: one landing per reason, fed by a slice from each channel band,
+    // peeling from that band's own lower edge so the ribbon starts where it leaves.
+    const reasons = [
+      { at: 0, key: 'id', label: 'NIN or BVN needed a person', c: PERSON, pick: (ch: typeof chans[number]) => ch.leakId },
+      { at: 1, key: 'screen', label: 'Screening needed a person', c: PERSON, pick: (ch: typeof chans[number]) => ch.leakScreen },
+      { at: 1, key: 'run', label: 'Still running its checks', c: DIM, pick: (ch: typeof chans[number]) => ch.leakRunning },
+      { at: 2, key: 'kyc', label: 'Open, KYC outstanding', c: DIM, pick: (ch: typeof chans[number]) => ch.leakKyc },
+    ];
     const landLanes: Record<number, number> = {};
     const rivers: { d: string; c: string; n: number; label: string; lane: string }[] = [];
     const landings: { lx: number; ly: number; lh: number; n: number; label: string; c: string }[] = [];
-    for (const g of groups.values()) {
-      const lx = SX[g.at + 1] - 30;
-      const lh = Math.max(2, scale(g.n));
+    for (const r of reasons) {
+      const n = chans.reduce((sum, ch) => sum + r.pick(ch), 0);
+      if (!n) continue;
+      const lx = SX[r.at + 1] - 46, lh = Math.max(2, scale(n));
       const ly = LEAK_Y + (landLanes[lx] ?? 0);
-      landLanes[lx] = (landLanes[lx] ?? 0) + lh + 9;
+      landLanes[lx] = (landLanes[lx] ?? 0) + lh + 10;
       let off = 0;
-      for (const it of g.items) {
-        const ih = Math.max(1.5, scale(it.n));
-        const y0 = it.lane.top + it.lane.th[g.at + 1];   // peels from under the narrowing edge
-        rivers.push({ d: ribbon(SX[g.at], y0, ih, lx, ly + off, ih), c: g.c, n: it.n, label: g.label, lane: it.lane.label });
+      for (const b of bands) {
+        const q = r.pick(b as unknown as typeof chans[number]);
+        if (!q) continue;
+        const ih = Math.max(1.5, scale(q));
+        const y0 = b.bots[r.at + 1];                    // peels from the band's lower edge
+        rivers.push({ d: ribbon(SX[r.at], y0 - ih, ih, lx, ly + off, ih), c: r.c, n: q, label: r.label, lane: b.label });
         off += ih;
       }
-      landings.push({ lx, ly, lh, n: g.n, label: g.label, c: g.c });
+      landings.push({ lx, ly, lh, n, label: r.label, c: r.c });
     }
 
-    // Station heads show the combined line.
-    const stations = ['Arrived', 'Identity verified', 'Account open', 'Fully activated'].map((label, i) => ({
-      key: label, label, n: lanesOut.reduce((sum, l) => sum + l.counts[i], 0),
+    const stations = ['Arrived', 'Identity verified', 'Account open', 'Fully activated'].map((label, si) => ({
+      key: label, label, n: chans.reduce((sum, ch) => sum + ch.counts[si], 0),
     }));
 
     const person = s.filter(touched);
@@ -206,7 +202,7 @@ function TowerInner() {
 
     return {
       total: s.length, clean: clean.length, person: person.length, totals,
-      stations, lanes: lanesOut, rivers, landings, causes, flow, bulkN,
+      stations, bands, rivers, landings, causes, flow, bulkN,
       hoursBack: Math.round((clean.length * (MANUAL_MIN - AUTO_MIN)) / 60),
       hoursSpent: Math.round((person.length * HANDLE_MIN) / 60 * 10) / 10,
     };
@@ -285,14 +281,14 @@ function TowerInner() {
                 ))}
                 {m.landings.map((l, i) => <rect key={i} x={l.lx} y={l.ly} width={5} height={l.lh} rx={2} fill={l.c} />)}
 
-                {/* One lane per channel. Same gradient — hue means "on the line",
-                    the lanes are told apart by position and their left-edge label. */}
-                {m.lanes.map((lane) => (
-                  <path key={lane.key} d={lane.d} fill="url(#mainflow)" className="rb"
-                    onMouseMove={(e) => over(e, lane.label, [
-                      { k: 'Arrived', v: String(lane.counts[0]) },
-                      { k: 'Account open', v: String(lane.counts[2]) },
-                      { k: 'Fully activated', v: String(lane.counts[3]) },
+                {/* The stream, subdivided by channel. The boundary between the
+                    bands IS the mix; hue tells the two channels apart. */}
+                {m.bands.map((b) => (
+                  <path key={b.key} d={b.d} fill={b.c} fillOpacity={0.9} className="rb"
+                    onMouseMove={(e) => over(e, b.label, [
+                      { k: 'Arrived', v: String(b.counts[0]) },
+                      { k: 'Account open', v: String(b.counts[2]) },
+                      { k: 'Fully activated', v: String(b.counts[3]) },
                     ])}
                     onMouseLeave={blur} />
                 ))}
@@ -306,9 +302,9 @@ function TowerInner() {
                     <b>{st.n}</b><em>{st.label}</em>
                   </span>
                 ))}
-                {m.lanes.map((lane) => (
-                  <span key={lane.key} className="ln" style={{ left: `${(SX[0] / VB_W) * 100}%`, top: `${((lane.top + lane.th[0] / 2) / VB_H) * 100}%` }}>
-                    {lane.label}<b>{lane.n}</b>
+                {m.bands.map((b) => (
+                  <span key={b.key} className="ln" style={{ left: `${((SX[0] + 14) / VB_W) * 100}%`, top: `${(((b.tops[0] + b.bots[0]) / 2) / VB_H) * 100}%` }}>
+                    <b>{b.counts[0]}</b>{b.label}
                   </span>
                 ))}
                 {m.landings.map((l, i) => (
@@ -320,9 +316,10 @@ function TowerInner() {
               </div>
 
               <div className="tw-key">
-                <span><i style={{ background: CLEAN }} />On the line</span>
-                <span><i style={{ background: PERSON }} />Left it — needs a person</span>
-                <span><i style={{ background: DIM }} />Left it — still working</span>
+                <span><i style={{ background: '#3B82F6' }} />Bulk payroll</span>
+                <span><i style={{ background: '#5FD39A' }} />Walk-in &amp; self-serve</span>
+                <span className="sep"><i style={{ background: PERSON }} />Left the line — needs a person</span>
+                <span><i style={{ background: DIM }} />Left the line — still working</span>
                 <em>Thickness is volume</em>
               </div>
             </section>
