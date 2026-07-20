@@ -131,4 +131,49 @@
 .fn-detail dd { font-size: 13px; }
 .fn-detail .eyebrow { font: 600 10.5px/1 var(--i-num); letter-spacing: .1em; text-transform: uppercase; color: var(--i-ink-4); padding: 16px 18px 6px; }
 
+/* ── Customer Comms (/comms) ── */
+.cm-tools { display: flex; align-items: center; gap: 12px; padding: 14px 0 12px; flex-wrap: wrap; }
+.cm-find { display: flex; align-items: center; gap: 8px; flex: 1 1 220px; max-width: 300px; padding: 8px 12px; border: 1px solid var(--i-line-2); border-radius: 9px; background: var(--i-card); color: var(--i-ink-3); }
+.cm-find input { border: none; outline: none; background: none; font: inherit; font-size: 13px; color: var(--i-ink); width: 100%; }
+.cm-find input::placeholder { color: var(--i-ink-3); }
+.cm-segs { display: inline-flex; gap: 2px; padding: 3px; background: var(--i-line-3); border-radius: 9px; }
+.cm-segs button { display: inline-flex; align-items: center; gap: 5px; padding: 6px 11px; border-radius: 7px; font-size: 12.5px; font-weight: 500; color: var(--i-ink-2); }
+.cm-segs button[aria-pressed="true"] { background: var(--i-card); color: var(--i-ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.cm-segs button.ch-sms[aria-pressed="true"] { color: #0079b3; }
+.cm-segs button.ch-whatsapp[aria-pressed="true"] { color: #1da851; }
+.cm-segs button.ch-email[aria-pressed="true"] { color: var(--i-brand); }
+
+.cm-list { border: 1px solid var(--i-line-2); border-radius: 12px; overflow: hidden; background: var(--i-card); }
+.cm-conv { display: grid; grid-template-columns: 40px minmax(0,1fr) auto; gap: 12px; align-items: center; width: 100%; text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--i-line-3); background: var(--i-card); animation: instIn .4s ease-out; }
+.cm-conv:last-child { border-bottom: none; }
+.cm-conv:hover { background: #fafaf7; }
+.cm-conv[aria-current="true"] { background: rgba(var(--i-brand-rgb), .06); box-shadow: inset 3px 0 0 var(--i-brand); }
+.cm-ava { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: #fff; }
+.cm-ava.sms { background: #0091DA; }
+.cm-ava.whatsapp { background: #25D366; }
+.cm-ava.email { background: var(--i-brand); }
+.cm-cmid { min-width: 0; }
+.cm-nm { display: block; font-size: 13.5px; font-weight: 600; letter-spacing: -.01em; }
+.cm-prev { display: block; font-size: 12.5px; color: var(--i-ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cm-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
+.cm-at { font-size: 11.5px; color: var(--i-ink-3); }
+.cm-count { min-width: 20px; height: 18px; padding: 0 6px; border-radius: 999px; background: var(--i-line); color: var(--i-ink-2); font-size: 11px; font-weight: 600; display: grid; place-items: center; }
+
+.cm-detail .cm-thread { padding: 16px 18px 24px; display: flex; flex-direction: column; gap: 16px; }
+.cm-msg { display: flex; flex-direction: column; gap: 6px; }
+.cm-msg-h { display: flex; align-items: center; gap: 8px; }
+.cm-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.cm-msg.sms .cm-chip { background: rgba(0, 145, 218, .12); color: #0079b3; }
+.cm-msg.whatsapp .cm-chip { background: rgba(37, 211, 102, .14); color: #1da851; }
+.cm-msg.email .cm-chip { background: rgba(var(--i-brand-rgb), .1); color: var(--i-brand); }
+.cm-label { font-size: 12px; font-weight: 600; color: var(--i-ink-2); }
+.cm-time { margin-left: auto; font-size: 11.5px; color: var(--i-ink-3); }
+.cm-bubble { font-size: 13px; line-height: 1.5; color: var(--i-ink); background: var(--i-card); border: 1px solid var(--i-line-2); border-radius: 4px 14px 14px 14px; padding: 11px 13px; }
+.cm-msg.email .cm-bubble { background: var(--i-surface); }
+.cm-status { display: flex; align-items: center; gap: 10px; padding-left: 2px; }
+.cm-to { font-size: 11.5px; color: var(--i-ink-3); }
+.cm-del { font-size: 11px; font-weight: 600; margin-left: auto; }
+.cm-del.delivered { color: var(--i-good-ink); }
+.cm-del.sent { color: var(--i-ink-3); }
+
 @media (max-width: 1000px) { .fn.open { grid-template-columns: minmax(0, 1fr); } .fn.open .fn-main { display: none; } .fn.open .fn-detail { border-left: none; } }

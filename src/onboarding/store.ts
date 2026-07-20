@@ -39,7 +39,7 @@ export interface OnboardingStore {
 const CASES_KEY = 'aof_cases';
 const EVENTS_KEY = 'aof_events';
 const SEED_VERSION_KEY = 'aof_seed_v';
-const SEED_VERSION = '4';   // bump to force a reseed when the demo data changes
+const SEED_VERSION = '5';   // bump to force a reseed when the demo data changes
 const SEED_AT_KEY = 'aof_seed_at';   // wall-clock of the last seed, for staleness
 // Seeded cases freeze their createdAt at seed time, so "opened 2h ago" drifts to
 // "opened 3d ago" once the seed sits overnight. A new demo sitting should start
@@ -203,6 +203,48 @@ interface SeedRow extends NewCaseInput {
 
 const BEYOND_VALIDATION: OnboardingState[] = ['VALIDATED', 'ACCOUNT_CREATED', 'PENDING_DOCUMENTS', 'PENDING_LIVENESS', 'FULLY_ACTIVATED'];
 
+// Filler for the payroll batches. A real bulk upload is tens of people, and a
+// one-row "batch" makes the grouped pipeline look broken — so the seeded batches
+// carry a believable roster with the usual mix: most straight through, a few
+// waiting on the customer, one or two that need a person.
+const BULK_FIRST = ['Ibrahim', 'Amina', 'Emeka', 'Ngozi', 'Yakubu', 'Funke', 'Sadiq', 'Chioma', 'Tunde', 'Halima',
+  'Peter', 'Grace', 'Musa', 'Zainab', 'Obinna', 'Folake', 'Bashir', 'Adaeze', 'Segun', 'Hauwa'];
+const BULK_LAST = ['Musa', 'Sule', 'Obi', 'Umeh', 'Bello', 'Ade', 'Idris', 'Nwankwo', 'Balogun', 'Yusuf',
+  'Okon', 'Effiong', 'Danladi', 'Abubakar', 'Chukwu', 'Adeyemi', 'Garba', 'Eze', 'Ogundipe', 'Lawal'];
+
+/** Deterministic rows for one payroll batch — same set on every reseed. */
+function bulkRows(employer: string, batchId: string, count: number, offset: number, agoMin: number): SeedRow[] {
+  const out: SeedRow[] = [];
+  for (let i = 0; i < count; i++) {
+    const n = offset + i;
+    const firstName = BULK_FIRST[n % BULK_FIRST.length];
+    const lastName = BULK_LAST[(n * 7 + 3) % BULK_LAST.length];
+    const m = i % 10;
+    const state: OnboardingState =
+      m === 3 ? 'EXCEPTION'
+      : m === 6 ? 'PENDING_DOCUMENTS'
+      : m === 1 || m === 8 ? 'PENDING_LIVENESS'
+      : m === 5 ? 'ACCOUNT_CREATED'
+      : 'FULLY_ACTIVATED';
+    const vals: SeedRow['vals'] =
+      state === 'EXCEPTION' ? { BVN: 'failed', NIN: 'passed', AML: 'passed', PEP: 'passed', FRAUD: 'passed', LIVENESS: 'pending' }
+      : state === 'PENDING_LIVENESS' ? { LIVENESS: 'pending' }
+      : undefined;
+    out.push({
+      firstName, lastName,
+      phone: `0803${String(2000000 + n).slice(-7)}`,
+      email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}${n}@example.com`,
+      bvn: `222${String(20000000 + n).slice(-8)}`,
+      nin: `101${String(30000000 + n).slice(-8)}`,
+      address: `${(n % 60) + 1} Station Rd, Lagos`,
+      channel: 'bulk', source: 'rm', employer, batchId,
+      state, account: state !== 'EXCEPTION', vals,
+      agoMin: agoMin + (i % 12),
+    });
+  }
+  return out;
+}
+
 function seed(s: MockOnboardingStore) {
   const rows: SeedRow[] = [
     { firstName: 'Amara', lastName: 'Okafor', phone: '08031234571', email: 'amara.okafor@example.com', bvn: '22212345671', nin: '10123456781', address: '14 Marina Rd, Lagos', source: 'rm', state: 'FULLY_ACTIVATED', account: true, agoMin: 2880 },
@@ -213,6 +255,10 @@ function seed(s: MockOnboardingStore) {
     { firstName: 'Emeka', lastName: 'Nwosu', phone: '08023456786', email: 'emeka.nwosu@example.com', bvn: '22212345676', nin: '10123456786', address: '41 Chime Ave, Enugu', source: 'contact-centre', state: 'VALIDATION_IN_PROGRESS', vals: { NIN: 'running', BVN: 'passed', AML: 'running', PEP: 'pending', FRAUD: 'pending', LIVENESS: 'pending' }, agoMin: 4 },
     { firstName: 'Aisha', lastName: 'Yusuf', phone: '08134567897', email: 'aisha.yusuf@example.com', bvn: '22212345677', nin: '10123456787', address: '7 Sultan Rd, Sokoto', source: 'rm', state: 'EXCEPTION', vals: { NIN: 'timeout', BVN: 'passed', AML: 'passed', PEP: 'passed', FRAUD: 'passed', LIVENESS: 'pending' }, agoMin: 35 },
     { firstName: 'Blessing', lastName: 'Okoro', phone: '08098765438', email: 'blessing.okoro@example.com', bvn: '22212345678', nin: '10123456788', address: '12 Warri Rd, Delta', channel: 'bulk', source: 'rm', employer: 'Delta Co-op', batchId: 'BATCH-002', state: 'EXCEPTION', vals: { BVN: 'failed', NIN: 'passed', AML: 'passed', PEP: 'passed', FRAUD: 'passed', LIVENESS: 'pending' }, agoMin: 120 },
+    // The two named rows above anchor the demo narrative; these fill their
+    // batches out to a believable size — NYSC 10, Delta Co-op 20.
+    ...bulkRows('NYSC', 'BATCH-001', 9, 100, 300),
+    ...bulkRows('Delta Co-op', 'BATCH-002', 19, 200, 120),
   ];
   rows.forEach((r) => { void seedCase(s, r); });
 }

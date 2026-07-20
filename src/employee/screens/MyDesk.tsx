@@ -24,6 +24,9 @@ type Item = {
   what: string;
   when: string;
   tag?: { tone: Tone; text: string };
+  /** Where the application came from — set for openings only, so a banker can
+   *  tell a payroll row from a walk-in without opening it. */
+  src?: { kind: 'bulk' | 'single'; label: string };
   rank: number;          // lower = more urgent
   go: () => void;
 };
@@ -51,6 +54,9 @@ function fromCases(cases: OnboardingCase[], open: (id: string) => void): Item[] 
       what,
       when: ago(c.createdAt),
       tag: { tone: STATE_TONE[m.tone] ?? 'idle', text: m.label },
+      src: c.batchId
+        ? { kind: 'bulk', label: c.employer || 'Bulk' }
+        : { kind: 'single', label: 'Walk-in' },
       rank: exc ? 0 : pend ? 2 : 5,
       go: () => open(c.id),
     };
@@ -190,7 +196,14 @@ function Rows({ items }: { items: Item[] }) {
             <Dot tone={i.dot} live={i.dot === 'info'} />
             <span style={{ minWidth: 0 }}>
               <span className="nm" style={{ display: 'block' }}>{i.who}</span>
-              <span className="rf">{i.ref}</span>
+              <span className="rf">
+                {i.ref}
+                {i.src && (
+                  <span className={`dk-src ${i.src.kind}`} title={i.src.kind === 'bulk' ? `Bulk upload · ${i.src.label}` : 'Single capture'}>
+                    {i.src.kind === 'bulk' && <I n="layers" s={10} w={2.2} />}{i.src.label}
+                  </span>
+                )}
+              </span>
             </span>
           </span>
           <span className="mu">{i.what}</span>

@@ -51,6 +51,8 @@ if (route === 'admin') {
   import('./instruments/Kafka').then((mod) => render(<mod.default />))
 } else if (route === 'finacle') {
   import('./instruments/Finacle').then((mod) => render(<mod.default />))
+} else if (route === 'comms') {
+  import('./instruments/Comms').then((mod) => render(<mod.default />))
 } else {
   // launcher
   import('./skeleton').then((mod) => render(<mod.SkeletonRouter route={route} />))

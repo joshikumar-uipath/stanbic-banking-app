@@ -28,6 +28,10 @@ export interface Branding {
    *  (uploaded in the admin) or an image URL. Empty/undefined → no logo (the
    *  app name text shows on its own, as before). */
   logo?: string;
+  /** Optional logo variant for dark surfaces (navy nav rails): the artwork with
+   *  a transparent background, so it blends onto the rail instead of showing its
+   *  own plate as a box. Falls back to `logo` when unset. */
+  logoLight?: string;
   /** How large the logo renders on the welcome/login screens. Chosen in the
    *  admin (Branding) so wide vs. compact logos can be sized without re-cropping
    *  the image. Undefined → 'large' (the original size). */

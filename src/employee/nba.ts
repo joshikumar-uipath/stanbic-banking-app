@@ -24,8 +24,8 @@ export interface Nba {
   primary?: boolean;
   /** Absent for 'wait'/'done' — there is deliberately nothing to press. */
   run?: () => Promise<string>;   // resolves with the toast to show
-  /** Opens a screen instead of mutating (handled by the caller). */
-  opens?: 'kyc';
+  /** Opens a screen or dialog instead of mutating (handled by the caller). */
+  opens?: 'kyc' | 'channels';
   /** A tel: / mailto: link rather than an action. */
   href?: string;
 }
@@ -122,14 +122,11 @@ export function nextBestActions(c: OnboardingCase): Nba[] {
     const thing = isSelfie ? 'the selfie check is' : 'their documents are';
     out.push({
       id: 'resend',
-      title: 'Re-send the KYC link by SMS',
+      title: 'Re-send the KYC link',
       why: `The account is already open and working — only ${thing} outstanding, and that limits what they can do until it's done. They can finish it on their own phone; they don't need to come in.`,
       kind: 'do',
       primary: true,
-      run: async () => {
-        await store.publish(c.id, 'customer-notification', `KYC link re-sent by SMS${c.phone ? ` to ${c.phone}` : ''}`);
-        return `KYC link sent${c.phone ? ` to ${c.phone}` : ''}`;
-      },
+      opens: 'channels',
     });
     if (isSelfie) {
       out.push({

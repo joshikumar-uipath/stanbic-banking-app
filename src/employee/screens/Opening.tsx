@@ -7,8 +7,13 @@ import { useMemo, useState } from 'react';
 import { stateMeta, fullName, ONBOARDING_STATES, type OnboardingCase, type OnboardingState } from '../../onboarding';
 import AccountOpeningFlow from '../../customer/flow';
 import CaseDetail from './CaseDetail';
+import BulkUpload from './BulkUpload';
 import { I, Tag, Dot, Stat, type Tone } from '../ui';
 import { ago } from '../time';
+
+// Sentinel for the right-pane mode: '' = new single capture, '__bulk__' = bulk
+// upload, a case id = track that case, null = nothing open.
+const BULK = '__bulk__';
 
 const TONE: Record<string, Tone> = { good: 'good', pending: 'warn', exception: 'crit', progress: 'info', neutral: 'idle' };
 type Filter = 'all' | 'needs' | 'flight' | 'done';
@@ -18,26 +23,78 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: 'flight', label: 'In flight' },
   { id: 'done', label: 'Done' },
 ];
+type Src = 'all' | 'bulk' | 'single';
+const SOURCES: { id: Src; label: string }[] = [
+  { id: 'all', label: 'All sources' },
+  { id: 'bulk', label: 'Bulk' },
+  { id: 'single', label: 'Single' },
+];
 
 const needsAttention = (s: OnboardingState) => s === 'EXCEPTION' || s === 'PENDING_LIVENESS' || s === 'PENDING_DOCUMENTS';
 
 export default function Opening({ cases, flow, setFlow }: { cases: OnboardingCase[]; flow: string | null; setFlow: (v: string | null) => void }) {
   const [filter, setFilter] = useState<Filter>('all');
+  const [source, setSource] = useState<Src>('all');
   const [q, setQ] = useState('');
+  // Which groups the banker has expanded/collapsed by hand. Bulk batches start
+  // collapsed (so the batch roots read at a glance); direct captures start open.
+  const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
+
+  // A case can be opened from outside this screen (My desk, global search). Reveal
+  // it in context: expand the batch it belongs to — collapsing the other batches to
+  // keep the accordion — so the row is visible and highlighted, not buried in a
+  // folded group. Render-phase adjustment: it reacts to `flow` changing, not a click.
+  const [revealed, setRevealed] = useState<string | null>(null);
+  if (flow !== revealed) {
+    setRevealed(flow);
+    const target = flow && flow !== '' && flow !== BULK ? cases.find((c) => c.id === flow) : null;
+    if (target) {
+      setOpenMap((m) => {
+        const next = { ...m };
+        if (target.batchId) for (const c of cases) if (c.batchId) next[c.batchId] = false;
+        next[target.batchId ?? '__direct__'] = true;
+        return next;
+      });
+    }
+  }
 
   const list = useMemo(() => {
     let l = cases;
+    if (source === 'bulk') l = l.filter((c) => !!c.batchId);
+    if (source === 'single') l = l.filter((c) => !c.batchId);
     if (filter === 'needs') l = l.filter((c) => needsAttention(c.state));
     if (filter === 'flight') l = l.filter((c) => !needsAttention(c.state) && c.state !== 'FULLY_ACTIVATED');
     if (filter === 'done') l = l.filter((c) => c.state === 'FULLY_ACTIVATED');
     const t = q.trim().toLowerCase();
     if (t) l = l.filter((c) => fullName(c).toLowerCase().includes(t) || c.id.toLowerCase().includes(t));
     return l;
-  }, [cases, filter, q]);
+  }, [cases, filter, source, q]);
+
+  // A batch upload is one node; loose single captures share a "Walk-in" node.
+  const groups = useMemo(() => buildGroups(list), [list]);
+
+  // A text search or status filter forces every group open so matches show.
+  // The source filter only narrows which nodes appear — the roots stay foldable.
+  const searching = filter !== 'all' || q.trim() !== '';
+  const storedOpen = (g: Group) => (g.key in openMap ? openMap[g.key] : g.kind === 'direct');
+  const isOpen = (g: Group) => searching || storedOpen(g);
+  // Batches behave as an accordion: opening one payroll collapses the others, so
+  // a 20-row roster never buries the batch below it. Walk-in folds independently.
+  const toggle = (g: Group) => setOpenMap((m) => {
+    const willOpen = !storedOpen(g);
+    if (g.kind !== 'batch' || !willOpen) return { ...m, [g.key]: willOpen };
+    const next = { ...m };
+    for (const other of groups) if (other.kind === 'batch') next[other.key] = false;
+    next[g.key] = true;
+    return next;
+  });
+  const anyOpen = groups.some(storedOpen);
+  const setAll = (v: boolean) => setOpenMap(Object.fromEntries(groups.map((g) => [g.key, v])));
 
   // Read the selected case out of the live list rather than holding a copy, so an
   // action taken in the right pane re-renders it as the store moves the case on.
-  const picked = flow ? cases.find((c) => c.id === flow) ?? null : null;
+  // '' (new) and BULK are pane modes, not case ids.
+  const picked = flow && flow !== '' && flow !== BULK ? cases.find((c) => c.id === flow) ?? null : null;
 
   const open = cases.filter((c) => c.state !== 'FULLY_ACTIVATED').length;
   const waiting = cases.filter((c) => c.state === 'PENDING_LIVENESS' || c.state === 'PENDING_DOCUMENTS').length;
@@ -65,11 +122,14 @@ export default function Opening({ cases, flow, setFlow }: { cases: OnboardingCas
                 <h1>Open an account<span className="n">{list.length}</span></h1>
                 <div className="sub">Assisted capture · branch pipeline</div>
               </div>
-              <button className="dk-btn pri lg" onClick={() => setFlow('')}><I n="plus" s={15} w={2.4} />New application</button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="dk-btn lg" onClick={() => setFlow(BULK)}><I n="layers" s={15} />Bulk upload</button>
+                <button className="dk-btn pri lg" onClick={() => setFlow('')}><I n="plus" s={15} w={2.4} />New application</button>
+              </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, paddingBottom: 12 }}>
-              <div className="dk-find" style={{ maxWidth: 280 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, paddingBottom: 12, flexWrap: 'wrap' }}>
+              <div className="dk-find" style={{ flex: '1 1 200px', maxWidth: 280 }}>
                 <span className="s"><I n="search" s={15} /></span>
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or reference" />
               </div>
@@ -78,9 +138,19 @@ export default function Opening({ cases, flow, setFlow }: { cases: OnboardingCas
                   <button key={f.id} aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>{f.label}</button>
                 ))}
               </div>
+              <div className="dk-segs">
+                {SOURCES.map((f) => (
+                  <button key={f.id} aria-pressed={source === f.id} onClick={() => setSource(f.id)}>{f.label}</button>
+                ))}
+              </div>
+              <button className="dk-btn" style={{ marginLeft: 'auto' }} onClick={() => setAll(!anyOpen)} disabled={searching} title={searching ? 'Groups open automatically while searching' : undefined}>
+                <I n={anyOpen ? 'collapse' : 'expand'} s={14} />{anyOpen ? 'Collapse all' : 'Expand all'}
+              </button>
             </div>
 
-            {list.length ? <Table list={list} active={flow} onPick={setFlow} /> : (
+            {list.length ? (
+              <GroupedTable groups={groups} active={flow} onPick={setFlow} isOpen={isOpen} toggle={toggle} />
+            ) : (
               <div className="dk-empty"><b>Nothing here</b><span>No applications match this filter.</span></div>
             )}
           </div>
@@ -91,17 +161,18 @@ export default function Opening({ cases, flow, setFlow }: { cases: OnboardingCas
           customer, so customer voice is correct there. An *existing* case gets
           the staff view: what to do about it, in the banker's voice. */}
       <div className="p r" style={{ position: 'relative' }}>
-        {flow === null && <Blank onNew={() => setFlow('')} />}
+        {flow === null && <Blank onNew={() => setFlow('')} onBulk={() => setFlow(BULK)} />}
         {flow === '' && <div className="dk-flow"><AccountOpeningFlow mode="rm" onExit={() => setFlow(null)} /></div>}
-        {flow && (picked
+        {flow === BULK && <BulkUpload onExit={() => setFlow(null)} />}
+        {flow && flow !== BULK && flow !== '' && (picked
           ? <CaseDetail key={picked.id} c={picked} onClose={() => setFlow(null)} />
-          : <Blank onNew={() => setFlow('')} />)}
+          : <Blank onNew={() => setFlow('')} onBulk={() => setFlow(BULK)} />)}
       </div>
     </div>
   );
 }
 
-function Blank({ onNew }: { onNew: () => void }) {
+function Blank({ onNew, onBulk }: { onNew: () => void; onBulk: () => void }) {
   return (
     <div className="dk-flow">
       <div style={{ border: 'none', boxShadow: 'none', background: 'transparent', display: 'grid', placeItems: 'center', textAlign: 'center', padding: 30 }}>
@@ -111,9 +182,12 @@ function Blank({ onNew }: { onNew: () => void }) {
           </div>
           <div style={{ font: '600 15px/1.35 inherit', marginBottom: 6 }}>Nothing open</div>
           <p style={{ fontSize: 13, color: 'var(--d-ink-2)', lineHeight: 1.55, maxWidth: 260, margin: '0 auto 16px' }}>
-            Start a new application, or pick one from the pipeline to see where it got to.
+            Start a new application, upload many at once, or pick one from the pipeline to see where it got to.
           </p>
-          <button className="dk-btn pri" onClick={onNew}><I n="plus" s={14} w={2.4} />New application</button>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}>
+            <button className="dk-btn" onClick={onBulk}><I n="layers" s={14} />Bulk upload</button>
+            <button className="dk-btn pri" onClick={onNew}><I n="plus" s={14} w={2.4} />New application</button>
+          </div>
         </div>
       </div>
     </div>
@@ -122,39 +196,97 @@ function Blank({ onNew }: { onNew: () => void }) {
 
 const GRID = { gridTemplateColumns: 'minmax(0,1.2fr) minmax(0,1fr) 130px 84px 20px' };
 
-function Table({ list, active, onPick }: { list: OnboardingCase[]; active: string | null; onPick: (id: string) => void }) {
+// ── Grouping: each bulk upload is a node; loose single captures share one. ──
+type Group = { key: string; kind: 'batch' | 'direct'; title: string; batchId?: string; createdAt: string; rows: OnboardingCase[] };
+
+const isOpened = (c: OnboardingCase) =>
+  !!c.accountNumber || c.state === 'ACCOUNT_CREATED' || c.state === 'PENDING_LIVENESS' || c.state === 'PENDING_DOCUMENTS' || c.state === 'FULLY_ACTIVATED';
+
+function summarize(rows: OnboardingCase[]) {
+  const opened = rows.filter(isOpened).length;
+  const exc = rows.filter((c) => c.state === 'EXCEPTION').length;
+  return { total: rows.length, opened, exc, proc: rows.length - opened - exc };
+}
+
+function buildGroups(list: OnboardingCase[]): Group[] {
+  const batches = new Map<string, OnboardingCase[]>();
+  const direct: OnboardingCase[] = [];
+  for (const c of list) {
+    if (c.batchId) { const a = batches.get(c.batchId) ?? []; a.push(c); batches.set(c.batchId, a); }
+    else direct.push(c);
+  }
+  const groups: Group[] = [];
+  for (const [batchId, rows] of batches) {
+    const sorted = [...rows].sort((a, b) => a.id.localeCompare(b.id));
+    const employer = sorted.find((c) => c.employer)?.employer;
+    const createdAt = sorted.reduce((min, c) => (c.createdAt < min ? c.createdAt : min), sorted[0].createdAt);
+    groups.push({ key: batchId, kind: 'batch', title: employer || 'Bulk batch', batchId, createdAt, rows: sorted });
+  }
+  groups.sort((a, b) => b.createdAt.localeCompare(a.createdAt)); // newest batch first
+  if (direct.length) groups.push({ key: '__direct__', kind: 'direct', title: 'Walk-in / direct', createdAt: '', rows: direct });
+  return groups;
+}
+
+function GroupedTable({ groups, active, onPick, isOpen, toggle }: {
+  groups: Group[]; active: string | null; onPick: (id: string) => void; isOpen: (g: Group) => boolean; toggle: (g: Group) => void;
+}) {
   return (
-    <div className="dk-rows">
-      <div className="dk-cols" style={GRID}>
-        <span>Applicant</span><span>Stage</span><span>Status</span><span>Started</span><span />
-      </div>
-      {list.map((c) => {
-        const m = stateMeta(c.state);
-        const tone = TONE[m.tone] ?? 'idle';
-        const step = ONBOARDING_STATES.findIndex((x) => x.state === c.state) + 1;
-        const failed = c.validations.filter((v) => v.status === 'failed' || v.status === 'timeout').map((v) => v.kind);
-        const stage = c.state === 'EXCEPTION'
-          ? (failed.length ? `${failed.join(' & ')} needs a person` : 'Needs review')
-          : c.accountNumber ? null
-          : `Step ${step} of ${ONBOARDING_STATES.length - 1}`;
+    <div className="dk-groups">
+      {groups.map((g) => {
+        const open = isOpen(g);
+        const s = summarize(g.rows);
         return (
-          <button key={c.id} className="dk-row" style={GRID} aria-current={active === c.id} onClick={() => onPick(c.id)}>
-            <span className="who">
-              <Dot tone={tone} live={tone === 'info'} />
-              <span style={{ minWidth: 0 }}>
-                <span className="nm" style={{ display: 'block' }}>{fullName(c).trim() || 'Unnamed applicant'}</span>
-                <span className="rf">{c.id}</span>
+          <div className="dk-group" data-open={open} key={g.key}>
+            <button className="dk-group-hd" aria-expanded={open} onClick={() => toggle(g)}>
+              <span className="tw"><I n="chevron" s={15} /></span>
+              <span className={`gi${g.kind === 'direct' ? ' direct' : ''}`}><I n={g.kind === 'batch' ? 'layers' : 'user'} s={16} /></span>
+              <span className="gt">
+                <b>{g.title}</b>
+                <span className="gs">{g.kind === 'batch' ? `${g.batchId} · ${ago(g.createdAt)}` : 'Single captures'}</span>
               </span>
-            </span>
-            <span className="mu">
-              {stage ?? <>Account <span className="num">{c.accountNumber}</span></>}
-            </span>
-            <span><Tag tone={tone}>{m.label}</Tag></span>
-            <span className="rf">{ago(c.createdAt)}</span>
-            <span className="ch"><I n="chevron" s={15} /></span>
-          </button>
+              <span className="gc">
+                <span className="dk-chip">{s.total} {g.kind === 'batch' ? (s.total === 1 ? 'person' : 'people') : (s.total === 1 ? 'app' : 'apps')}</span>
+                {s.opened > 0 && <span className="dk-chip green">{s.opened} opened</span>}
+                {s.exc > 0 && <span className="dk-chip red">{s.exc} exception{s.exc === 1 ? '' : 's'}</span>}
+                {s.proc > 0 && <span className="dk-chip amber">{s.proc} in flight</span>}
+              </span>
+            </button>
+            {open && (
+              <div className="dk-group-body">
+                {g.rows.map((c) => <Row key={c.id} c={c} active={active} onPick={onPick} />)}
+              </div>
+            )}
+          </div>
         );
       })}
     </div>
+  );
+}
+
+function Row({ c, active, onPick }: { c: OnboardingCase; active: string | null; onPick: (id: string) => void }) {
+  const m = stateMeta(c.state);
+  const tone = TONE[m.tone] ?? 'idle';
+  const step = ONBOARDING_STATES.findIndex((x) => x.state === c.state) + 1;
+  const failed = c.validations.filter((v) => v.status === 'failed' || v.status === 'timeout').map((v) => v.kind);
+  const stage = c.state === 'EXCEPTION'
+    ? (failed.length ? `${failed.join(' & ')} needs a person` : 'Needs review')
+    : c.accountNumber ? null
+    : `Step ${step} of ${ONBOARDING_STATES.length - 1}`;
+  return (
+    <button className="dk-row" style={GRID} aria-current={active === c.id} onClick={() => onPick(c.id)}>
+      <span className="who">
+        <Dot tone={tone} live={tone === 'info'} />
+        <span style={{ minWidth: 0 }}>
+          <span className="nm" style={{ display: 'block' }}>{fullName(c).trim() || 'Unnamed applicant'}</span>
+          <span className="rf">{c.id}</span>
+        </span>
+      </span>
+      <span className="mu">
+        {stage ?? <>Account <span className="num">{c.accountNumber}</span></>}
+      </span>
+      <span><Tag tone={tone}>{m.label}</Tag></span>
+      <span className="rf">{ago(c.createdAt)}</span>
+      <span className="ch"><I n="chevron" s={15} /></span>
+    </button>
   );
 }

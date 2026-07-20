@@ -49,6 +49,13 @@ export const stanbicConfig: TenantConfig = {
     // server answers with index.html (200 text/html, not a 404), so the <img>
     // silently got HTML and fell back to the wordmark.
     logo: '/stanbic-logo.png',
+    // Transparent-background variant for the navy nav rails (desk + ops), so the
+    // logo blends in rather than showing its blue plate as a box. The plated
+    // `logo` above still serves light surfaces (home launcher).
+    logoLight: '/stanbic-logo-light.png',
+    // Square shield mark (cropped from the wordmark) for the browser tab and any
+    // compact spot. Without this the tab falls back to an auto-generated initial.
+    favicon: '/stanbic-favicon.png',
     primaryColor: '#0033A1',
     secondaryColor: '#0091DA',
     accentColor: '#0091DA',

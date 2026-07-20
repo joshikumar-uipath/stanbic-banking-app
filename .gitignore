@@ -19,6 +19,9 @@ dist/
 
 # Playwright MCP / automation artifacts
 .playwright-mcp/
+# Screenshots dropped in the repo root while verifying UI work. Leading slash so
+# this never touches the real assets in public/.
+/*.png
 
 # iOS / Capacitor build
 ios/App/Pods/

@@ -17,6 +17,10 @@ const P: Record<string, ReactNode> = {
   alert: <><path d="M12 9v4M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></>,
   zap: <><path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5z" /></>,
   clock: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,
+  upload: <><path d="M12 15V3" /><path d="m7 8 5-5 5 5" /><path d="M5 15v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" /></>,
+  layers: <><path d="m12 3 9 5-9 5-9-5 9-5z" /><path d="m3 13 9 5 9-5" /></>,
+  collapse: <><path d="M7 4l5 5 5-5" /><path d="M7 20l5-5 5 5" /></>,
+  expand: <><path d="M7 9l5-5 5 5" /><path d="M7 15l5 5 5-5" /></>,
 };
 
 export function I({ n, s = 16, w = 1.8, style }: { n: string; s?: number; w?: number; style?: CSSProperties }) {

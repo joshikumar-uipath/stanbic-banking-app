@@ -4,6 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Account Opening — Stanbic IBTC</title>
+<link rel="icon" type="image/png" href="/stanbic-favicon.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -70,7 +71,12 @@
 
   /* ---------- sidebar ---------- */
   .side { background: var(--navy); color: var(--on-navy); display: flex; flex-direction: column; }
-  .side .logo { display: flex; align-items: center; gap: 10px; padding: 18px 18px 16px; }
+  .side .logo { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; padding: 18px 18px 16px; }
+  /* White plate behind the tenant logo — most brand marks are drawn for light
+     backgrounds and would disappear on this navy rail. */
+  .side .logo .plate { display: inline-flex; align-items: center; background: #fff; border-radius: 9px; padding: 7px 10px; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+  .side .logo .wordmark { max-height: 26px; max-width: 158px; object-fit: contain; object-position: left center; display: block; }
+  .side .logo .wm-sub { font-style: normal; font-size: 10.5px; color: var(--on-navy-dim); letter-spacing: 0.04em; }
   .side .glyph { width: 30px; height: 30px; border-radius: 8px; background: var(--sky); display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 15px; }
   .side .logo b { font-weight: 600; font-size: 15px; color: #fff; letter-spacing: -0.01em; }
   .side .logo em { display: block; font-style: normal; font-size: 10.5px; color: var(--on-navy-dim); letter-spacing: 0.04em; }
@@ -452,8 +458,8 @@
 
   <nav class="side" aria-label="Views">
     <div class="logo">
-      <div class="glyph">S</div>
-      <div><b>Account Opening</b><em>STANBIC IBTC · STAGING</em></div>
+      <span class="plate"><img class="wordmark" src="/stanbic-logo.png" alt="Stanbic IBTC" /></span>
+      <em class="wm-sub">Account Opening · Staging</em>
     </div>
     <!-- Role switcher. Same block as the branch desk: one workspace, two jobs.
          target="_top" because this console is framed by /ops — without it the
@@ -1471,6 +1477,20 @@ window.addEventListener("storage", function (e) {
   if (e.key !== STORE_KEY && e.key !== EVENTS_KEY && e.key !== null) return;
   syncFromStore();
   render();
+});
+
+// The /ops wrapper owns the tenant config; it posts the branding in so this rail
+// follows an admin logo change instead of shipping a hard-coded asset. Falls back
+// to the bundled Stanbic mark in the markup when opened standalone.
+window.addEventListener("message", function (e) {
+  if (e.origin !== window.location.origin) return;
+  var d = e.data;
+  if (!d || d.type !== "aof-brand") return;
+  if (d.logo) {
+    var el = document.querySelector(".side .logo .wordmark");
+    if (el && el.getAttribute("src") !== d.logo) el.setAttribute("src", d.logo);
+    if (el && d.appName) el.setAttribute("alt", d.appName);
+  }
 });
 
 render();

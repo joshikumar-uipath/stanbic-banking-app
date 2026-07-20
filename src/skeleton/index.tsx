@@ -24,8 +24,9 @@ const SLATE = '#64748B';
 const NEW_TAB = { target: '_blank', rel: 'noopener noreferrer' } as const;
 
 // ── Monoline icon set (Lucide-style) ─────────────────────────────────────────
-type IconName = 'phone' | 'monitor' | 'dashboard' | 'user' | 'link' | 'sliders' | 'activity' | 'landmark' | 'briefcase';
+type IconName = 'phone' | 'monitor' | 'dashboard' | 'user' | 'link' | 'sliders' | 'activity' | 'landmark' | 'briefcase' | 'message';
 const PATHS: Record<IconName, string> = {
+  message: 'M21 11.5a8.38 8.38 0 0 1-8.5 8.5 9.6 9.6 0 0 1-4-.9L3 20l1.4-3.5A8.38 8.38 0 0 1 3.5 12 8.5 8.5 0 0 1 12 3.5a8.38 8.38 0 0 1 9 8Z',
   phone: 'M15 2H9a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z M11 18h2',
   monitor: 'M3 4h18v12H3z M8 20h8 M12 16v4',
   dashboard: 'M4 4h6v7H4z M14 4h6v4h-6z M14 12h6v8h-6z M4 15h6v5H4z',
@@ -85,6 +86,7 @@ interface Tool { key: string; name: string; url: string; desc: string; icon: Ico
 const TOOLS: Tool[] = [
   { key: 'kafka', name: 'Mock Kafka console', url: '/kafka', icon: 'activity', accent: DEMO, desc: 'The live event stream across the eight topics.' },
   { key: 'finacle', name: 'Mock Finacle UI', url: '/finacle', icon: 'landmark', accent: SLATE, desc: 'Core banking back office — CIFs and accounts.' },
+  { key: 'comms', name: 'Notification service', url: '/comms', icon: 'message', accent: DEMO, desc: 'Every SMS and email the customer receives, per step.' },
 ];
 
 // index.css sets a global --brand-primary; the front door has no host app to
@@ -212,6 +214,7 @@ function Shell({ route }: { route: RouteKey }) {
   const meta: Record<string, { name: string; role: string; url: string; phase: string; icon: IconName }> = {
     kafka: { name: 'Mock Kafka Console', role: 'Presenter · demo', url: '/kafka', phase: 'Phase 1', icon: 'activity' },
     finacle: { name: 'Mock Finacle UI', role: 'Presenter · demo', url: '/finacle', phase: 'Phase 1', icon: 'landmark' },
+    comms: { name: 'Notification Service', role: 'Presenter · demo', url: '/comms', phase: 'Phase 1', icon: 'message' },
   };
   const m = meta[route] ?? { name: route, role: '—', url: `/${route}`, phase: 'Phase 1', icon: 'dashboard' as IconName };
   return (
