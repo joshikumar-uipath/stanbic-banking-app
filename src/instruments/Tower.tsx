@@ -55,18 +55,19 @@ const CHECK_LABEL: Record<string, string> = {
 // stations, and at each one some of it falls out. Thickness is what is still
 // moving; every tributary is work that left the line and why.
 const VB_W = 1000, VB_H = 300;
-const S_TOP = 72;        // top edge of the stream (labels ride above it)
-const S_MAX = 116;       // thickness at full intake
-const LEAK_Y = 232;      // where tributaries land
+const S_TOP = 74;        // top edge of the first lane (labels ride above it)
+const S_MAX = 104;       // total thickness shared by both lanes at full intake
+const LANE_GAP = 13;     // surface gap between the two lines
+const LEAK_Y = 216;      // where tributaries land
 const SX = [26, 350, 674, 962];
 
-/** The main stream: straight top edge, bottom edge easing down past each station. */
-function stream(th: number[]): string {
+/** One lane: straight top edge, bottom edge easing down past each station. */
+function stream(th: number[], top: number): string {
   const last = SX.length - 1;
-  let d = `M${SX[0]},${S_TOP} L${SX[last]},${S_TOP} L${SX[last]},${S_TOP + th[last]}`;
+  let d = `M${SX[0]},${top} L${SX[last]},${top} L${SX[last]},${top + th[last]}`;
   for (let i = last; i > 0; i--) {
     const x0 = SX[i], x1 = SX[i - 1], xm = (x0 + x1) / 2;
-    d += ` C${xm},${S_TOP + th[i]} ${xm},${S_TOP + th[i - 1]} ${x1},${S_TOP + th[i - 1]}`;
+    d += ` C${xm},${top + th[i]} ${xm},${top + th[i - 1]} ${x1},${top + th[i - 1]}`;
   }
   return d + ' Z';
 }
@@ -100,51 +101,87 @@ function TowerInner() {
     const from = now - cfg.hours * 3600_000;
     const s = cases.filter((c) => Date.parse(c.createdAt) >= from);
 
-    // Stations on the line. Thickness is what is still moving; each tributary is
-    // work that left the line, and the label says why it left.
+    // One lane per channel, both scaled by the same intake so a thick lane really
+    // does mean more work. The question this answers: does the payroll line run
+    // cleaner than the walk-in line?
     const failed = (c: OnboardingCase, ...k: ValidationKind[]) =>
       c.validations.some((v) => k.includes(v.kind) && (v.status === 'failed' || v.status === 'timeout'));
 
-    const arrived = s.length;
-    const leakId = s.filter((c) => failed(c, 'NIN', 'BVN')).length;                    // identity bureaux
-    const afterId = arrived - leakId;
-    const leakScreen = s.filter((c) => !failed(c, 'NIN', 'BVN') && failed(c, 'AML', 'PEP', 'FRAUD')).length;
-    const afterScreen = afterId - leakScreen;
-    const open = s.filter((c) => opened(c)).length;
-    const leakRunning = Math.max(0, afterScreen - open);                               // still working, not lost
-    const activated = s.filter((c) => c.state === 'FULLY_ACTIVATED').length;
-    const leakKyc = Math.max(0, open - activated);                                     // open, waiting on the customer
+    const total = s.length;
+    const lanesIn = [
+      { key: 'bulk', label: 'Bulk payroll', arr: s.filter((c) => c.channel === 'bulk') },
+      { key: 'single', label: 'Walk-in & self-serve', arr: s.filter((c) => c.channel !== 'bulk') },
+    ].filter((l) => l.arr.length > 0);
 
-    const counts = [arrived, afterId, open, activated];
-    const th = counts.map((n) => (arrived ? Math.max(2, (n / arrived) * S_MAX) : 0));
-    const stations = [
-      { key: 'in', label: 'Arrived', n: arrived },
-      { key: 'id', label: 'Identity verified', n: afterId },
-      { key: 'acct', label: 'Account open', n: open },
-      { key: 'live', label: 'Fully activated', n: activated },
-    ];
+    const scale = (n: number) => (total ? (n / total) * S_MAX : 0);
+    const lanesOut: {
+      key: string; label: string; top: number; n: number; th: number[]; counts: number[]; d: string;
+      leaks: { n: number; c: string; label: string; at: number }[];
+    }[] = [];
 
-    // Tributaries: source span on the stream's underside, landing in the lane.
-    const leaks = [
-      { at: 0, n: leakId, c: PERSON, label: 'NIN or BVN needed a person', tone: 'bad' as const },
-      { at: 1, n: leakScreen, c: PERSON, label: 'Screening needed a person', tone: 'bad' as const },
-      { at: 1, n: leakRunning, c: DIM, label: 'Still running its checks', tone: 'idle' as const },
-      { at: 2, n: leakKyc, c: DIM, label: 'Open, KYC outstanding', tone: 'idle' as const },
-    ].filter((l) => l.n > 0);
+    let top = S_TOP;
+    for (const l of lanesIn) {
+      const a = l.arr;
+      const leakId = a.filter((c) => failed(c, 'NIN', 'BVN')).length;
+      const afterId = a.length - leakId;
+      const leakScreen = a.filter((c) => !failed(c, 'NIN', 'BVN') && failed(c, 'AML', 'PEP', 'FRAUD')).length;
+      const afterScreen = afterId - leakScreen;
+      const open = a.filter(opened).length;
+      const leakRunning = Math.max(0, afterScreen - open);
+      const activated = a.filter((c) => c.state === 'FULLY_ACTIVATED').length;
+      const leakKyc = Math.max(0, open - activated);
+      const counts = [a.length, afterId, open, activated];
+      const th = counts.map((n) => (n > 0 ? Math.max(1.5, scale(n)) : 0));
+      lanesOut.push({
+        key: l.key, label: l.label, top, n: a.length, counts, th, d: stream(th, top),
+        leaks: [
+          { at: 0, n: leakId, c: PERSON, label: 'NIN or BVN needed a person' },
+          { at: 1, n: leakScreen, c: PERSON, label: 'Screening needed a person' },
+          { at: 1, n: leakRunning, c: DIM, label: 'Still running its checks' },
+          { at: 2, n: leakKyc, c: DIM, label: 'Open, KYC outstanding' },
+        ].filter((x) => x.n > 0),
+      });
+      top += scale(a.length) + LANE_GAP;
+    }
 
-    const lanes: Record<number, number> = {};
-    const rivers = leaks.map((l) => {
-      const h = Math.max(2, (l.n / (arrived || 1)) * S_MAX);
-      const x0 = SX[l.at], lx = SX[l.at + 1] - 30;
-      const y0 = S_TOP + th[l.at + 1];                 // peels from under the narrowing edge
-      const ly = LEAK_Y + (lanes[lx] ?? 0);
-      lanes[lx] = (lanes[lx] ?? 0) + h + 9;
-      return { ...l, d: ribbon(x0, y0, h, lx, ly, h), ly, lh: h, lx };
-    });
+    // Both lanes leak for the same reasons, so a reason gets ONE landing and one
+    // label — each lane just feeds a slice of it. Repeating the label per lane
+    // read as a duplicate rather than a split.
+    const raw = lanesOut.flatMap((lane) => lane.leaks.map((l) => ({ ...l, lane })));
+    const groups = new Map<string, { at: number; label: string; c: string; n: number; items: typeof raw }>();
+    for (const r of raw) {
+      const k = `${r.at}|${r.label}`;
+      const g = groups.get(k) ?? { at: r.at, label: r.label, c: r.c, n: 0, items: [] as typeof raw };
+      g.n += r.n; g.items.push(r); groups.set(k, g);
+    }
+
+    const landLanes: Record<number, number> = {};
+    const rivers: { d: string; c: string; n: number; label: string; lane: string }[] = [];
+    const landings: { lx: number; ly: number; lh: number; n: number; label: string; c: string }[] = [];
+    for (const g of groups.values()) {
+      const lx = SX[g.at + 1] - 30;
+      const lh = Math.max(2, scale(g.n));
+      const ly = LEAK_Y + (landLanes[lx] ?? 0);
+      landLanes[lx] = (landLanes[lx] ?? 0) + lh + 9;
+      let off = 0;
+      for (const it of g.items) {
+        const ih = Math.max(1.5, scale(it.n));
+        const y0 = it.lane.top + it.lane.th[g.at + 1];   // peels from under the narrowing edge
+        rivers.push({ d: ribbon(SX[g.at], y0, ih, lx, ly + off, ih), c: g.c, n: it.n, label: g.label, lane: it.lane.label });
+        off += ih;
+      }
+      landings.push({ lx, ly, lh, n: g.n, label: g.label, c: g.c });
+    }
+
+    // Station heads show the combined line.
+    const stations = ['Arrived', 'Identity verified', 'Account open', 'Fully activated'].map((label, i) => ({
+      key: label, label, n: lanesOut.reduce((sum, l) => sum + l.counts[i], 0),
+    }));
 
     const person = s.filter(touched);
     const clean = s.filter((c) => !touched(c));
-    const totals = { open, checks: leakRunning, stuck: s.filter(stuck).length };
+    const bulkN = s.filter((c) => c.channel === 'bulk').length;
+    const totals = { open: s.filter(opened).length, checks: 0, stuck: s.filter(stuck).length };
 
     // What is actually costing people time.
     const causes = VALIDATION_KINDS
@@ -169,7 +206,7 @@ function TowerInner() {
 
     return {
       total: s.length, clean: clean.length, person: person.length, totals,
-      stations, th, rivers, causes, flow,
+      stations, lanes: lanesOut, rivers, landings, causes, flow, bulkN,
       hoursBack: Math.round((clean.length * (MANUAL_MIN - AUTO_MIN)) / 60),
       hoursSpent: Math.round((person.length * HANDLE_MIN) / 60 * 10) / 10,
     };
@@ -212,6 +249,7 @@ function TowerInner() {
                   <span className="hl">{pct}%</span> never reached a person.
                 </h1>
                 <p>
+                  {m.bulkN > 0 && <><b>{m.bulkN}</b> of them came in on the payroll line. </>}
                   {top
                     ? <>The rest cost you about <b>{m.hoursSpent}h</b> of handling, nearly all of it <b>{top.label}</b>{m.totals.stuck > 0 ? <> — {m.totals.stuck} {m.totals.stuck === 1 ? 'is' : 'are'} still waiting on somebody.</> : '.'}</>
                     : <>Nothing failed a check. The line ran clean.</>}
@@ -241,18 +279,23 @@ function TowerInner() {
 
                 {/* Tributaries first, so the main line sits over them. */}
                 {m.rivers.map((r, i) => (
-                  <g key={i}>
-                    <path d={r.d} fill={`url(#lk${i})`} className="rb"
-                      onMouseMove={(e) => over(e, r.label, [{ k: 'Applications', v: String(r.n) }])}
-                      onMouseLeave={blur} />
-                    <rect x={r.lx} y={r.ly} width={5} height={r.lh} rx={2} fill={r.c} />
-                  </g>
+                  <path key={i} d={r.d} fill={`url(#lk${i})`} className="rb"
+                    onMouseMove={(e) => over(e, r.label, [{ k: r.lane, v: String(r.n) }])}
+                    onMouseLeave={blur} />
                 ))}
+                {m.landings.map((l, i) => <rect key={i} x={l.lx} y={l.ly} width={5} height={l.lh} rx={2} fill={l.c} />)}
 
-                {/* The line itself. */}
-                <path d={stream(m.th)} fill="url(#mainflow)" className="rb"
-                  onMouseMove={(e) => over(e, 'Still on the line', [{ k: 'Arrived', v: String(m.stations[0].n) }, { k: 'Activated', v: String(m.stations[3].n) }])}
-                  onMouseLeave={blur} />
+                {/* One lane per channel. Same gradient — hue means "on the line",
+                    the lanes are told apart by position and their left-edge label. */}
+                {m.lanes.map((lane) => (
+                  <path key={lane.key} d={lane.d} fill="url(#mainflow)" className="rb"
+                    onMouseMove={(e) => over(e, lane.label, [
+                      { k: 'Arrived', v: String(lane.counts[0]) },
+                      { k: 'Account open', v: String(lane.counts[2]) },
+                      { k: 'Fully activated', v: String(lane.counts[3]) },
+                    ])}
+                    onMouseLeave={blur} />
+                ))}
               </svg>
 
               {/* Station and tributary labels in HTML — crisp at any scale. */}
@@ -263,9 +306,14 @@ function TowerInner() {
                     <b>{st.n}</b><em>{st.label}</em>
                   </span>
                 ))}
-                {m.rivers.map((r, i) => (
-                  <span key={i} className="lk" style={{ left: `${((r.lx + 12) / VB_W) * 100}%`, top: `${((r.ly + r.lh / 2) / VB_H) * 100}%` }}>
-                    <b>{r.n}</b>{r.label}
+                {m.lanes.map((lane) => (
+                  <span key={lane.key} className="ln" style={{ left: `${(SX[0] / VB_W) * 100}%`, top: `${((lane.top + lane.th[0] / 2) / VB_H) * 100}%` }}>
+                    {lane.label}<b>{lane.n}</b>
+                  </span>
+                ))}
+                {m.landings.map((l, i) => (
+                  <span key={i} className="lk" style={{ left: `${((l.lx + 12) / VB_W) * 100}%`, top: `${((l.ly + l.lh / 2) / VB_H) * 100}%` }}>
+                    <b>{l.n}</b>{l.label}
                   </span>
                 ))}
               </div>
