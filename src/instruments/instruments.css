@@ -183,18 +183,37 @@
 .tw-toggle:hover { background: #fafaf7; color: var(--i-ink); }
 .tw-toggle[aria-pressed="true"] { border-color: var(--i-brand); color: var(--i-brand); background: rgba(var(--i-brand-rgb), .05); }
 
-/* Hero + tiles. Proportional figures on the big numbers, never tabular. */
-.tw-kpis { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2.1fr); gap: 12px; margin-bottom: 12px; }
-.tw-hero { background: var(--i-navy); color: #fff; border-radius: 14px; padding: 18px 20px; }
-.tw-hero .k { font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--i-on-navy-dim); }
-.tw-hero .v { font: 700 52px/1.05 var(--i-num); letter-spacing: -.03em; margin: 6px 0 4px; }
-.tw-hero .s { font-size: 12.5px; color: var(--i-on-navy-dim); }
-.tw-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
-.tw-tile { background: var(--i-card); border: 1px solid var(--i-line-2); border-radius: 14px; padding: 16px 18px; }
-.tw-tile .k { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--i-ink-3); }
-.tw-tile .v { font: 700 30px/1.1 var(--i-num); letter-spacing: -.02em; margin: 7px 0 3px; color: var(--i-ink); }
-.tw-tile .v.good { color: var(--i-good-ink); } .tw-tile .v.warn { color: var(--i-warn-ink); } .tw-tile .v.bad { color: var(--i-red-ink); }
-.tw-tile .s { font-size: 12px; color: var(--i-ink-3); }
+/* ── The line: a dark factory floor, the same navy as the Ops pattern card ── */
+.tw-floor { position: relative; background: var(--i-navy); border-radius: 16px; padding: 22px 26px 18px; margin-bottom: 12px; overflow: hidden; }
+.tw-floor::after { content: ''; position: absolute; inset: 0; pointer-events: none;
+  background: radial-gradient(120% 90% at 88% 0%, rgba(255,255,255,.07), transparent 60%); }
+.tw-floor header { position: relative; z-index: 1; max-width: 62ch; }
+.tw-floor .eyebrow { font-family: var(--i-num); font-size: 10.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--i-on-navy-dim); }
+.tw-floor h1 { font-size: 21px; line-height: 1.42; font-weight: 500; color: var(--i-on-navy); letter-spacing: -.01em; margin: 8px 0 0; }
+.tw-floor h1 b { font-weight: 700; color: #fff; }
+.tw-floor h1 .hl { font-weight: 700; color: #7FE0A8; }
+.tw-floor header p { font-size: 13.5px; line-height: 1.55; color: var(--i-on-navy-dim); margin-top: 7px; }
+.tw-floor header p b { color: var(--i-on-navy); font-weight: 600; }
+
+/* The diagram sits in its own band; labels ride above it in HTML. */
+.tw-plot { position: relative; z-index: 1; max-width: 1000px; margin: 30px auto 2px; }
+.tw-sankey { display: block; width: 100%; height: auto; overflow: visible; }
+.tw-sankey .rb { transition: filter .14s; }
+.tw-sankey .rb:hover { filter: brightness(1.45); }
+.tw-marks { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+/* Station heads sit above the line; tributary labels ride beside their landing. */
+.tw-marks .st { position: absolute; transform: translate(0, -100%); white-space: nowrap; }
+.tw-marks .st.right { transform: translate(-100%, -100%); text-align: right; }
+.tw-marks .st b { display: block; font-family: var(--i-num); font-size: 21px; font-weight: 700; color: #fff; letter-spacing: -.02em; line-height: 1.1; }
+.tw-marks .st em { display: block; font-style: normal; font-size: 11.5px; color: var(--i-on-navy-dim); margin-top: 1px; }
+.tw-marks .lk { position: absolute; transform: translate(0, -50%); display: flex; align-items: baseline; gap: 7px; white-space: nowrap;
+  font-size: 12px; color: var(--i-on-navy-dim); text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+.tw-marks .lk b { font-family: var(--i-num); font-size: 14px; font-weight: 700; color: #fff; }
+
+.tw-key { position: relative; z-index: 1; display: flex; align-items: center; gap: 18px; margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.12); }
+.tw-key span { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--i-on-navy); }
+.tw-key i { width: 10px; height: 10px; border-radius: 3px; }
+.tw-key em { margin-left: auto; font-style: normal; font-size: 11.5px; color: var(--i-on-navy-dim); }
 
 .tw-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .tw-card { background: var(--i-card); border: 1px solid var(--i-line-2); border-radius: 14px; padding: 16px 18px 18px; min-width: 0; }

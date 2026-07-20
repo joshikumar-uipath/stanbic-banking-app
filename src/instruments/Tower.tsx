@@ -1,32 +1,34 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Factory control tower (/tower) — the management view of the account opening
-// factory, read live off the shared store.
+// Factory control tower (/tower) — the line, drawn.
 //
-// Everything else in this demo answers "what should I do about this case?".
-// This answers "is the factory working?" — throughput, straight-through rate,
-// where applications sit, what actually breaks, and how the work arrives.
+// Every other screen answers "what do I do about this case?". This one answers
+// "is the factory working?" — and the honest form for that is a flow, not a
+// grid of stat cards. Volume enters on the left, splits at verification into
+// the work that opened itself and the work that needed a person, and lands in
+// one of three outcomes. Ribbon thickness IS the volume, so a bottleneck shows
+// up as a fat amber stream instead of a number you have to interpret.
 //
-// Charts follow the house rules: one filter row scoping every card, thin marks
-// with rounded data-ends, solid hairline grids, selective direct labels, a
-// hover/focus tooltip on every mark, and a table twin so no value is gated
-// behind a hover.
+// The panel is deliberately the same navy as the Ops console's pattern card:
+// this is the same product speaking, and it opens with a written read of the
+// numbers rather than making you assemble one.
+//
+// Stream colours are validated against the navy surface (dataviz validator:
+// lightness band, chroma floor, CVD ΔE 30.2, normal-vision 34.2, contrast ≥3:1).
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react';
-import { store, ONBOARDING_STATES, VALIDATION_KINDS, type OnboardingCase, type ValidationKind } from '../onboarding';
+import { store, VALIDATION_KINDS, type OnboardingCase, type ValidationKind } from '../onboarding';
 import { InstrumentProvider, TopBar } from './shell';
 import { useBrandVars } from './brand';
 
-// Validated categorical trio (see dataviz validator: lightness band, chroma
-// floor, CVD ΔE 13.5, normal-vision 19.8, contrast ≥3:1 on a light surface).
-// Identity colours for how work arrives — deliberately not the brand hue, which
-// is reserved for single-series magnitude.
-const CHANNEL_COLOR: Record<string, string> = { single: '#2563EB', bulk: '#A16207', self: '#0D9488' };
-const CHANNEL_LABEL: Record<string, string> = { single: 'Walk-in / branch', bulk: 'Bulk payroll', self: 'Self-service' };
-const CHANNELS = ['single', 'bulk', 'self'] as const;
+const CLEAN = '#3B82F6';   // opened itself — cool
+const PERSON = '#D97706';  // needed a person — warm, the opposite pole
+const DIM = '#7C93C4';     // still moving, nobody blocked — recessive, not a status
 
-// Minutes of human handling saved per application that never needed a person.
+// Minutes of human handling: what an application costs when nobody touches it,
+// what it costs when somebody must, and what one exception costs to work.
 const MANUAL_MIN = 35;
 const AUTO_MIN = 4;
+const HANDLE_MIN = 18;
 
 type Range = '24h' | '48h' | '7d';
 const RANGES: { id: Range; label: string; hours: number; bucketH: number }[] = [
@@ -38,9 +40,42 @@ const RANGES: { id: Range; label: string; hours: number; bucketH: number }[] = [
 const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const two = (n: number) => String(n).padStart(2, '0');
 const opened = (c: OnboardingCase) => Boolean(c.accountNumber);
-/** Touched = a person had to get involved at some point. */
+const stuck = (c: OnboardingCase) => c.state === 'EXCEPTION';
+/** Touched = a person had to get involved at some point on this application. */
 const touched = (c: OnboardingCase) =>
-  c.state === 'EXCEPTION' || c.validations.some((v) => v.status === 'failed' || v.status === 'timeout');
+  stuck(c) || c.validations.some((v) => v.status === 'failed' || v.status === 'timeout');
+
+const CHECK_LABEL: Record<string, string> = {
+  NIN: 'NIN · NIMC', BVN: 'BVN · NIBSS', AML: 'AML screening',
+  PEP: 'PEP screening', FRAUD: 'Fraud screening', LIVENESS: 'Selfie check',
+};
+
+// ── The line: a stream that narrows, with tributaries peeling off ────────────
+// A factory line is not a set of stacked bars — material enters, travels through
+// stations, and at each one some of it falls out. Thickness is what is still
+// moving; every tributary is work that left the line and why.
+const VB_W = 1000, VB_H = 300;
+const S_TOP = 72;        // top edge of the stream (labels ride above it)
+const S_MAX = 116;       // thickness at full intake
+const LEAK_Y = 232;      // where tributaries land
+const SX = [26, 350, 674, 962];
+
+/** The main stream: straight top edge, bottom edge easing down past each station. */
+function stream(th: number[]): string {
+  const last = SX.length - 1;
+  let d = `M${SX[0]},${S_TOP} L${SX[last]},${S_TOP} L${SX[last]},${S_TOP + th[last]}`;
+  for (let i = last; i > 0; i--) {
+    const x0 = SX[i], x1 = SX[i - 1], xm = (x0 + x1) / 2;
+    d += ` C${xm},${S_TOP + th[i]} ${xm},${S_TOP + th[i - 1]} ${x1},${S_TOP + th[i - 1]}`;
+  }
+  return d + ' Z';
+}
+
+/** A sankey ribbon: two cubic curves, filled. */
+function ribbon(x0: number, y0: number, h0: number, x1: number, y1: number, h1: number): string {
+  const xm = (x0 + x1) / 2;
+  return `M${x0},${y0} C${xm},${y0} ${xm},${y1} ${x1},${y1} L${x1},${y1 + h1} C${xm},${y1 + h1} ${xm},${y0 + h0} ${x0},${y0 + h0} Z`;
+}
 
 interface Tip { x: number; y: number; title: string; rows: { k: string; v: string }[] }
 
@@ -49,7 +84,6 @@ function TowerInner() {
   const [range, setRange] = useState<Range>('48h');
   const [showData, setShowData] = useState(false);
   const [tip, setTip] = useState<Tip | null>(null);
-  // `now` travels with the data so nothing time-dependent is computed in render.
   const [{ cases, now }, setData] = useState<{ cases: OnboardingCase[]; now: number }>({ cases: [], now: 0 });
 
   useEffect(() => {
@@ -62,73 +96,98 @@ function TowerInner() {
 
   const cfg = RANGES.find((r) => r.id === range)!;
 
-  const model = useMemo(() => {
+  const m = useMemo(() => {
     const from = now - cfg.hours * 3600_000;
-    const scoped = cases.filter((c) => Date.parse(c.createdAt) >= from);
+    const s = cases.filter((c) => Date.parse(c.createdAt) >= from);
 
-    // Headline figures.
-    const stpCount = scoped.filter((c) => !touched(c)).length;
-    const kpi = {
-      opened: scoped.filter(opened).length,
-      received: scoped.length,
-      stp: scoped.length ? Math.round((stpCount / scoped.length) * 100) : 0,
-      exceptions: scoped.filter((c) => c.state === 'EXCEPTION').length,
-      hours: Math.round((stpCount * (MANUAL_MIN - AUTO_MIN)) / 60),
-    };
+    // Stations on the line. Thickness is what is still moving; each tributary is
+    // work that left the line, and the label says why it left.
+    const failed = (c: OnboardingCase, ...k: ValidationKind[]) =>
+      c.validations.some((v) => k.includes(v.kind) && (v.status === 'failed' || v.status === 'timeout'));
 
-    // Throughput — equal buckets across the window, oldest first.
-    const count = Math.round(cfg.hours / cfg.bucketH);
-    const span = cfg.bucketH * 3600_000;
+    const arrived = s.length;
+    const leakId = s.filter((c) => failed(c, 'NIN', 'BVN')).length;                    // identity bureaux
+    const afterId = arrived - leakId;
+    const leakScreen = s.filter((c) => !failed(c, 'NIN', 'BVN') && failed(c, 'AML', 'PEP', 'FRAUD')).length;
+    const afterScreen = afterId - leakScreen;
+    const open = s.filter((c) => opened(c)).length;
+    const leakRunning = Math.max(0, afterScreen - open);                               // still working, not lost
+    const activated = s.filter((c) => c.state === 'FULLY_ACTIVATED').length;
+    const leakKyc = Math.max(0, open - activated);                                     // open, waiting on the customer
+
+    const counts = [arrived, afterId, open, activated];
+    const th = counts.map((n) => (arrived ? Math.max(2, (n / arrived) * S_MAX) : 0));
+    const stations = [
+      { key: 'in', label: 'Arrived', n: arrived },
+      { key: 'id', label: 'Identity verified', n: afterId },
+      { key: 'acct', label: 'Account open', n: open },
+      { key: 'live', label: 'Fully activated', n: activated },
+    ];
+
+    // Tributaries: source span on the stream's underside, landing in the lane.
+    const leaks = [
+      { at: 0, n: leakId, c: PERSON, label: 'NIN or BVN needed a person', tone: 'bad' as const },
+      { at: 1, n: leakScreen, c: PERSON, label: 'Screening needed a person', tone: 'bad' as const },
+      { at: 1, n: leakRunning, c: DIM, label: 'Still running its checks', tone: 'idle' as const },
+      { at: 2, n: leakKyc, c: DIM, label: 'Open, KYC outstanding', tone: 'idle' as const },
+    ].filter((l) => l.n > 0);
+
+    const lanes: Record<number, number> = {};
+    const rivers = leaks.map((l) => {
+      const h = Math.max(2, (l.n / (arrived || 1)) * S_MAX);
+      const x0 = SX[l.at], lx = SX[l.at + 1] - 30;
+      const y0 = S_TOP + th[l.at + 1];                 // peels from under the narrowing edge
+      const ly = LEAK_Y + (lanes[lx] ?? 0);
+      lanes[lx] = (lanes[lx] ?? 0) + h + 9;
+      return { ...l, d: ribbon(x0, y0, h, lx, ly, h), ly, lh: h, lx };
+    });
+
+    const person = s.filter(touched);
+    const clean = s.filter((c) => !touched(c));
+    const totals = { open, checks: leakRunning, stuck: s.filter(stuck).length };
+
+    // What is actually costing people time.
+    const causes = VALIDATION_KINDS
+      .map((k: ValidationKind) => ({
+        key: k, label: CHECK_LABEL[k] ?? k,
+        n: s.filter((c) => c.validations.some((v) => v.kind === k && (v.status === 'failed' || v.status === 'timeout'))).length,
+      }))
+      .filter((c) => c.n > 0)
+      .sort((x, y) => y.n - x.n);
+
+    // Arrivals, bucketed across the window.
+    const count = Math.round(cfg.hours / cfg.bucketH), span = cfg.bucketH * 3600_000;
     const flow = Array.from({ length: count }, (_, i) => {
-      const start = from + i * span;
-      const d = new Date(start + span / 2);
+      const start = from + i * span, d = new Date(start + span / 2);
+      const inBucket = s.filter((c) => { const t = Date.parse(c.createdAt); return t >= start && t < start + span; });
       return {
         label: cfg.bucketH >= 24 ? DAY[d.getDay()] : `${two(d.getHours())}:00`,
         full: cfg.bucketH >= 24 ? `${DAY[d.getDay()]} ${d.getDate()}` : `${two(d.getHours())}:00–${two((d.getHours() + cfg.bucketH) % 24)}:00`,
-        n: scoped.filter((c) => { const t = Date.parse(c.createdAt); return t >= start && t < start + span; }).length,
+        n: inBucket.length, bulk: inBucket.filter((c) => c.channel === 'bulk').length,
       };
     });
 
-    // Where applications sit right now.
-    const stages = ONBOARDING_STATES
-      .map((s) => ({ label: s.label, n: scoped.filter((c) => c.state === s.state).length }))
-      .filter((s) => s.n > 0);
-
-    // What actually breaks — a case can fail more than one check.
-    const causes = VALIDATION_KINDS
-      .map((k: ValidationKind) => ({
-        label: k === 'LIVENESS' ? 'Selfie check' : k === 'FRAUD' ? 'Fraud screening' : k,
-        n: scoped.filter((c) => c.validations.some((v) => v.kind === k && (v.status === 'failed' || v.status === 'timeout'))).length,
-      }))
-      .filter((c) => c.n > 0)
-      .sort((a, b) => b.n - a.n);
-
-    // How the work arrives.
-    const mix = CHANNELS.map((k) => ({ key: k, label: CHANNEL_LABEL[k], color: CHANNEL_COLOR[k], n: scoped.filter((c) => (c.channel ?? 'single') === k).length }));
-
-    return { kpi, flow, stages, causes, mix, total: scoped.length };
+    return {
+      total: s.length, clean: clean.length, person: person.length, totals,
+      stations, th, rivers, causes, flow,
+      hoursBack: Math.round((clean.length * (MANUAL_MIN - AUTO_MIN)) / 60),
+      hoursSpent: Math.round((person.length * HANDLE_MIN) / 60 * 10) / 10,
+    };
   }, [cases, now, cfg]);
 
-  const { kpi, flow, stages, causes, mix, total } = model;
-  const flowMax = Math.max(1, ...flow.map((f) => f.n));
-  const flowPeak = flow.reduce((a, b) => (b.n > a.n ? b : a), flow[0] ?? { n: -1, label: '' });
-  const stageMax = Math.max(1, ...stages.map((s) => s.n));
-  const causeMax = Math.max(1, ...causes.map((c) => c.n));
-  const mixTotal = mix.reduce((s, m) => s + m.n, 0);
+  const pct = m.total ? Math.round((m.clean / m.total) * 100) : 0;
+  const top = m.causes[0];
+  const flowMax = Math.max(1, ...m.flow.map((f) => f.n));
 
   const over = (e: { clientX: number; clientY: number }, title: string, rows: { k: string; v: string }[]) =>
     setTip({ x: e.clientX, y: e.clientY, title, rows });
-  const focusTip = (el: EventTarget & Element, title: string, rows: { k: string; v: string }[]) => {
-    const r = el.getBoundingClientRect();
-    setTip({ x: r.left + r.width / 2, y: r.top, title, rows });
-  };
+  const blur = () => setTip(null);
 
   return (
-    <div className="inst" onMouseLeave={() => setTip(null)}>
-      <TopBar system="Control Tower" sub="Account opening" />
+    <div className="inst" onMouseLeave={blur}>
+      <TopBar system="Control Tower" sub="The line" />
 
       <div className="tw-scroll">
-        {/* One filter row, scoping every card below it. */}
         <div className="tw-filters">
           <div className="cm-segs" role="group" aria-label="Time range">
             {RANGES.map((r) => (
@@ -140,101 +199,138 @@ function TowerInner() {
           </button>
         </div>
 
-        {total === 0 ? (
-          <div className="fn-empty"><b>Nothing in this window</b><span>No applications were received in the last {cfg.label}. Try a wider range.</span></div>
+        {m.total === 0 ? (
+          <div className="fn-empty"><b>The line is quiet</b><span>No applications arrived in the last {cfg.label}. Try a wider range.</span></div>
         ) : (
           <>
-            {/* Hero + supporting tiles. Exactly one hero figure per view. */}
-            <div className="tw-kpis">
-              <div className="tw-hero">
-                <div className="k">Accounts opened</div>
-                <div className="v">{kpi.opened}</div>
-                <div className="s">of {kpi.received} received · last {cfg.label}</div>
+            {/* ── The line. The hero is the flow, not a number. ── */}
+            <section className="tw-floor">
+              <header>
+                <span className="eyebrow">The line · last {cfg.label}</span>
+                <h1>
+                  <b>{m.total}</b> arrived. <b>{m.clean}</b> opened themselves —{' '}
+                  <span className="hl">{pct}%</span> never reached a person.
+                </h1>
+                <p>
+                  {top
+                    ? <>The rest cost you about <b>{m.hoursSpent}h</b> of handling, nearly all of it <b>{top.label}</b>{m.totals.stuck > 0 ? <> — {m.totals.stuck} {m.totals.stuck === 1 ? 'is' : 'are'} still waiting on somebody.</> : '.'}</>
+                    : <>Nothing failed a check. The line ran clean.</>}
+                </p>
+              </header>
+
+              <div className="tw-plot">
+              <svg className="tw-sankey" viewBox={`0 0 ${VB_W} ${VB_H}`}
+                role="img" aria-label={`The line: ${m.stations.map((st) => `${st.n} ${st.label}`).join(', ')}. Leaving the line: ${m.rivers.map((r) => `${r.n} ${r.label}`).join(', ')}.`}>
+                <defs>
+                  <linearGradient id="mainflow" x1="0" y1="0" x2="1" y2="0">
+                    <stop offset="0%" stopColor={CLEAN} stopOpacity={0.85} />
+                    <stop offset="100%" stopColor="#5FD39A" stopOpacity={0.9} />
+                  </linearGradient>
+                  {m.rivers.map((r, i) => (
+                    <linearGradient key={i} id={`lk${i}`} x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor={r.c} stopOpacity={0.55} />
+                      <stop offset="100%" stopColor={r.c} stopOpacity={0.85} />
+                    </linearGradient>
+                  ))}
+                </defs>
+
+                {/* Station rules — recessive hairlines the stream passes through. */}
+                {SX.map((x, i) => (
+                  <line key={i} x1={x} y1={S_TOP - 34} x2={x} y2={LEAK_Y + 46} stroke="#fff" strokeOpacity={0.11} strokeWidth={1} />
+                ))}
+
+                {/* Tributaries first, so the main line sits over them. */}
+                {m.rivers.map((r, i) => (
+                  <g key={i}>
+                    <path d={r.d} fill={`url(#lk${i})`} className="rb"
+                      onMouseMove={(e) => over(e, r.label, [{ k: 'Applications', v: String(r.n) }])}
+                      onMouseLeave={blur} />
+                    <rect x={r.lx} y={r.ly} width={5} height={r.lh} rx={2} fill={r.c} />
+                  </g>
+                ))}
+
+                {/* The line itself. */}
+                <path d={stream(m.th)} fill="url(#mainflow)" className="rb"
+                  onMouseMove={(e) => over(e, 'Still on the line', [{ k: 'Arrived', v: String(m.stations[0].n) }, { k: 'Activated', v: String(m.stations[3].n) }])}
+                  onMouseLeave={blur} />
+              </svg>
+
+              {/* Station and tributary labels in HTML — crisp at any scale. */}
+              <div className="tw-marks">
+                {m.stations.map((st, i) => (
+                  <span key={st.key} className={`st ${i === SX.length - 1 ? 'right' : ''}`}
+                    style={{ left: `${(SX[i] / VB_W) * 100}%`, top: `${((S_TOP - 30) / VB_H) * 100}%` }}>
+                    <b>{st.n}</b><em>{st.label}</em>
+                  </span>
+                ))}
+                {m.rivers.map((r, i) => (
+                  <span key={i} className="lk" style={{ left: `${((r.lx + 12) / VB_W) * 100}%`, top: `${((r.ly + r.lh / 2) / VB_H) * 100}%` }}>
+                    <b>{r.n}</b>{r.label}
+                  </span>
+                ))}
               </div>
-              <div className="tw-tiles">
-                <Tile label="Straight through" value={`${kpi.stp}%`} sub="never needed a person" tone={kpi.stp >= 80 ? 'good' : kpi.stp >= 60 ? 'warn' : 'bad'} />
-                <Tile label="Exceptions" value={kpi.exceptions} sub="waiting on a person" tone={kpi.exceptions === 0 ? 'good' : 'bad'} />
-                <Tile label="Hours returned" value={kpi.hours} sub={`vs ${MANUAL_MIN}-min manual open`} tone="none" />
               </div>
-            </div>
+
+              <div className="tw-key">
+                <span><i style={{ background: CLEAN }} />On the line</span>
+                <span><i style={{ background: PERSON }} />Left it — needs a person</span>
+                <span><i style={{ background: DIM }} />Left it — still working</span>
+                <em>Thickness is volume</em>
+              </div>
+            </section>
 
             <div className="tw-grid">
-              {/* ── Throughput: change over time, single series → no legend ── */}
-              <section className="tw-card wide">
-                <header><h2>Applications received</h2><p>Each bar is {cfg.bucketH >= 24 ? 'a day' : `${cfg.bucketH} hours`}. Peak {flowPeak.n} in {flowPeak.label}.</p></header>
-                <div className="tw-cols">
-                  <div className="plot">
-                    <div className="grid" aria-hidden><i /><i /><i /><i /></div>
-                    {flow.map((f, i) => (
-                      <button
-                        className="hit" key={i}
-                        aria-label={`${f.full}: ${f.n} applications`}
-                        onMouseMove={(e) => over(e, f.full, [{ k: 'Applications', v: String(f.n) }])}
-                        onFocus={(e) => focusTip(e.currentTarget, f.full, [{ k: 'Applications', v: String(f.n) }])}
-                        onBlur={() => setTip(null)}
-                      >
-                        {f.n === flowPeak.n && f.n > 0 && <span className="cap">{f.n}</span>}
-                        {/* An empty bucket draws nothing — a minimum-height stub
-                            would read as volume that isn't there. */}
-                        <i className="col" style={{ height: f.n ? `${Math.max(3, (f.n / flowMax) * 128)}px` : 0 }} />
-                      </button>
+              {/* ── The constraint, named and costed ── */}
+              <section className="tw-card">
+                <header><h2>What is holding the line</h2><p>Checks that failed or timed out, by the time they cost.</p></header>
+                {m.causes.length ? (
+                  <div className="tw-bars">
+                    {m.causes.map((c) => (
+                      <div className="row" key={c.key}>
+                        <span className="lb">{c.label}</span>
+                        <span className="track">
+                          <button className="bar bad" style={{ width: `${Math.max(3, (c.n / m.causes[0].n) * 100)}%` }}
+                            aria-label={`${c.label}: ${c.n} cases`}
+                            onMouseMove={(e) => over(e, c.label, [{ k: 'Cases', v: String(c.n) }, { k: 'Handling', v: `${Math.round(c.n * HANDLE_MIN / 6) / 10}h` }])}
+                            onMouseLeave={blur} />
+                        </span>
+                        <span className="vl">{c.n}</span>
+                      </div>
                     ))}
                   </div>
-                  <div className="axis">{flow.map((f, i) => <span key={i}>{f.label}</span>)}</div>
-                </div>
-                {showData && <Table head={['Bucket', 'Applications']} rows={flow.map((f) => [f.full, String(f.n)])} />}
-              </section>
-
-              {/* ── Where they sit: magnitude across ordered stages ── */}
-              <section className="tw-card">
-                <header><h2>Where applications sit</h2><p>Live count by stage.</p></header>
-                <BarList
-                  items={stages.map((s) => ({ label: s.label, n: s.n }))}
-                  max={stageMax}
-                  onTip={over} onFocusTip={focusTip} unit="applications"
-                />
-                {showData && <Table head={['Stage', 'Applications']} rows={stages.map((s) => [s.label, String(s.n)])} />}
-              </section>
-
-              {/* ── What breaks ── */}
-              <section className="tw-card">
-                <header><h2>What needs a person</h2><p>Checks that failed or timed out.</p></header>
-                {causes.length ? (
-                  <>
-                    <BarList
-                      items={causes.map((c) => ({ label: c.label, n: c.n }))}
-                      max={causeMax} tone="bad"
-                      onTip={over} onFocusTip={focusTip} unit="cases"
-                    />
-                    {showData && <Table head={['Check', 'Cases']} rows={causes.map((c) => [c.label, String(c.n)])} />}
-                  </>
-                ) : (
-                  <div className="tw-clear">Nothing failed in this window — every check passed first time.</div>
+                ) : <div className="tw-clear">Nothing failed in this window — every check passed first time.</div>}
+                {showData && m.causes.length > 0 && (
+                  <Table head={['Check', 'Cases', 'Handling']} rows={m.causes.map((c) => [c.label, String(c.n), `${Math.round(c.n * HANDLE_MIN / 6) / 10}h`])} />
                 )}
               </section>
 
-              {/* ── How work arrives: part-to-whole, 3 categorical hues + legend ── */}
-              <section className="tw-card wide">
-                <header><h2>How the work arrives</h2><p>Share of applications by channel.</p></header>
-                <div className="tw-stack">
-                  {mix.filter((m) => m.n > 0).map((m) => (
-                    <button
-                      key={m.key} className="seg" style={{ flexGrow: m.n, background: m.color }}
-                      aria-label={`${m.label}: ${m.n} applications, ${Math.round((m.n / mixTotal) * 100)}%`}
-                      onMouseMove={(e) => over(e, m.label, [{ k: 'Applications', v: String(m.n) }, { k: 'Share', v: `${Math.round((m.n / mixTotal) * 100)}%` }])}
-                      onFocus={(e) => focusTip(e.currentTarget, m.label, [{ k: 'Applications', v: String(m.n) }])}
-                      onBlur={() => setTip(null)}
-                    />
-                  ))}
+              {/* ── Arrivals: the batch spikes are the point ── */}
+              <section className="tw-card">
+                <header><h2>When the work arrived</h2><p>Bulk uploads land as spikes; walk-ins trickle.</p></header>
+                <div className="tw-cols">
+                  <div className="plot">
+                    <div className="grid" aria-hidden><i /><i /><i /><i /></div>
+                    {m.flow.map((f, i) => (
+                      <button className="hit" key={i} aria-label={`${f.full}: ${f.n} applications, ${f.bulk} from bulk`}
+                        onMouseMove={(e) => over(e, f.full, [{ k: 'Arrived', v: String(f.n) }, { k: 'From bulk', v: String(f.bulk) }])}
+                        onMouseLeave={blur}>
+                        <i className="col" style={{ height: f.n ? `${Math.max(3, (f.n / flowMax) * 110)}px` : 0 }} />
+                      </button>
+                    ))}
+                  </div>
+                  <div className="axis">{m.flow.map((f, i) => <span key={i}>{f.label}</span>)}</div>
                 </div>
-                <div className="tw-legend">
-                  {mix.map((m) => (
-                    <span key={m.key}><i style={{ background: m.color }} />{m.label}<b>{mixTotal ? Math.round((m.n / mixTotal) * 100) : 0}%</b></span>
-                  ))}
-                </div>
-                {showData && <Table head={['Channel', 'Applications', 'Share']} rows={mix.map((m) => [m.label, String(m.n), `${mixTotal ? Math.round((m.n / mixTotal) * 100) : 0}%`])} />}
+                {showData && <Table head={['Window', 'Arrived', 'From bulk']} rows={m.flow.map((f) => [f.full, String(f.n), String(f.bulk)])} />}
               </section>
             </div>
+
+            {showData && (
+              <section className="tw-card" style={{ marginTop: 12 }}>
+                <header><h2>The line, as numbers</h2></header>
+                <Table head={['Station', 'Still on the line']} rows={m.stations.map((st) => [st.label, String(st.n)])} />
+                <Table head={['Left the line', 'Applications']} rows={m.rivers.map((r) => [r.label, String(r.n)])} />
+              </section>
+            )}
           </>
         )}
       </div>
@@ -242,51 +338,13 @@ function TowerInner() {
       {tip && (
         <div className="tw-tip" style={{ left: tip.x, top: tip.y }} role="status">
           <b>{tip.title}</b>
-          {tip.rows.map((r) => <span key={r.k}>{r.k}<em>{r.v}</em></span>)}
+          {tip.rows.filter((r) => r.v).map((r, i) => <span key={i}>{r.k}<em>{r.v}</em></span>)}
         </div>
       )}
     </div>
   );
 }
 
-function Tile({ label, value, sub, tone }: { label: string; value: string | number; sub: string; tone: 'good' | 'warn' | 'bad' | 'none' }) {
-  return (
-    <div className="tw-tile">
-      <div className="k">{label}</div>
-      <div className={`v ${tone}`}>{value}</div>
-      <div className="s">{sub}</div>
-    </div>
-  );
-}
-
-/** Horizontal bars — one series, one colour; value rides the tip. */
-function BarList({ items, max, tone, onTip, onFocusTip, unit }: {
-  items: { label: string; n: number }[]; max: number; tone?: 'bad'; unit: string;
-  onTip: (e: { clientX: number; clientY: number }, t: string, r: { k: string; v: string }[]) => void;
-  onFocusTip: (el: EventTarget & Element, t: string, r: { k: string; v: string }[]) => void;
-}) {
-  return (
-    <div className="tw-bars">
-      {items.map((it) => (
-        <div className="row" key={it.label}>
-          <span className="lb">{it.label}</span>
-          <span className="track">
-            <button
-              className={`bar${tone === 'bad' ? ' bad' : ''}`} style={{ width: `${Math.max(2, (it.n / max) * 100)}%` }}
-              aria-label={`${it.label}: ${it.n} ${unit}`}
-              onMouseMove={(e) => onTip(e, it.label, [{ k: unit[0].toUpperCase() + unit.slice(1), v: String(it.n) }])}
-              onFocus={(e) => onFocusTip(e.currentTarget, it.label, [{ k: unit[0].toUpperCase() + unit.slice(1), v: String(it.n) }])}
-              onBlur={() => onTip({ clientX: -9999, clientY: -9999 }, '', [])}
-            />
-          </span>
-          <span className="vl">{it.n}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** The table twin — every charted value readable without a hover. */
 function Table({ head, rows }: { head: string[]; rows: string[][] }) {
   return (
     <table className="tw-table">
