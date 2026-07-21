@@ -60,7 +60,7 @@ const [RM, OPS] = ROLES;
 const PEOPLE: Persona[] = [
   {
     key: 'rm', name: RM.name, sub: RM.sub, blurb: RM.blurb, href: RM.href, icon: 'briefcase',
-    alts: [{ label: 'On mobile', href: '/employee-mobile' }],
+    alts: [{ label: 'On web', href: '/employee-web' }, { label: 'On mobile', href: '/employee-mobile' }],
   },
   {
     key: 'ops', name: OPS.name, sub: OPS.sub, blurb: OPS.blurb, href: OPS.href, icon: 'dashboard',
