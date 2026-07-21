@@ -176,59 +176,74 @@
 .cm-del.delivered { color: var(--i-good-ink); }
 .cm-del.sent { color: var(--i-ink-3); }
 
-/* ── The morning brief (/tower) — an editorial read, not a dashboard ── */
-.br-scroll { overflow-y: auto; padding: 22px 28px 40px; min-height: 0; background: var(--i-page); }
-.br-filters { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 auto 20px; max-width: 1080px; }
-.tw-toggle { margin-left: auto; border: 1px solid var(--i-line-2); background: var(--i-card); border-radius: 8px; padding: 7px 12px; font-size: 12.5px; font-weight: 600; color: var(--i-ink-2); }
-.tw-toggle:hover { background: #fafaf7; color: var(--i-ink); }
-.tw-toggle[aria-pressed="true"] { border-color: var(--i-brand); color: var(--i-brand); background: rgba(var(--i-brand-rgb), .05); }
+/* ── Control tower (/tower) — an operations dashboard ── */
+.db-scroll { overflow-y: auto; padding: 18px 22px 34px; min-height: 0; background: var(--i-page); }
+.db-filters { margin-bottom: 14px; }
 
-.br { max-width: 1080px; margin: 0 auto; background: var(--i-card); border: 1px solid var(--i-line-2); border-radius: 18px; padding: 40px 48px 44px; box-shadow: 0 1px 2px rgba(0,0,0,.03); }
-.br-kicker { font-family: var(--i-num); font-size: 11px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--i-brand); }
-.br-kicker::before { content: ''; display: inline-block; width: 22px; height: 2px; background: var(--i-brand); vertical-align: middle; margin-right: 10px; margin-bottom: 3px; }
+.db-kpis { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+.db-kpi { background: var(--i-card); border: 1px solid var(--i-line-2); border-radius: 14px; padding: 15px 16px 12px; min-width: 0; }
+.db-kpi .k { font-size: 11px; letter-spacing: .07em; text-transform: uppercase; color: var(--i-ink-3); }
+.db-kpi .v { font: 700 30px/1.05 var(--i-num); letter-spacing: -.02em; color: var(--i-ink); margin: 7px 0 2px; }
+.db-kpi .v.good { color: var(--i-good-ink); } .db-kpi .v.warn { color: var(--i-warn-ink); } .db-kpi .v.bad { color: var(--i-red-ink); }
+.db-kpi .s { font-size: 11.5px; color: var(--i-ink-3); }
+.db-mini { width: 100%; height: 24px; margin-top: 8px; display: block; }
 
-/* The lede carries the whole story; the figures are set into the sentence. */
-.br-lede { font-size: 30px; line-height: 1.34; font-weight: 500; letter-spacing: -.018em; color: var(--i-ink); margin: 16px 0 28px; max-width: 24ch; }
-.br-lede b { font-weight: 700; }
-.br-lede .hl { font-weight: 700; color: var(--i-good-ink); }
+.db-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
+.db-card { background: var(--i-card); border: 1px solid var(--i-line-2); border-radius: 14px; padding: 16px 18px; min-width: 0; }
+.db-card header { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.db-card h2 { font-size: 14px; font-weight: 700; letter-spacing: -.01em; }
+.db-card header .mu { font-size: 11.5px; color: var(--i-ink-3); }
+.a-flow { grid-column: span 8; } .a-gauge { grid-column: span 4; }
+.a-funnel { grid-column: span 5; } .a-cause { grid-column: span 4; } .a-chan { grid-column: span 3; }
+.a-up { grid-column: span 12; }
 
-.br-cols { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 40px; align-items: start; }
-.br-body { border-top: 1px solid var(--i-line-2); padding-top: 22px; }
-.br-body p { font-size: 16px; line-height: 1.66; color: var(--i-ink-2); max-width: 60ch; }
-.br-body p + p { margin-top: 15px; }
-.br-body b { font-weight: 700; color: var(--i-ink); font-variant-numeric: tabular-nums; }
-.br-body .br-close { margin-top: 20px; padding-top: 16px; border-top: 1px dashed var(--i-line-2); font-size: 15px; color: var(--i-ink-3); }
-.br-body .br-close b { color: var(--i-ink-2); }
+.db-area { width: 100%; height: 168px; display: block; }
+.db-axis { display: flex; justify-content: space-between; margin-top: 4px; }
+.db-axis span { font-family: var(--i-num); font-variant-numeric: tabular-nums; font-size: 10.5px; color: var(--i-ink-4); }
 
-/* The rail: the numbers behind the sentences, and when the work landed. */
-.br-rail { border-top: 1px solid var(--i-line-2); padding-top: 22px; display: flex; flex-direction: column; gap: 24px; }
-.br-figs { display: grid; grid-template-columns: 1fr 1fr; gap: 20px 16px; }
-.br-fig .v { font: 700 30px/1 var(--i-num); letter-spacing: -.02em; color: var(--i-ink); }
-.br-fig .v.good { color: var(--i-good-ink); } .br-fig .v.warn { color: var(--i-warn-ink); } .br-fig .v.bad { color: var(--i-red-ink); } .br-fig .v.mute { color: var(--i-ink); }
-.br-fig .k { font-size: 11.5px; line-height: 1.35; color: var(--i-ink-3); margin-top: 6px; }
+.db-gauge { position: relative; display: grid; place-items: center; padding-top: 6px; }
+.db-gauge-v { position: absolute; bottom: 2px; font: 700 34px/1 var(--i-num); letter-spacing: -.03em; }
+.db-gauge-v em { font-style: normal; font-size: 17px; font-weight: 600; margin-left: 1px; }
+.db-note { font-size: 12px; color: var(--i-ink-3); text-align: center; margin-top: 10px; line-height: 1.5; }
 
-.br-spark { border-top: 1px solid var(--i-line-3); padding-top: 16px; }
-.br-spark-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; font-size: 12px; font-weight: 600; color: var(--i-ink-2); }
-.br-spark-h span { font-family: var(--i-num); font-variant-numeric: tabular-nums; font-size: 11px; font-weight: 500; color: var(--i-ink-4); }
-.br-bars { display: flex; align-items: flex-end; gap: 3px; height: 60px; margin: 12px 0 6px; }
-.br-bars .b { flex: 1; height: 100%; display: flex; align-items: flex-end; }
-.br-bars .b i { display: block; width: 100%; border-radius: 3px 3px 0 0; background: var(--i-accent); }
-.br-axis { display: flex; justify-content: space-between; font-family: var(--i-num); font-variant-numeric: tabular-nums; font-size: 10px; color: var(--i-ink-4); }
-.br-spark-k { font-size: 11px; color: var(--i-ink-4); margin-top: 10px; }
+.db-funnel { display: flex; flex-direction: column; gap: 11px; }
+.db-funnel .row { display: grid; grid-template-columns: 104px minmax(0, 1fr) 66px; align-items: center; gap: 12px; }
+.db-funnel .lb { font-size: 12.5px; color: var(--i-ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.db-funnel .track { display: flex; height: 14px; }
+.db-funnel .track i { height: 100%; border-radius: 0 4px 4px 0; min-width: 3px; }
+.db-funnel .vl { font-family: var(--i-num); font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 700; color: var(--i-ink); text-align: right; }
+.db-funnel .vl em { font-style: normal; font-weight: 500; font-size: 11px; color: var(--i-ink-4); margin-left: 5px; }
 
-.br-data { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--i-line-2); }
+.db-split { display: flex; align-items: center; gap: 16px; }
+.db-split svg { flex: 0 0 auto; }
+.do-v { font: 700 22px/1 var(--i-num); fill: var(--i-ink); letter-spacing: -.02em; }
+.do-k { font-family: var(--i-num); font-size: 8.5px; letter-spacing: .1em; fill: var(--i-ink-4); }
+.db-leg { list-style: none; display: flex; flex-direction: column; gap: 9px; min-width: 0; flex: 1; }
+.db-leg li { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--i-ink-2); min-width: 0; }
+.db-leg li i { width: 9px; height: 9px; border-radius: 3px; flex: 0 0 auto; }
+.db-leg li b { margin-left: auto; font-family: var(--i-num); font-variant-numeric: tabular-nums; color: var(--i-ink); }
+.db-clear { font-size: 13px; color: var(--i-good-ink); background: var(--i-good-bg); border-radius: 10px; padding: 22px 16px; text-align: center; }
 
-@media (max-width: 900px) {
+.db-svc { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.db-svc .svc { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 3px 9px; padding: 12px 14px; border: 1px solid var(--i-line-2); border-radius: 11px; }
+.db-svc .dot { width: 9px; height: 9px; border-radius: 50%; align-self: center; }
+.db-svc .nm { font-size: 13.5px; font-weight: 700; color: var(--i-ink); }
+.db-svc .sys { grid-column: 2; font-size: 11px; color: var(--i-ink-4); }
+.db-svc .st { grid-column: 1 / -1; font-size: 12px; color: var(--i-ink-2); margin-top: 5px; }
+.db-svc .svc.healthy .dot { background: var(--i-good); }
+.db-svc .svc.watch .dot { background: var(--i-warn); }
+.db-svc .svc.degraded .dot { background: var(--i-red); box-shadow: 0 0 0 3px var(--i-red-bg); }
+.db-svc .svc.degraded { border-color: #f3d0cd; background: var(--i-red-bg); }
+.db-svc .svc.degraded .st { color: var(--i-red-ink); font-weight: 600; }
+
+.tw-tip { position: fixed; z-index: 60; transform: translate(-50%, calc(-100% - 12px)); pointer-events: none;
+  background: var(--i-ink); color: #fff; border-radius: 9px; padding: 8px 11px; box-shadow: 0 10px 24px -8px rgba(0,0,0,.5); white-space: nowrap; }
+.tw-tip b { display: block; font-size: 12px; font-weight: 700; margin-bottom: 2px; }
+.tw-tip span { font-size: 11.5px; color: rgba(255,255,255,.78); font-family: var(--i-num); }
+
+@media (max-width: 1080px) {
   .fn.open { grid-template-columns: minmax(0, 1fr); } .fn.open .fn-main { display: none; } .fn.open .fn-detail { border-left: none; }
-  .br { padding: 30px 24px 34px; }
-  .br-lede { font-size: 25px; max-width: none; }
-  .br-cols, .br-data { grid-template-columns: minmax(0, 1fr); gap: 26px; }
+  .db-kpis { grid-template-columns: repeat(2, 1fr); }
+  .a-flow, .a-gauge, .a-funnel, .a-cause, .a-chan { grid-column: span 12; }
+  .db-svc { grid-template-columns: repeat(2, 1fr); }
 }
-
-/* Table twin — every value readable without the prose */
-.tw-table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 12.5px; }
-.tw-table th { text-align: left; font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--i-ink-4); padding: 6px 8px; border-bottom: 1px solid var(--i-line-2); }
-.tw-table td { padding: 6px 8px; border-bottom: 1px solid var(--i-line-3); color: var(--i-ink-2); font-variant-numeric: tabular-nums; }
-.tw-table td:first-child { color: var(--i-ink); font-variant-numeric: normal; }
-.tw-table tr:last-child td { border-bottom: none; }
-
