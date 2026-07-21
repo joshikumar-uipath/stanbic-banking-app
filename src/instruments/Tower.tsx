@@ -1,31 +1,26 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Control tower (/tower) — the account-opening factory as an operations board.
+// Control tower (/tower) — the account-opening line, as an operations console.
 //
-// A real dashboard, read at a glance: a KPI strip, a throughput area chart, a
-// straight-through gauge, the pipeline as a funnel, what breaks and how work
-// arrives as donuts, and an upstream-service health strip. Every figure is live
-// off the shared store. The chart marks follow the house rules — smooth 2px
-// lines, one-hue gauges, a validated categorical palette for the channel mix,
-// solid hairline grids, and a hover read on the plotted series.
+// Not an admin dashboard of white cards. This is the tower: a dark instrument
+// board in Stanbic navy where the numbers read like telemetry (mono), status is
+// carried by signal colour, and the line's throughput sweeps across the top like
+// an oscilloscope. One bold idea — the console aesthetic — held with restraint.
+// Every reading is live off the shared store.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react';
-import { store, ONBOARDING_STATES, type OnboardingCase, type ValidationKind, type OnboardingState } from '../onboarding';
+import { store, type OnboardingCase, type ValidationKind } from '../onboarding';
 import { InstrumentProvider, TopBar } from './shell';
 import { useBrandVars } from './brand';
 
 const MANUAL_MIN = 35, AUTO_MIN = 4;
-// Validated categorical trio for the channel mix (dataviz validator, white
-// surface: CVD ΔE 13.5, normal-vision 19.8, contrast ≥3:1).
-const CH = { bulk: '#A16207', single: '#2563EB', self: '#0D9488' } as const;
-const CH_LABEL = { bulk: 'Bulk payroll', single: 'Walk-in & branch', self: 'Self-service' } as const;
 
 type Range = '24h' | '48h' | '7d';
 const RANGES: { id: Range; label: string; hours: number; bucketH: number }[] = [
-  { id: '24h', label: '24 hours', hours: 24, bucketH: 3 },
-  { id: '48h', label: '48 hours', hours: 48, bucketH: 6 },
-  { id: '7d', label: '7 days', hours: 168, bucketH: 24 },
+  { id: '24h', label: '24H', hours: 24, bucketH: 2 },
+  { id: '48h', label: '48H', hours: 48, bucketH: 4 },
+  { id: '7d', label: '7D', hours: 168, bucketH: 12 },
 ];
-const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 const two = (n: number) => String(n).padStart(2, '0');
 const opened = (c: OnboardingCase) => Boolean(c.accountNumber);
 const stuck = (c: OnboardingCase) => c.state === 'EXCEPTION';
@@ -34,71 +29,9 @@ const touched = (c: OnboardingCase) =>
 const failedK = (c: OnboardingCase, k: ValidationKind) =>
   c.validations.some((v) => v.kind === k && (v.status === 'failed' || v.status === 'timeout'));
 const KINDS: ValidationKind[] = ['NIN', 'BVN', 'AML', 'PEP', 'FRAUD', 'LIVENESS'];
-const KLABEL: Record<string, string> = { NIN: 'NIN · NIMC', BVN: 'BVN · NIBSS', AML: 'AML', PEP: 'PEP', FRAUD: 'Fraud', LIVENESS: 'Selfie' };
-
-// ── Chart primitives (self-contained SVG) ────────────────────────────────────
-function Gauge({ pct, color, size = 116 }: { pct: number; color: string; size?: number }) {
-  const r = (size - 16) / 2, cy = size / 2 + r / 2 - 4, circ = Math.PI * r;
-  const d = `M 8 ${cy} A ${r} ${r} 0 0 1 ${size - 8} ${cy}`;
-  return (
-    <svg width={size} height={cy + 8} viewBox={`0 0 ${size} ${cy + 8}`} aria-hidden>
-      <path d={d} fill="none" stroke="var(--i-line)" strokeWidth="11" strokeLinecap="round" />
-      <path d={d} fill="none" stroke={color} strokeWidth="11" strokeLinecap="round" strokeDasharray={`${(pct / 100) * circ} ${circ}`} />
-    </svg>
-  );
-}
-
-function Donut({ segments, size = 128, stroke = 18, center }: {
-  segments: { label: string; value: number; color: string }[]; size?: number; stroke?: number; center: { v: string; k: string };
-}) {
-  const total = segments.reduce((s, x) => s + x.value, 0) || 1;
-  const r = (size - stroke) / 2, c = size / 2, circ = 2 * Math.PI * r, gap = segments.filter((s) => s.value).length > 1 ? 3 : 0;
-  // Precompute each segment's start offset so nothing mutates during render.
-  const arcs = segments.reduce<{ seg: typeof segments[number]; len: number; off: number }[]>((acc, seg) => {
-    const len = (seg.value / total) * circ;
-    acc.push({ seg, len, off: acc.reduce((s, a) => s + a.len, 0) });
-    return acc;
-  }, []);
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden>
-      <g transform={`rotate(-90 ${c} ${c})`}>
-        <circle cx={c} cy={c} r={r} fill="none" stroke="var(--i-line)" strokeWidth={stroke} />
-        {arcs.map((a, i) => (
-          <circle key={i} cx={c} cy={c} r={r} fill="none" stroke={a.seg.color} strokeWidth={stroke}
-            strokeDasharray={`${Math.max(0, a.len - gap)} ${circ - Math.max(0, a.len - gap)}`} strokeDashoffset={-a.off} strokeLinecap="round" />
-        ))}
-      </g>
-      <text x={c} y={c - 1} textAnchor="middle" className="do-v">{center.v}</text>
-      <text x={c} y={c + 15} textAnchor="middle" className="do-k">{center.k}</text>
-    </svg>
-  );
-}
+const KLABEL: Record<string, string> = { NIN: 'NIN', BVN: 'BVN', AML: 'AML', PEP: 'PEP', FRAUD: 'FRAUD', LIVENESS: 'SELFIE' };
 
 interface Pt { label: string; full: string; n: number }
-function Area({ series, color, tip }: { series: Pt[]; color: string; tip: (e: React.MouseEvent, p: Pt) => void }) {
-  const W = 720, H = 168, PAD_B = 22, PAD_T = 12;
-  const max = Math.max(1, ...series.map((p) => p.n));
-  const x = (i: number) => (series.length === 1 ? W / 2 : (i / (series.length - 1)) * W);
-  const y = (v: number) => PAD_T + (1 - v / max) * (H - PAD_T - PAD_B);
-  const line = series.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.n).toFixed(1)}`).join(' ');
-  const area = `${line} L${x(series.length - 1)},${H - PAD_B} L${x(0)},${H - PAD_B} Z`;
-  const peak = series.reduce((a, b, i) => (b.n > series[a].n ? i : a), 0);
-  const gy = [0, 0.5, 1].map((t) => PAD_T + t * (H - PAD_T - PAD_B));
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="db-area" preserveAspectRatio="none" role="img" aria-label="Applications received over time">
-      <defs><linearGradient id="areaG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={color} stopOpacity="0.2" /><stop offset="1" stopColor={color} stopOpacity="0" /></linearGradient></defs>
-      {gy.map((yy, i) => <line key={i} x1="0" y1={yy} x2={W} y2={yy} stroke="var(--i-line)" strokeWidth="1" />)}
-      <path d={area} fill="url(#areaG)" />
-      <path d={line} fill="none" stroke={color} strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      {series[peak].n > 0 && <circle cx={x(peak)} cy={y(series[peak].n)} r="3.4" fill={color} stroke="var(--i-card)" strokeWidth="2" />}
-      {series.map((p, i) => (
-        <rect key={i} x={x(i) - W / series.length / 2} y="0" width={W / series.length} height={H}
-          fill="transparent" onMouseMove={(e) => tip(e, p)} />
-      ))}
-    </svg>
-  );
-}
-
 interface Tip { x: number; y: number; title: string; v: string }
 
 function TowerInner() {
@@ -123,193 +56,221 @@ function TowerInner() {
     const clean = s.filter((c) => !touched(c)).length;
     const stp = s.length ? Math.round((clean / s.length) * 100) : 0;
 
+    // Trend: straight-through in the first half of the window vs the second.
+    const mid = from + (cfg.hours / 2) * 3600_000;
+    const half = (a: OnboardingCase[]) => (a.length ? Math.round(a.filter((c) => !touched(c)).length / a.length * 100) : 0);
+    const trend = half(s.filter((c) => Date.parse(c.createdAt) >= mid)) - half(s.filter((c) => Date.parse(c.createdAt) < mid));
+
     const count = Math.round(cfg.hours / cfg.bucketH), span = cfg.bucketH * 3600_000;
     const flow: Pt[] = Array.from({ length: count }, (_, i) => {
       const start = from + i * span, d = new Date(start + span / 2);
       const inB = s.filter((c) => { const t = Date.parse(c.createdAt); return t >= start && t < start + span; });
-      return {
-        n: inB.length,
-        label: cfg.bucketH >= 24 ? DAY[d.getDay()] : two(d.getHours()),
-        full: cfg.bucketH >= 24 ? `${DAY[d.getDay()]} ${d.getDate()}` : `${two(d.getHours())}:00`,
-      };
+      return { n: inB.length, label: cfg.bucketH >= 12 ? DAY[d.getDay()] : two(d.getHours()), full: cfg.bucketH >= 12 ? `${DAY[d.getDay()]} ${d.getDate()}` : `${two(d.getHours())}:00` };
     });
 
-    // Funnel: reach of each milestone (a case counts for every stage it passed).
-    const reached = (st: OnboardingState) => {
-      const idx = ONBOARDING_STATES.findIndex((x) => x.state === st);
-      return s.filter((c) => ONBOARDING_STATES.findIndex((x) => x.state === c.state) >= idx || (st === 'ACCOUNT_CREATED' && opened(c))).length;
-    };
-    const funnel = [
-      { label: 'Arrived', n: s.length },
-      { label: 'Validated', n: s.filter((c) => !failedK(c, 'NIN') && !failedK(c, 'BVN') && c.state !== 'EXCEPTION' && (opened(c) || reached('VALIDATED'))).length },
-      { label: 'Account open', n: s.filter(opened).length },
-      { label: 'Fully activated', n: s.filter((c) => c.state === 'FULLY_ACTIVATED').length },
+    // The line — reach at each milestone, and the drop between them.
+    const line = [
+      { label: 'ARRIVED', n: s.length },
+      { label: 'VALIDATED', n: s.filter((c) => opened(c) || (c.state === 'VALIDATED' && !stuck(c))).length },
+      { label: 'ACCOUNT OPEN', n: s.filter(opened).length },
+      { label: 'ACTIVATED', n: s.filter((c) => c.state === 'FULLY_ACTIVATED').length },
     ];
 
-    // Ordered red→amber ramp so the donut's segments stay distinguishable — they
-    // are all "needs a person", ranked by how many.
-    const CAUSE_RAMP = ['#B91C1C', '#DC2626', '#EA580C', '#D97706', '#CA8A04', '#A16207'];
-    const causes = KINDS.map((k) => ({ label: KLABEL[k], value: s.filter((c) => failedK(c, k)).length }))
-      .filter((c) => c.value > 0).sort((a, b) => b.value - a.value)
-      .map((c, i) => ({ ...c, color: CAUSE_RAMP[i % CAUSE_RAMP.length] }));
-    const causeTotal = causes.reduce((a, b) => a + b.value, 0);
+    const holding = [
+      { label: 'Exceptions', n: s.filter(stuck).length, sig: 'stop' as const },
+      { label: 'Awaiting KYC', n: s.filter((c) => c.state === 'PENDING_LIVENESS' || c.state === 'PENDING_DOCUMENTS').length, sig: 'warn' as const },
+      { label: 'In validation', n: s.filter((c) => c.state === 'VALIDATION_IN_PROGRESS').length, sig: 'data' as const },
+    ].filter((h) => h.n > 0);
 
-    const channels = (['bulk', 'single', 'self'] as const)
-      .map((k) => ({ key: k, label: CH_LABEL[k], value: s.filter((c) => (c.channel ?? 'single') === k).length, color: CH[k] }))
-      .filter((c) => c.value > 0);
+    const causes = KINDS.map((k) => ({ k, n: s.filter((c) => failedK(c, k)).length })).filter((c) => c.n > 0).sort((a, b) => b.n - a.n);
+    const oldestExc = s.filter(stuck).map((c) => c.createdAt).sort()[0];
 
-    // Upstream health, derived from the checks actually failing in the window.
-    const svc = (kinds: ValidationKind[], name: string, sys: string) => {
+    const channels = ([['bulk', 'PAYROLL', 'var(--gold)'], ['single', 'BRANCH', 'var(--data)'], ['self', 'DIGITAL', 'var(--go)']] as const)
+      .map(([k, label, color]) => ({ k, label, color, n: s.filter((c) => (c.channel ?? 'single') === k).length }))
+      .filter((c) => c.n > 0);
+
+    // Upstream — status from the checks actually failing in the window.
+    const svc = (kinds: ValidationKind[], name: string, note: string) => {
       const fails = s.filter((c) => kinds.some((k) => failedK(c, k))).length;
       const ran = s.filter((c) => c.validations.some((v) => kinds.includes(v.kind) && v.status !== 'pending')).length;
-      return { name, sys, fails, ran, status: fails >= 3 ? 'degraded' : fails > 0 ? 'watch' : 'healthy' as const };
+      return { name, note, fails, ran, sig: (fails >= 3 ? 'stop' : fails > 0 ? 'warn' : 'go') as 'stop' | 'warn' | 'go' };
     };
     const upstream = [
       svc(['NIN'], 'NIMC', 'Identity'),
-      svc(['BVN'], 'NIBSS', 'Bank verification'),
-      svc(['LIVENESS'], 'Liveness', 'Selfie / AWS'),
-      { name: 'Finacle', sys: 'Core banking', fails: 0, ran: s.filter(opened).length, status: 'healthy' as const },
+      svc(['BVN'], 'NIBSS', 'Bank verify'),
+      svc(['LIVENESS'], 'LIVENESS', 'Selfie · AWS'),
+      { name: 'FINACLE', note: 'Core banking', fails: 0, ran: s.filter(opened).length, sig: 'go' as const },
     ];
 
     return {
-      total: s.length, opened: s.filter(opened).length, stp, exceptions: s.filter(stuck).length,
-      kyc: s.filter((c) => c.state === 'PENDING_LIVENESS' || c.state === 'PENDING_DOCUMENTS').length,
-      hours: Math.round((clean * (MANUAL_MIN - AUTO_MIN)) / 60 * 10) / 10,
-      flow, funnel, causes, causeTotal, channels, chTotal: channels.reduce((a, b) => a + b.value, 0), upstream,
+      total: s.length, opened: s.filter(opened).length, clean, stp, trend,
+      exceptions: s.filter(stuck).length, hours: Math.round(clean * (MANUAL_MIN - AUTO_MIN) / 60 * 10) / 10,
+      flow, line, holding, causes, oldestExc, upstream, channels,
     };
   }, [cases, now, cfg]);
 
-  const stpColor = m.stp >= 80 ? 'var(--i-good)' : m.stp >= 60 ? 'var(--i-warn)' : 'var(--i-red)';
-  const spark = m.flow.map((p) => p.n);
-  const onTip = (e: React.MouseEvent, p: Pt) => setTip({ x: e.clientX, y: e.clientY, title: p.full, v: `${p.n} ${p.n === 1 ? 'application' : 'applications'}` });
+  const clock = now ? `${two(new Date(now).getHours())}:${two(new Date(now).getMinutes())}` : '';
+  const age = (iso?: string) => {
+    if (!iso) return '—';
+    const mins = Math.floor((now - Date.parse(iso)) / 60000);
+    return mins < 60 ? `${mins}m` : mins < 1440 ? `${Math.floor(mins / 60)}h${two(mins % 60)}m` : `${Math.floor(mins / 1440)}d`;
+  };
 
   return (
-    <div className="inst" onMouseLeave={() => setTip(null)}>
+    <div className="inst tower" onMouseLeave={() => setTip(null)}>
       <TopBar system="Control Tower" sub="Account opening" />
-      <div className="db-scroll">
-        <div className="db-filters">
-          <div className="cm-segs" role="group" aria-label="Time range">
+
+      <div className="tw-board">
+        {/* Status ribbon */}
+        <div className="tw-ribbon">
+          <span className="live"><i />ON LINE</span>
+          <span className="sep" />
+          <span className="ttl">ACCOUNT&nbsp;OPENING · THE&nbsp;LINE</span>
+          <div className="rng">
             {RANGES.map((r) => <button key={r.id} aria-pressed={range === r.id} onClick={() => setRange(r.id)}>{r.label}</button>)}
           </div>
+          <span className="clk">{clock} <em>WAT</em></span>
         </div>
 
         {m.total === 0 ? (
-          <div className="fn-empty"><b>Nothing in this window</b><span>No applications in the last {cfg.label}. Try a wider range.</span></div>
+          <div className="tw-quiet"><b>THE LINE IS QUIET</b><span>No applications in the {cfg.label} window. Widen the range.</span></div>
         ) : (
-          <>
-            {/* KPI strip */}
-            <div className="db-kpis">
-              <Kpi label="Straight through" value={`${m.stp}%`} tone={m.stp >= 80 ? 'good' : m.stp >= 60 ? 'warn' : 'bad'} spark={spark} sparkColor={stpColor} />
-              <Kpi label="Accounts opened" value={m.opened} sub={`of ${m.total} received`} spark={spark} />
-              <Kpi label="Exceptions" value={m.exceptions} tone={m.exceptions ? 'bad' : 'good'} sub="need a person" />
-              <Kpi label="Awaiting KYC" value={m.kyc} tone="mute" sub="open, limited" />
-              <Kpi label="Hours returned" value={`${m.hours}h`} tone="mute" sub={`vs ${MANUAL_MIN}-min manual`} />
-            </div>
+          <div className="tw-grid">
+            {/* Hero: the straight-through instrument */}
+            <section className="tw-panel p-stp">
+              <div className="p-hd">STRAIGHT-THROUGH RATE</div>
+              <div className="stp-read">
+                <span className="big">{m.stp}</span><span className="pct">%</span>
+                <span className={`trend ${m.trend >= 0 ? 'up' : 'dn'}`}>{m.trend >= 0 ? '▲' : '▼'} {Math.abs(m.trend)}</span>
+              </div>
+              <Bar pct={m.stp} target={80} />
+              <div className="stp-sub"><b>{m.clean}</b> of <b>{m.total}</b> cleared with no one touching them · target 80%</div>
+            </section>
 
-            <div className="db-grid">
-              {/* Throughput */}
-              <section className="db-card a-flow">
-                <header><h2>Applications received</h2><span className="mu">last {cfg.label}</span></header>
-                <Area series={m.flow} color="var(--i-accent)" tip={onTip} />
-                <div className="db-axis">{m.flow.filter((_, i) => i % Math.ceil(m.flow.length / 6) === 0).map((p, i) => <span key={i}>{p.label}</span>)}</div>
-              </section>
+            {/* Signature: the throughput trace */}
+            <section className="tw-panel p-trace">
+              <div className="p-hd">THROUGHPUT<span className="mu">/ arrivals · {cfg.label.toLowerCase()}</span></div>
+              <Trace series={m.flow} onTip={(e, p) => setTip({ x: e.clientX, y: e.clientY, title: p.full, v: `${p.n} in` })} />
+            </section>
 
-              {/* STP gauge */}
-              <section className="db-card a-gauge">
-                <header><h2>Straight-through</h2></header>
-                <div className="db-gauge">
-                  <Gauge pct={m.stp} color={stpColor} />
-                  <div className="db-gauge-v" style={{ color: stpColor }}>{m.stp}<em>%</em></div>
+            {/* The line — pipeline as a departures board */}
+            <section className="tw-panel p-line">
+              <div className="p-hd">THE LINE<span className="mu">/ reach by station</span></div>
+              <div className="line-board">
+                {m.line.map((st, i) => {
+                  const pct = m.line[0].n ? (st.n / m.line[0].n) * 100 : 0;
+                  const drop = i > 0 ? m.line[i - 1].n - st.n : 0;
+                  return (
+                    <div className="lrow" key={st.label}>
+                      <span className="stn">{st.label}</span>
+                      <span className="meter"><i style={{ width: `${Math.max(2, pct)}%` }} /></span>
+                      <span className="cnt">{two(st.n)}</span>
+                      <span className="drop">{i > 0 ? (drop > 0 ? `−${drop}` : '·') : ''}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Channel mix — fills the board, and says where the volume comes from. */}
+              <div className="chan">
+                <div className="chan-h">CHANNEL MIX</div>
+                <div className="chan-bar">
+                  {m.channels.map((c) => <i key={c.k} style={{ flexGrow: c.n, background: c.color }} title={`${c.label}: ${c.n}`} />)}
                 </div>
-                <p className="db-note">{m.total - Math.round(m.total * m.stp / 100)} of {m.total} needed a person. Target 80%.</p>
-              </section>
+                <div className="chan-key">
+                  {m.channels.map((c) => <span key={c.k}><i style={{ background: c.color }} />{c.label}<b>{c.n}</b></span>)}
+                </div>
+              </div>
+            </section>
 
-              {/* Funnel */}
-              <section className="db-card a-funnel">
-                <header><h2>Pipeline</h2><span className="mu">reach by stage</span></header>
-                <div className="db-funnel">
-                  {m.funnel.map((f, i) => {
-                    const pct = m.funnel[0].n ? Math.round((f.n / m.funnel[0].n) * 100) : 0;
+            {/* Upstream systems — status lights */}
+            <section className="tw-panel p-up">
+              <div className="p-hd">UPSTREAM SYSTEMS</div>
+              <div className="up-list">
+                {m.upstream.map((u) => (
+                  <div className={`up ${u.sig}`} key={u.name}>
+                    <span className="led" />
+                    <span className="nm">{u.name}</span>
+                    <span className="stt">{u.sig === 'stop' ? 'DEGRADED' : u.sig === 'warn' ? 'WATCH' : 'NOMINAL'}</span>
+                    <span className="nt">{u.note}</span>
+                    <span className="qty">{u.sig === 'go' ? `${u.ran} clean` : `${u.fails} failing`}</span>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            {/* Holding for a person */}
+            <section className="tw-panel p-hold">
+              <div className="p-hd">HOLDING FOR A PERSON<span className={`badge ${m.exceptions ? 'stop' : 'go'}`}>{m.exceptions + m.holding.filter((h) => h.sig === 'warn').reduce((a, b) => a + b.n, 0)}</span></div>
+              <div className="hold-grid">
+                {m.holding.map((h) => (
+                  <div className={`hcell ${h.sig}`} key={h.label}>
+                    <span className="hn">{two(h.n)}</span>
+                    <span className="hl">{h.label}</span>
+                  </div>
+                ))}
+              </div>
+              {m.causes.length > 0 && (
+                <div className="cause">
+                  <div className="cause-h">FAILING CHECKS · oldest stuck {age(m.oldestExc)}</div>
+                  {m.causes.map((c) => {
+                    const w = (c.n / m.causes[0].n) * 100;
                     return (
-                      <div className="row" key={f.label}>
-                        <span className="lb">{f.label}</span>
-                        <span className="track"><i style={{ width: `${Math.max(3, pct)}%`, background: `color-mix(in srgb, var(--i-brand) ${100 - i * 16}%, #7F9CE0)` }} /></span>
-                        <span className="vl">{f.n}<em>{pct}%</em></span>
+                      <div className="crow" key={c.k}>
+                        <span className="ck">{KLABEL[c.k]}</span>
+                        <span className="cbar"><i style={{ width: `${Math.max(6, w)}%` }} /></span>
+                        <span className="cn">{c.n}</span>
                       </div>
                     );
                   })}
                 </div>
-              </section>
-
-              {/* Needs a person */}
-              <section className="db-card a-cause">
-                <header><h2>What needs a person</h2></header>
-                {m.causes.length ? (
-                  <div className="db-split">
-                    <Donut segments={m.causes} center={{ v: String(m.causeTotal), k: 'CASES' }} />
-                    <ul className="db-leg">
-                      {m.causes.map((c) => <li key={c.label}><i style={{ background: c.color }} />{c.label}<b>{c.value}</b></li>)}
-                    </ul>
-                  </div>
-                ) : <div className="db-clear">Every check passed first time.</div>}
-              </section>
-
-              {/* Channels */}
-              <section className="db-card a-chan">
-                <header><h2>How work arrives</h2></header>
-                <div className="db-split">
-                  <Donut segments={m.channels} center={{ v: String(m.chTotal), k: 'APPS' }} />
-                  <ul className="db-leg">
-                    {m.channels.map((c) => <li key={c.key}><i style={{ background: c.color }} />{c.label}<b>{m.chTotal ? Math.round((c.value / m.chTotal) * 100) : 0}%</b></li>)}
-                  </ul>
-                </div>
-              </section>
-
-              {/* Upstream health */}
-              <section className="db-card a-up">
-                <header><h2>Upstream services</h2><span className="mu">live</span></header>
-                <div className="db-svc">
-                  {m.upstream.map((u) => (
-                    <div className={`svc ${u.status}`} key={u.name}>
-                      <span className="dot" /><span className="nm">{u.name}</span>
-                      <span className="sys">{u.sys}</span>
-                      <span className="st">{u.status === 'degraded' ? `${u.fails} failing` : u.status === 'watch' ? `${u.fails} to watch` : `${u.ran} clean`}</span>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            </div>
-          </>
+              )}
+            </section>
+          </div>
         )}
       </div>
 
-      {tip && <div className="tw-tip" style={{ left: tip.x, top: tip.y }} role="status"><b>{tip.title}</b><span>{tip.v}</span></div>}
+      {tip && <div className="tw-otip" style={{ left: tip.x, top: tip.y }} role="status"><b>{tip.title}</b><span>{tip.v}</span></div>}
     </div>
   );
 }
 
-function Kpi({ label, value, sub, tone = 'mute', spark, sparkColor }: {
-  label: string; value: string | number; sub?: string; tone?: 'good' | 'warn' | 'bad' | 'mute'; spark?: number[]; sparkColor?: string;
-}) {
+// STP arc-bar with a target tick.
+function Bar({ pct, target }: { pct: number; target: number }) {
   return (
-    <div className="db-kpi">
-      <div className="k">{label}</div>
-      <div className={`v ${tone}`}>{value}</div>
-      {sub && <div className="s">{sub}</div>}
-      {spark && spark.length > 1 && <MiniSpark data={spark} color={sparkColor ?? 'var(--i-ink-4)'} />}
+    <div className="stp-bar">
+      <i style={{ width: `${pct}%` }} />
+      <span className="tick" style={{ left: `${target}%` }} />
     </div>
   );
 }
 
-function MiniSpark({ data, color }: { data: number[]; color: string }) {
-  const W = 132, H = 26, max = Math.max(1, ...data);
-  const x = (i: number) => (i / (data.length - 1)) * W;
-  const y = (v: number) => H - 2 - (v / max) * (H - 5);
-  const line = data.map((v, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+// The oscilloscope trace — glowing line on a dark grid.
+function Trace({ series, onTip }: { series: Pt[]; onTip: (e: React.MouseEvent, p: Pt) => void }) {
+  const W = 760, H = 150, PB = 6, PT = 10;
+  const max = Math.max(1, ...series.map((p) => p.n));
+  const x = (i: number) => (series.length === 1 ? W / 2 : (i / (series.length - 1)) * W);
+  const y = (v: number) => PT + (1 - v / max) * (H - PT - PB);
+  const line = series.map((p, i) => `${i ? 'L' : 'M'}${x(i).toFixed(1)},${y(p.n).toFixed(1)}`).join(' ');
+  const area = `${line} L${x(series.length - 1)},${H} L${x(0)},${H} Z`;
+  const last = series.length - 1;
+  const peak = series.reduce((a, b, i) => (b.n > series[a].n ? i : a), 0);
   return (
-    <svg className="db-mini" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" aria-hidden>
-      <path d={line} fill="none" stroke={color} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" opacity="0.85" />
-    </svg>
+    <div className="trace-wrap">
+      <svg viewBox={`0 0 ${W} ${H}`} className="trace" preserveAspectRatio="none" role="img" aria-label="Throughput trace">
+        <defs>
+          <linearGradient id="trG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#5aa0ff" stopOpacity="0.28" /><stop offset="1" stopColor="#5aa0ff" stopOpacity="0" /></linearGradient>
+          <filter id="trGlow" x="-20%" y="-40%" width="140%" height="180%"><feGaussianBlur stdDeviation="2.4" /></filter>
+        </defs>
+        {[0.25, 0.5, 0.75].map((t) => <line key={t} x1="0" y1={PT + t * (H - PT - PB)} x2={W} y2={PT + t * (H - PT - PB)} className="grid" />)}
+        <path d={area} fill="url(#trG)" />
+        <path d={line} className="glow" fill="none" filter="url(#trGlow)" vectorEffect="non-scaling-stroke" />
+        <path d={line} className="ln" fill="none" vectorEffect="non-scaling-stroke" />
+        {series[peak].n > 0 && <circle cx={x(peak)} cy={y(series[peak].n)} r="3" className="pk" />}
+        {series[last].n > 0 && <circle cx={x(last)} cy={y(series[last].n)} r="3.4" className="head" />}
+        {series.map((p, i) => <rect key={i} x={x(i) - W / series.length / 2} y="0" width={W / series.length} height={H} fill="transparent" onMouseMove={(e) => onTip(e, p)} />)}
+      </svg>
+      <div className="trace-x">{series.filter((_, i) => i % Math.ceil(series.length / 6) === 0).map((p, i) => <span key={i}>{p.label}</span>)}</div>
+    </div>
   );
 }
 
