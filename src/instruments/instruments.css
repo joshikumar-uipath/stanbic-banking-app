@@ -300,6 +300,19 @@
 .cl svg, .cl .cl-donut { outline:none !important; border:none; }
 .cl button:focus-visible { outline:2px solid var(--navy); outline-offset:2px; }
 
+/* Sankey — channel → outcome flow */
+.cl-sankey { margin-top:16px; }
+.cl-sankey .hd { align-items:center; }
+.cl-sankey .sk-key { display:flex; align-items:center; gap:16px; }
+.cl-sankey .sk-key .col { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); }
+.cl-sankey .sk-key span { display:inline-flex; align-items:center; gap:7px; font-size:12.5px; color:var(--ink-2); }
+.cl-sankey .sk-key i { width:9px; height:9px; border-radius:3px; }
+.cl-sk-svg { width:100%; height:250px; display:block; overflow:visible; }
+.cl-sk-svg .rb { transition:fill-opacity .14s; }
+.cl-sk-svg .rb:hover { fill-opacity:.6; }
+.cl-sk-svg .sk-lb .n { font-family:var(--disp); font-weight:700; font-size:15px; fill:var(--ink); }
+.cl-sk-svg .sk-lb .l { font-size:12.5px; fill:var(--ink-2); }
+
 .cl-empty { text-align:center; padding:90px 20px; }
 .cl-empty b { display:block; font-family:var(--disp); font-size:18px; color:var(--ink); margin-bottom:8px; }
 .cl-empty span { font-size:13px; color:var(--ink-2); }

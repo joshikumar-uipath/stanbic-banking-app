@@ -118,11 +118,35 @@ function TowerInner() {
       ...(inval ? [{ icon: 'spark', title: 'In validation', sub: `${inval} running now`, sig: 'ok' as const }] : []),
     ].slice(0, 5);
 
+    // Sankey — where each channel's volume ends up. Bipartite: channel → outcome.
+    const CHS = [
+      { key: 'bulk', label: 'Bulk payroll', color: GOLD },
+      { key: 'single', label: 'Branch & walk-in', color: NAVY },
+      { key: 'self', label: 'Digital', color: GREEN },
+    ];
+    const OUT = [
+      { key: 'active', label: 'Fully activated', color: NAVY },
+      { key: 'kyc', label: 'Awaiting KYC', color: BLUE },
+      { key: 'progress', label: 'In progress', color: GOLD },
+      { key: 'person', label: 'Needs a person', color: RED },
+    ];
+    const chOf = (c: OnboardingCase) => c.channel ?? 'single';
+    const outcomeOf = (c: OnboardingCase) => stuck(c) ? 'person'
+      : c.state === 'FULLY_ACTIVATED' ? 'active'
+      : (c.state === 'PENDING_LIVENESS' || c.state === 'PENDING_DOCUMENTS') ? 'kyc' : 'progress';
+    const sources = CHS.map((ch) => ({ ...ch, n: s.filter((c) => chOf(c) === ch.key).length })).filter((x) => x.n > 0);
+    const targets = OUT.map((o) => ({ ...o, n: s.filter((c) => outcomeOf(c) === o.key).length })).filter((x) => x.n > 0);
+    const links = sources.flatMap((sc) => targets.map((tg) => ({
+      s: sc.key, t: tg.key, color: sc.color, sLabel: sc.label, tLabel: tg.label,
+      n: s.filter((c) => chOf(c) === sc.key && outcomeOf(c) === tg.key).length,
+    }))).filter((l) => l.n > 0);
+
     return {
       T, clean, opn, exc, kyc, stp, activated, activatedPct: pctOf(activated),
       hours: Math.round(clean * (MANUAL_MIN - AUTO_MIN) / 60 * 10) / 10,
       mix, flow, peakI, flowMax: Math.max(1, ...flow.map((f) => f.n)),
       channels, chTotal: channels.reduce((a, b) => a + b.n, 0), upstream, funnel, attn, openCount: exc + kyc,
+      sankey: { sources, targets, links },
     };
   }, [cases, now, cfg]);
 
@@ -242,12 +266,76 @@ function TowerInner() {
                   </div>
                 </section>
               </div>
+
+              {/* Sankey — how each channel's applications flow to an outcome */}
+              <section className="cl-card cl-sankey">
+                <div className="hd">
+                  <div><div className="t">Account opening flow</div><div className="v">{m.T}<span> applications · by channel &amp; outcome</span></div></div>
+                  <div className="sk-key">
+                    <span className="col">Channel</span>
+                    {m.sankey.sources.map((sc) => <span key={sc.key}><i style={{ background: sc.color }} />{sc.label}</span>)}
+                  </div>
+                </div>
+                <Sankey sources={m.sankey.sources} targets={m.sankey.targets} links={m.sankey.links}
+                  onTip={(e, t) => setTip({ x: e.clientX, y: e.clientY, t })} clearTip={() => setTip(null)} />
+              </section>
             </>
           )}
         </div>
       </div>
       {tip && <div className="cl-tip" style={{ left: tip.x, top: tip.y }}>{tip.t}</div>}
     </div>
+  );
+}
+
+// A filled sankey ribbon between two node faces.
+function ribbon(x0: number, y0: number, h0: number, x1: number, y1: number, h1: number): string {
+  const xm = (x0 + x1) / 2;
+  return `M${x0},${y0} C${xm},${y0} ${xm},${y1} ${x1},${y1} L${x1},${y1 + h1} C${xm},${y1 + h1} ${xm},${y0 + h0} ${x0},${y0 + h0} Z`;
+}
+
+interface SkNode { key: string; label: string; color: string; n: number }
+interface SkLink { s: string; t: string; n: number; color: string; sLabel: string; tLabel: string }
+function Sankey({ sources, targets, links, onTip, clearTip }: {
+  sources: SkNode[]; targets: SkNode[]; links: SkLink[];
+  onTip: (e: React.MouseEvent, t: string) => void; clearTip: () => void;
+}) {
+  const W = 760, H = 250, NW = 12, GAP = 18, PAD = 6, GUT = 168;
+  const totS = sources.reduce((a, b) => a + b.n, 0) || 1;
+  const totT = targets.reduce((a, b) => a + b.n, 0) || 1;
+  const stack = (nodes: SkNode[], tot: number, x: number) => {
+    const space = H - PAD * 2 - GAP * Math.max(0, nodes.length - 1);
+    let y = PAD;
+    return nodes.map((nd) => { const h = Math.max(8, nd.n / tot * space); const box = { ...nd, x, y, h }; y += h + GAP; return box; });
+  };
+  const S = stack(sources, totS, 0), T = stack(targets, totT, W - NW);
+  const outC: Record<string, number> = {}, inC: Record<string, number> = {};
+  const ribs = links.map((l) => {
+    const sn = S.find((n) => n.key === l.s)!, tn = T.find((n) => n.key === l.t)!;
+    const sh = l.n / sn.n * sn.h, th = l.n / tn.n * tn.h;
+    const y0 = sn.y + (outC[l.s] ?? 0), y1 = tn.y + (inC[l.t] ?? 0);
+    outC[l.s] = (outC[l.s] ?? 0) + sh; inC[l.t] = (inC[l.t] ?? 0) + th;
+    return { ...l, d: ribbon(NW, y0 + 0.5, Math.max(1, sh - 1), W - NW, y1 + 0.5, Math.max(1, th - 1)) };
+  });
+  return (
+    <svg viewBox={`${-GUT} 0 ${W + GUT * 2} ${H}`} className="cl-sk-svg" role="img"
+      aria-label={`Flow by channel: ${sources.map((s) => `${s.n} ${s.label}`).join(', ')} into ${targets.map((t) => `${t.n} ${t.label}`).join(', ')}`}>
+      {ribs.map((r, i) => (
+        <path key={i} d={r.d} fill={r.color} fillOpacity={0.32} className="rb"
+          onMouseMove={(e) => onTip(e, `${r.sLabel} → ${r.tLabel}: ${r.n}`)} onMouseLeave={clearTip} />
+      ))}
+      {[...S, ...T].map((nd) => <rect key={nd.key} x={nd.x} y={nd.y} width={NW} height={nd.h} rx={3} fill={nd.color} />)}
+      {S.map((nd) => (
+        <text key={nd.key} x={-14} y={nd.y + nd.h / 2} textAnchor="end" dominantBaseline="middle" className="sk-lb">
+          <tspan className="n">{nd.n}</tspan><tspan dx={7} className="l">{nd.label}</tspan>
+        </text>
+      ))}
+      {T.map((nd) => (
+        <text key={nd.key} x={W + 14} y={nd.y + nd.h / 2} textAnchor="start" dominantBaseline="middle" className="sk-lb">
+          <tspan className="l">{nd.label}</tspan><tspan dx={7} className="n">{nd.n}</tspan>
+        </text>
+      ))}
+    </svg>
   );
 }
 
