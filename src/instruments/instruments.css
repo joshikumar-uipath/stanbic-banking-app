@@ -307,10 +307,13 @@
 .cl-sankey .sk-key .col { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); }
 .cl-sankey .sk-key span { display:inline-flex; align-items:center; gap:7px; font-size:12.5px; color:var(--ink-2); }
 .cl-sankey .sk-key i { width:9px; height:9px; border-radius:3px; }
-.cl-sk-svg { width:100%; height:250px; display:block; overflow:visible; }
+.cl-sk-svg { width:100%; height:340px; display:block; overflow:visible; }
 .cl-sk-svg .rb { transition:fill-opacity .14s; }
 .cl-sk-svg .rb:hover { fill-opacity:.6; }
 .cl-sk-svg .sk-lb .n { font-family:var(--disp); font-weight:700; font-size:15px; fill:var(--ink); }
+.cl-sk-svg .sk-lb.mid .n { font-size:13px; }
+.cl-sk-svg .sk-lb.mid .l { font-size:11.5px; }
+.cl-sk-svg .sk-stage { font-family:var(--disp); font-weight:600; font-size:10.5px; letter-spacing:.14em; text-transform:uppercase; fill:var(--ink-3); }
 .cl-sk-svg .sk-lb .l { font-size:12.5px; fill:var(--ink-2); }
 
 .cl-empty { text-align:center; padding:90px 20px; }
