@@ -118,25 +118,35 @@ function TowerInner() {
       ...(inval ? [{ icon: 'spark', title: 'In validation', sub: `${inval} running now`, sig: 'ok' as const }] : []),
     ].slice(0, 5);
 
-    // Sankey — three stages: how the work came in, whether it cleared its checks,
-    // and where it ended up. Ribbons carry the intake colour the whole way, so a
-    // reader can trace bulk vs single from left to right.
+    // Sankey — four stages: intake → verification → outcome → (for exceptions)
+    // the check that actually failed. Ribbons carry the intake colour, so bulk vs
+    // single can be traced across the whole diagram.
+    const AMB = '#b45309';
     const intakeOf = (c: OnboardingCase) => (c.channel === 'bulk' ? 'bulk' : 'single');
     const checkOf = (c: OnboardingCase) => (touched(c) ? 'flagged' : 'cleared');
     const outcomeOf = (c: OnboardingCase) => stuck(c) ? 'person'
       : c.state === 'FULLY_ACTIVATED' ? 'active'
       : (c.state === 'PENDING_LIVENESS' || c.state === 'PENDING_DOCUMENTS') ? 'kyc' : 'progress';
+    const FAIL_META: Record<string, [string, string]> = { BVN: ['BVN · NIBSS', RED], NIN: ['NIN · NIMC', AMB], AML: ['AML', BLUE], PEP: ['PEP', BLUE], FRAUD: ['Fraud', BLUE], LIVENESS: ['Selfie', BLUE] };
+    const FAIL_ORDER: ValidationKind[] = ['BVN', 'NIN', 'AML', 'PEP', 'FRAUD', 'LIVENESS'];
+    const primaryFail = (c: OnboardingCase) => FAIL_ORDER.find((k) => failedK(c, k)) ?? null;
+    const pathOf = (c: OnboardingCase) => {
+      const p = [intakeOf(c), checkOf(c), outcomeOf(c)];
+      if (outcomeOf(c) === 'person') { const f = primaryFail(c); if (f) p.push(f); }
+      return p;
+    };
+    const pathN: Record<string, number> = {};
+    s.forEach((c) => { const k = pathOf(c).join('>'); pathN[k] = (pathN[k] ?? 0) + 1; });
+    const flows = Object.entries(pathN).map(([k, n]) => { const path = k.split('>'); return { path, n, color: path[0] === 'bulk' ? GOLD : NAVY }; });
+    const nAt = (ci: number, key: string) => flows.filter((f) => f.path[ci] === key).reduce((a, b) => a + b.n, 0);
     const C0 = [{ key: 'bulk', label: 'Bulk upload', color: GOLD }, { key: 'single', label: 'Single', color: NAVY }];
     const C1 = [{ key: 'cleared', label: 'Cleared checks', color: GREEN }, { key: 'flagged', label: 'Flagged for review', color: RED }];
     const C2 = [
       { key: 'active', label: 'Fully activated', color: NAVY }, { key: 'kyc', label: 'Awaiting KYC', color: BLUE },
       { key: 'progress', label: 'In progress', color: GOLD }, { key: 'person', label: 'Needs a person', color: RED },
     ];
-    const pathN: Record<string, number> = {};
-    s.forEach((c) => { const k = `${intakeOf(c)}>${checkOf(c)}>${outcomeOf(c)}`; pathN[k] = (pathN[k] ?? 0) + 1; });
-    const flows = Object.entries(pathN).map(([k, n]) => { const path = k.split('>'); return { path, n, color: path[0] === 'bulk' ? GOLD : NAVY }; });
-    const nAt = (ci: number, key: string) => flows.filter((f) => f.path[ci] === key).reduce((a, b) => a + b.n, 0);
-    const columns = [C0, C1, C2].map((col, ci) => col.map((nd) => ({ ...nd, n: nAt(ci, nd.key) })).filter((nd) => nd.n > 0));
+    const C3 = FAIL_ORDER.filter((k) => flows.some((f) => f.path[3] === k)).map((k) => ({ key: k, label: FAIL_META[k][0], color: FAIL_META[k][1] }));
+    const columns = (C3.length ? [C0, C1, C2, C3] : [C0, C1, C2]).map((col, ci) => col.map((nd) => ({ ...nd, n: nAt(ci, nd.key) })).filter((nd) => nd.n > 0));
     const flaggedN = s.filter((c) => touched(c)).length;
 
     return {
@@ -270,12 +280,12 @@ function TowerInner() {
                 <div className="hd">
                   <div><div className="t">Account opening flow</div><div className="v">{m.T}<span> applications · {m.clearedPct}% cleared checks, {m.flaggedN} flagged</span></div></div>
                   <div className="sk-key">
-                    <span className="col">Traced by</span>
+                    <span className="col">Hover a path · click a channel to focus</span>
                     <span><i style={{ background: GOLD }} />Bulk upload</span>
                     <span><i style={{ background: NAVY }} />Single</span>
                   </div>
                 </div>
-                <Sankey columns={m.sankey.columns} flows={m.sankey.flows}
+                <Sankey columns={m.sankey.columns} flows={m.sankey.flows} growKey={range}
                   onTip={(e, t) => setTip({ x: e.clientX, y: e.clientY, t })} clearTip={() => setTip(null)} />
               </section>
             </>
@@ -295,49 +305,82 @@ function ribbon(x0: number, y0: number, h0: number, x1: number, y1: number, h1: 
 
 interface SkNode { key: string; label: string; color: string; n: number }
 interface SkFlow { path: string[]; n: number; color: string }
-const STAGE = ['Intake', 'Verification', 'Outcome'];
-function Sankey({ columns, flows, onTip, clearTip }: {
-  columns: SkNode[][]; flows: SkFlow[];
+const STAGE = ['Intake', 'Verification', 'Outcome', 'Failing check'];
+function Sankey({ columns, flows, growKey, onTip, clearTip }: {
+  columns: SkNode[][]; flows: SkFlow[]; growKey: string;
   onTip: (e: React.MouseEvent, t: string) => void; clearTip: () => void;
 }) {
-  const W = 940, H = 320, NW = 13, GAP = 26, PAD = 12, GUT = 150;
-  const T = columns[0].reduce((a, b) => a + b.n, 0) || 1;
-  const nCols = columns.length;
-  const maxNodes = Math.max(...columns.map((c) => c.length), 1);
-  const unit = (H - PAD * 2 - GAP * (maxNodes - 1)) / T;   // one px-per-case, so ribbons keep width across stages
-  const colX = (i: number) => (nCols === 1 ? 0 : (i / (nCols - 1)) * (W - NW));
-  type Box = SkNode & { x: number; y: number; h: number; ci: number };
-  const pos: Record<string, Box> = {};
-  const laid = columns.map((col, ci) => {
-    const colH = col.reduce((s, n) => s + n.n * unit, 0) + GAP * Math.max(0, col.length - 1);
-    let y = PAD + (H - PAD * 2 - colH) / 2;   // centre shorter columns
-    return col.map((nd) => { const h = nd.n * unit; const box: Box = { ...nd, ci, x: colX(ci), y, h }; pos[`${ci}:${nd.key}`] = box; y += h + GAP; return box; });
-  });
-  const idx = columns.map((col) => Object.fromEntries(col.map((n, i) => [n.key, i])));
-  const sorted = [...flows].sort((a, b) => { for (let i = 0; i < a.path.length; i++) { const d = (idx[i]?.[a.path[i]] ?? 9) - (idx[i]?.[b.path[i]] ?? 9); if (d) return d; } return 0; });
-  // Advance both faces of a middle node together per flow, so ribbons pass straight through.
-  const outC: Record<string, number> = {}, inC: Record<string, number> = {};
-  const ribs: { d: string; color: string; tip: string }[] = [];
-  sorted.forEach((f) => {
-    for (let ci = 0; ci < f.path.length - 1; ci++) {
-      const src = pos[`${ci}:${f.path[ci]}`], tgt = pos[`${ci + 1}:${f.path[ci + 1]}`];
-      if (!src || !tgt) continue;
-      const h = f.n * unit, sk = `${ci}:${src.key}`, tk = `${ci + 1}:${tgt.key}`;
-      const y0 = src.y + (outC[sk] ?? 0), y1 = tgt.y + (inC[tk] ?? 0);
-      outC[sk] = (outC[sk] ?? 0) + h; inC[tk] = (inC[tk] ?? 0) + h;
-      ribs.push({ d: ribbon(src.x + NW, y0 + 0.4, Math.max(1, h - 0.8), tgt.x, y1 + 0.4, Math.max(1, h - 0.8)), color: f.color, tip: `${src.label} → ${tgt.label}: ${f.n}` });
-    }
-  });
-  const nodes = laid.flat();
+  const [hoverFlow, setHoverFlow] = useState<number | null>(null);
+  const [hoverNode, setHoverNode] = useState<string | null>(null);
+  const [focus, setFocus] = useState<string | null>(null);
+
+  const geo = useMemo(() => {
+    const W = 940, H = 320, NW = 13, GAP = 26, PAD = 12;
+    const T = columns[0].reduce((a, b) => a + b.n, 0) || 1;
+    const nCols = columns.length;
+    const maxNodes = Math.max(...columns.map((c) => c.length), 1);
+    const unit = (H - PAD * 2 - GAP * (maxNodes - 1)) / T;   // one px-per-case → ribbon widths honest across stages
+    const colX = (i: number) => (nCols === 1 ? 0 : (i / (nCols - 1)) * (W - NW));
+    type Box = SkNode & { x: number; y: number; h: number; ci: number; id: string };
+    const pos: Record<string, Box> = {};
+    // Left-to-right: a column fed by exactly one node aligns to it; else it centres.
+    const laid: Box[][] = [];
+    columns.forEach((col, ci) => {
+      const colH = col.reduce((s, n) => s + n.n * unit, 0) + GAP * Math.max(0, col.length - 1);
+      let y: number;
+      if (ci === 0) y = PAD + (H - PAD * 2 - colH) / 2;
+      else {
+        const srcs = new Set(flows.filter((f) => f.path.length > ci).map((f) => f.path[ci - 1]));
+        y = srcs.size === 1 && pos[`${ci - 1}:${[...srcs][0]}`] ? pos[`${ci - 1}:${[...srcs][0]}`].y : PAD + (H - PAD * 2 - colH) / 2;
+      }
+      laid.push(col.map((nd) => { const h = nd.n * unit; const b: Box = { ...nd, ci, x: colX(ci), y, h, id: `${ci}:${nd.key}` }; pos[b.id] = b; y += h + GAP; return b; }));
+    });
+    const idx = columns.map((col) => Object.fromEntries(col.map((n, i) => [n.key, i])));
+    const sorted = flows.map((f, i) => ({ ...f, fi: i })).sort((a, b) => { for (let i = 0; i < Math.min(a.path.length, b.path.length); i++) { const d = (idx[i]?.[a.path[i]] ?? 9) - (idx[i]?.[b.path[i]] ?? 9); if (d) return d; } return 0; });
+    const outC: Record<string, number> = {}, inC: Record<string, number> = {};
+    const segs: { d: string; sc: string; tc: string; tip: string; fi: number; ids: string[]; intake: string }[] = [];
+    sorted.forEach((f) => {
+      const ids = f.path.map((k, ci) => `${ci}:${k}`);
+      for (let ci = 0; ci < f.path.length - 1; ci++) {
+        const src = pos[`${ci}:${f.path[ci]}`], tgt = pos[`${ci + 1}:${f.path[ci + 1]}`];
+        if (!src || !tgt) continue;
+        const h = f.n * unit, sk = src.id, tk = tgt.id;
+        const y0 = src.y + (outC[sk] ?? 0), y1 = tgt.y + (inC[tk] ?? 0);
+        outC[sk] = (outC[sk] ?? 0) + h; inC[tk] = (inC[tk] ?? 0) + h;
+        segs.push({ d: ribbon(src.x + NW, y0 + 0.4, Math.max(1, h - 0.8), tgt.x, y1 + 0.4, Math.max(1, h - 0.8)), sc: src.color, tc: tgt.color, tip: `${src.label} → ${tgt.label}: ${f.n}`, fi: f.fi, ids, intake: f.path[0] });
+      }
+    });
+    return { W, H, NW, GUT: 150, nCols, colX, nodes: laid.flat(), segs };
+  }, [columns, flows]);
+
+  const anyHover = hoverFlow !== null || hoverNode !== null;
   return (
-    <svg viewBox={`${-GUT} -30 ${W + GUT * 2} ${H + 38}`} className="cl-sk-svg" role="img" aria-label="Account opening flow: intake, verification and outcome">
-      {columns.map((_, ci) => <text key={ci} x={colX(ci) + NW / 2} y={-16} textAnchor={ci === 0 ? 'start' : ci === nCols - 1 ? 'end' : 'middle'} className="sk-stage">{STAGE[ci]}</text>)}
-      {ribs.map((r, i) => <path key={i} d={r.d} fill={r.color} fillOpacity={0.3} className="rb" onMouseMove={(e) => onTip(e, r.tip)} onMouseLeave={clearTip} />)}
-      {nodes.map((nd) => <rect key={`${nd.ci}:${nd.key}`} x={nd.x} y={nd.y} width={NW} height={nd.h} rx={3} fill={nd.color} />)}
-      {nodes.map((nd) => {
+    <svg viewBox={`${-geo.GUT} -30 ${geo.W + geo.GUT * 2} ${geo.H + 38}`} className="cl-sk-svg" role="img" aria-label="Account opening flow"
+      onMouseLeave={() => { setHoverFlow(null); setHoverNode(null); clearTip(); }}>
+      <defs>{geo.segs.map((s, i) => (
+        <linearGradient key={i} id={`skg${i}`}><stop offset="0" stopColor={s.sc} /><stop offset="1" stopColor={s.tc} /></linearGradient>
+      ))}</defs>
+      {columns.map((_, ci) => <text key={ci} x={geo.colX(ci) + geo.NW / 2} y={-16} textAnchor={ci === 0 ? 'start' : ci === geo.nCols - 1 ? 'end' : 'middle'} className="sk-stage">{STAGE[ci]}</text>)}
+      <g className="cl-sk-ribs grow" key={growKey}>
+        {geo.segs.map((s, i) => {
+          const traced = (hoverFlow !== null && s.fi === hoverFlow) || (hoverNode !== null && s.ids.includes(hoverNode));
+          const focusOut = focus !== null && s.intake !== focus;
+          const hi = traced && !focusOut;
+          const dim = focusOut || (anyHover && !traced);
+          return <path key={i} d={s.d} fill={`url(#skg${i})`} className={`rb${hi ? ' hi' : ''}${dim ? ' dim' : ''}`}
+            onMouseEnter={() => setHoverFlow(s.fi)} onMouseMove={(e) => onTip(e, s.tip)} onMouseLeave={() => { setHoverFlow(null); clearTip(); }} />;
+        })}
+      </g>
+      {geo.nodes.map((nd) => (
+        <rect key={nd.id} x={nd.x} y={nd.y} width={geo.NW} height={nd.h} rx={3} fill={nd.color}
+          className={`nd${nd.ci === 0 ? ' click' : ''}${focus && nd.ci === 0 && nd.key !== focus ? ' ndim' : ''}`}
+          onMouseEnter={() => setHoverNode(nd.id)} onMouseLeave={() => setHoverNode(null)}
+          onClick={nd.ci === 0 ? () => setFocus((f) => (f === nd.key ? null : nd.key)) : undefined} />
+      ))}
+      {geo.nodes.map((nd) => {
         if (nd.ci === 0) return <text key={`l${nd.key}`} x={-14} y={nd.y + nd.h / 2} textAnchor="end" dominantBaseline="middle" className="sk-lb"><tspan className="n">{nd.n}</tspan><tspan dx={7} className="l">{nd.label}</tspan></text>;
-        if (nd.ci === nCols - 1) return <text key={`r${nd.key}`} x={W + 14} y={nd.y + nd.h / 2} textAnchor="start" dominantBaseline="middle" className="sk-lb"><tspan className="l">{nd.label}</tspan><tspan dx={7} className="n">{nd.n}</tspan></text>;
-        return <text key={`m${nd.key}`} x={nd.x + NW / 2} y={nd.y - 9} textAnchor="middle" className="sk-lb mid"><tspan className="n">{nd.n}</tspan><tspan dx={6} className="l">{nd.label}</tspan></text>;
+        if (nd.ci === geo.nCols - 1) return <text key={`r${nd.key}`} x={geo.W + 14} y={nd.y + nd.h / 2} textAnchor="start" dominantBaseline="middle" className="sk-lb"><tspan className="l">{nd.label}</tspan><tspan dx={7} className="n">{nd.n}</tspan></text>;
+        return <text key={`m${nd.key}`} x={nd.x + geo.NW / 2} y={nd.y - 9} textAnchor="middle" className="sk-lb mid"><tspan className="n">{nd.n}</tspan><tspan dx={6} className="l">{nd.label}</tspan></text>;
       })}
     </svg>
   );
