@@ -1,10 +1,11 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// Control tower (/tower) — the account-opening line, one bold branded board.
+// Control tower (/tower) — account-opening dashboard.
 //
-// The design the client chose: a Stanbic-navy hero that owns the headline number
-// in Space Grotesk display type with a gold accent, a smooth throughput curve,
-// and a small set of supporting tiles. One strong focal point, everything else
-// disciplined. Every figure is live off the shared store.
+// Design language adapted from the client's reference (a soft, rounded HR board):
+// a light ground, big rounded white cards, a segmented allocation bar, pill
+// bar-charts, a donut ring, circular-icon stat cards and a filled checklist card.
+// Recoloured to Stanbic navy and rebuilt around the account-opening line — same
+// chart types, our data, all live off the shared store.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react';
 import { store, type OnboardingCase, type ValidationKind } from '../onboarding';
@@ -12,15 +13,16 @@ import { InstrumentProvider, TopBar } from './shell';
 import { useBrandVars } from './brand';
 
 const MANUAL_MIN = 35, AUTO_MIN = 4;
-const GOLD = '#C8A24A', NAVY = '#012169', GREEN = '#2f9e6f', REDA = '#e5566b', REDB = '#d1344b';
+const NAVY = '#012169', BLUE = '#3f6fd6', GOLD = '#C8A24A', GREEN = '#2f9e6f', RED = '#e0566b';
 
 type Range = '24h' | '48h' | '7d';
 const RANGES: { id: Range; label: string; hours: number; bucketH: number }[] = [
-  { id: '24h', label: '24H', hours: 24, bucketH: 2 },
-  { id: '48h', label: '48H', hours: 48, bucketH: 3 },
-  { id: '7d', label: '7D', hours: 168, bucketH: 12 },
+  { id: '24h', label: '24 hours', hours: 24, bucketH: 3 },
+  { id: '48h', label: '48 hours', hours: 48, bucketH: 6 },
+  { id: '7d', label: '7 days', hours: 168, bucketH: 24 },
 ];
-const DAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const DAY = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const DAYF = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const two = (n: number) => String(n).padStart(2, '0');
 const opened = (c: OnboardingCase) => Boolean(c.accountNumber);
 const stuck = (c: OnboardingCase) => c.state === 'EXCEPTION';
@@ -29,14 +31,30 @@ const touched = (c: OnboardingCase) =>
 const failedK = (c: OnboardingCase, k: ValidationKind) =>
   c.validations.some((v) => v.kind === k && (v.status === 'failed' || v.status === 'timeout'));
 const KINDS: ValidationKind[] = ['NIN', 'BVN', 'AML', 'PEP', 'FRAUD', 'LIVENESS'];
-const KLABEL: Record<string, string> = { NIN: 'NIN · NIMC', BVN: 'BVN · NIBSS', AML: 'AML', PEP: 'PEP', FRAUD: 'Fraud', LIVENESS: 'Selfie' };
+const KLABEL: Record<string, string> = { NIN: 'NIN · NIMC', BVN: 'BVN · NIBSS', AML: 'AML screening', PEP: 'PEP screening', FRAUD: 'Fraud screening', LIVENESS: 'Selfie check' };
 
-interface Pt { label: string; full: string; n: number }
-interface Tip { x: number; y: number; title: string; v: string }
+// ── Icons (monoline) ─────────────────────────────────────────────────────────
+const IP: Record<string, string> = {
+  inbox: 'M22 12h-6l-2 3h-4l-2-3H2 M5 6l-3 6v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3-6a2 2 0 0 0-2-1H7a2 2 0 0 0-2 1Z',
+  check: 'M20 6 9 17l-5-5',
+  alert: 'M10.3 3.1 1.8 18a2 2 0 0 0 1.7 3h16a2 2 0 0 0 1.7-3L12.7 3.1a2 2 0 0 0-2.4 0Z M12 9v4 M12 17h.01',
+  card: 'M2 5h20v14H2z M2 10h20',
+  shield: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z',
+  clock: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Z M12 7v5l3 2',
+  users: 'M16 19a4 4 0 0 0-8 0 M12 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z',
+  layers: 'm12 2 9 5-9 5-9-5 9-5Z M3 12l9 5 9-5 M3 17l9 5 9-5',
+  spark: 'M12 3v4 M12 17v4 M3 12h4 M17 12h4 M6 6l2.5 2.5 M15.5 15.5 18 18 M18 6l-2.5 2.5 M8.5 15.5 6 18',
+};
+function I({ n, s = 18 }: { n: string; s?: number }) {
+  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden>{IP[n].split(' M').map((seg, i) => <path key={i} d={i === 0 ? seg : 'M' + seg} />)}</svg>;
+}
+
+interface Tip { x: number; y: number; t: string }
 
 function TowerInner() {
   useBrandVars('Control Tower');
   const [range, setRange] = useState<Range>('48h');
+  const [acc, setAcc] = useState<'channels' | 'systems'>('channels');
   const [tip, setTip] = useState<Tip | null>(null);
   const [{ cases, now }, setData] = useState<{ cases: OnboardingCase[]; now: number }>({ cases: [], now: 0 });
 
@@ -53,145 +71,205 @@ function TowerInner() {
   const m = useMemo(() => {
     const from = now - cfg.hours * 3600_000;
     const s = cases.filter((c) => Date.parse(c.createdAt) >= from);
+    const T = s.length;
     const clean = s.filter((c) => !touched(c)).length;
-    const stp = s.length ? Math.round((clean / s.length) * 100) : 0;
+    const stp = T ? Math.round(clean / T * 100) : 0;
+    const opn = s.filter(opened).length;
+    const exc = s.filter(stuck).length;
+    const kyc = s.filter((c) => c.state === 'PENDING_LIVENESS' || c.state === 'PENDING_DOCUMENTS').length;
+    const inval = s.filter((c) => c.state === 'VALIDATION_IN_PROGRESS' || (c.state === 'VALIDATED' && !opened(c))).length;
+    const activated = s.filter((c) => c.state === 'FULLY_ACTIVATED').length;
+
+    const pctOf = (n: number) => (T ? Math.round(n / T * 100) : 0);
+    const mix = [
+      { label: 'Straight-through', n: clean, pct: pctOf(clean), color: NAVY, solid: true },
+      { label: 'Awaiting KYC', n: kyc, pct: pctOf(kyc), color: BLUE, solid: false },
+      { label: 'Needs a person', n: exc, pct: pctOf(exc), color: RED, solid: false },
+      { label: 'In validation', n: inval, pct: pctOf(inval), color: GOLD, solid: false },
+    ].filter((x) => x.n > 0);
 
     const count = Math.round(cfg.hours / cfg.bucketH), span = cfg.bucketH * 3600_000;
-    const flow: Pt[] = Array.from({ length: count }, (_, i) => {
+    const flow = Array.from({ length: count }, (_, i) => {
       const start = from + i * span, d = new Date(start + span / 2);
       const inB = s.filter((c) => { const t = Date.parse(c.createdAt); return t >= start && t < start + span; });
-      return { n: inB.length, label: cfg.bucketH >= 12 ? DAY[d.getDay()] : two(d.getHours()), full: cfg.bucketH >= 12 ? `${DAY[d.getDay()]} ${d.getDate()}` : `${two(d.getHours())}:00` };
+      return { n: inB.length, label: cfg.bucketH >= 24 ? DAY[d.getDay()] : two(d.getHours()), full: cfg.bucketH >= 24 ? DAYF[d.getDay()] : `${two(d.getHours())}:00` };
     });
-    const peak = flow.reduce((a, b) => (b.n > a.n ? b : a), flow[0] ?? { n: 0, full: '' });
-    // Cumulative received across the window — an elegant rising curve, and honest:
-    // the running total climbs to however many arrived.
-    let run = 0;
-    const curve: Pt[] = flow.map((p) => { run += p.n; return { ...p, n: run }; });
+    const peakI = flow.reduce((a, b, i) => (b.n > flow[a].n ? i : a), 0);
 
-    const causes = KINDS.map((k) => ({ k, n: s.filter((c) => failedK(c, k)).length })).filter((c) => c.n > 0).sort((a, b) => b.n - a.n);
     const channels = ([['bulk', 'Bulk payroll', GOLD], ['single', 'Branch', NAVY], ['self', 'Digital', GREEN]] as const)
       .map(([k, label, color]) => ({ k, label, color, n: s.filter((c) => (c.channel ?? 'single') === k).length })).filter((c) => c.n > 0);
+
+    const svc = (kinds: ValidationKind[], name: string) => {
+      const f = s.filter((c) => kinds.some((k) => failedK(c, k))).length;
+      return { name, f, sig: (f >= 3 ? 'bad' : f > 0 ? 'warn' : 'ok') as 'bad' | 'warn' | 'ok' };
+    };
+    const upstream = [svc(['NIN'], 'NIMC'), svc(['BVN'], 'NIBSS'), svc(['LIVENESS'], 'Liveness'), { name: 'Finacle', f: 0, sig: 'ok' as const }];
+
     const funnel = [
-      { label: 'Arrived', n: s.length },
-      { label: 'Validated', n: s.filter((c) => opened(c) || (c.state === 'VALIDATED' && !stuck(c))).length },
-      { label: 'Account open', n: s.filter(opened).length },
-      { label: 'Activated', n: s.filter((c) => c.state === 'FULLY_ACTIVATED').length },
+      { label: 'Arrived', n: T }, { label: 'Validated', n: s.filter((c) => opened(c) || (c.state === 'VALIDATED' && !stuck(c))).length },
+      { label: 'Account open', n: opn }, { label: 'Activated', n: activated },
     ];
 
+    const causes = KINDS.map((k) => ({ k, n: s.filter((c) => failedK(c, k)).length })).filter((c) => c.n > 0).sort((a, b) => b.n - a.n);
+    // Attention list for the checklist card.
+    const attn = [
+      ...causes.map((c) => ({ icon: 'alert', title: KLABEL[c.k], sub: `${c.n} ${c.n === 1 ? 'case' : 'cases'} to review`, sig: 'bad' as const })),
+      ...(kyc ? [{ icon: 'clock', title: 'Awaiting KYC', sub: `${kyc} open · links sent`, sig: 'warn' as const }] : []),
+      ...(inval ? [{ icon: 'spark', title: 'In validation', sub: `${inval} running now`, sig: 'ok' as const }] : []),
+    ].slice(0, 5);
+
     return {
-      total: s.length, opened: s.filter(opened).length, clean, stp,
-      exceptions: s.filter(stuck).length, kyc: s.filter((c) => c.state === 'PENDING_LIVENESS' || c.state === 'PENDING_DOCUMENTS').length,
+      T, clean, opn, exc, kyc, stp, activated, activatedPct: pctOf(activated),
       hours: Math.round(clean * (MANUAL_MIN - AUTO_MIN) / 60 * 10) / 10,
-      flow, curve, peak, causes, causeMax: Math.max(1, ...causes.map((c) => c.n)),
-      channels, chTotal: channels.reduce((a, b) => a + b.n, 0), funnel,
+      mix, flow, peakI, flowMax: Math.max(1, ...flow.map((f) => f.n)),
+      channels, chTotal: channels.reduce((a, b) => a + b.n, 0), upstream, funnel, attn, openCount: exc + kyc,
     };
   }, [cases, now, cfg]);
 
-  const onTip = (e: { clientX: number; clientY: number }, p: Pt) => setTip({ x: e.clientX, y: e.clientY, title: `by ${p.full}`, v: `${p.n} received` });
-
   return (
-    <div className="inst bd" onMouseLeave={() => setTip(null)}>
+    <div className="inst cl" onMouseLeave={() => setTip(null)}>
       <TopBar system="Control Tower" sub="Account opening" />
+      <div className="cl-bg">
+        <div className="cl-scroll">
+          {/* Header */}
+          <div className="cl-head">
+            <div><h1>Account Opening</h1><p>Live view of the automated line</p></div>
+            <div className="cl-seg">{RANGES.map((r) => <button key={r.id} aria-pressed={range === r.id} onClick={() => setRange(r.id)}>{r.label}</button>)}</div>
+          </div>
 
-      <div className="bd-scroll">
-        <div className="bd-top">
-          <div><h1>Account Opening</h1><div className="sub">The factory line · {cfg.label === '24H' ? 'last 24 hours' : cfg.label === '48H' ? 'last 48 hours' : 'last 7 days'}</div></div>
-          <div className="bd-seg">{RANGES.map((r) => <button key={r.id} aria-pressed={range === r.id} onClick={() => setRange(r.id)}>{r.label}</button>)}</div>
-        </div>
-
-        {m.total === 0 ? (
-          <div className="bd-empty"><b>The line is quiet</b><span>No applications in this window. Try a wider range.</span></div>
-        ) : (
-          <>
-            <div className="bd-grid">
-              {/* Hero — owns the headline */}
-              <section className="bd-hero">
-                <div className="k">Straight-through rate</div>
-                <div className="big">{m.stp}<em>%</em></div>
-                <div className="tag">{m.clean} of {m.total} accounts opened without anyone touching them.</div>
-                <div className="foot">
-                  <div><div className="fn">{m.opened}</div><div className="fl">opened</div></div>
-                  <div><div className="fn" style={{ color: '#ff9a9a' }}>{m.exceptions}</div><div className="fl">exceptions</div></div>
-                  <div><div className="fn" style={{ color: GOLD }}>{m.hours}h</div><div className="fl">returned</div></div>
+          {m.T === 0 ? (
+            <div className="cl-empty"><b>The line is quiet</b><span>No applications in this window.</span></div>
+          ) : (
+            <>
+              {/* Allocation bar + stat cards */}
+              <div className="cl-top">
+                <div className="cl-mix">
+                  <div className="lbls">{m.mix.map((x) => <span key={x.label}>{x.label}</span>)}</div>
+                  <div className="bar">{m.mix.map((x) => (
+                    <span key={x.label} className={`seg${x.solid ? ' solid' : ''}`} style={{ flexGrow: Math.max(x.n, 0.6), ['--c' as string]: x.color }}>{x.pct}%</span>
+                  ))}</div>
                 </div>
-              </section>
+                <div className="cl-stats">
+                  <Stat icon="inbox" label="Arrived" v={m.T} />
+                  <Stat icon="check" label="Opened" v={m.opn} />
+                  <Stat icon="alert" label="Exceptions" v={m.exc} bad={m.exc > 0} />
+                </div>
+              </div>
 
-              <section className="bd-tile"><div className="k">Accounts opened</div><div className="v">{m.opened}<span className="of">/{m.total}</span></div><div className="s">{m.total ? Math.round(m.opened / m.total * 100) : 0}% of arrivals</div></section>
-              <section className="bd-tile"><div className="k">Awaiting KYC</div><div className="v gold">{m.kyc}</div><div className="s">open · limited</div></section>
+              {/* Main grid */}
+              <div className="cl-grid">
+                {/* Left column: feature + accordion */}
+                <div className="cl-col">
+                  <section className="cl-feature">
+                    <div className="k">Straight-through rate</div>
+                    <div className="big">{m.stp}<em>%</em></div>
+                    <div className="tag">{m.clean} of {m.T} opened with no one touching them</div>
+                    <div className="foot">
+                      <div><b>{m.opn}</b><span>opened</span></div>
+                      <div><b style={{ color: GOLD }}>{m.hours}h</b><span>returned</span></div>
+                    </div>
+                  </section>
 
-              {/* Throughput */}
-              <section className="bd-chart">
-                <div className="hd"><h2>Applications received</h2><span className="mu">{m.total} total{m.peak.n > 0 ? ` · busiest ${m.peak.full}` : ''}</span></div>
-                <Curve series={m.curve} onTip={onTip} />
-                <div className="bd-x">{m.flow.filter((_, i) => i % Math.ceil(m.flow.length / 6) === 0).map((p, i) => <span key={i}>{p.label}</span>)}</div>
-              </section>
-            </div>
+                  <section className="cl-acc">
+                    <button className={`row ${acc === 'channels' ? 'on' : ''}`} onClick={() => setAcc('channels')}><span>How work arrives</span><i>{acc === 'channels' ? '–' : '+'}</i></button>
+                    {acc === 'channels' && <div className="body">{m.channels.map((c) => (
+                      <div className="cbar" key={c.k}><span className="nm">{c.label}</span><span className="t"><i style={{ width: `${m.chTotal ? Math.max(6, c.n / m.chTotal * 100) : 0}%`, background: c.color }} /></span><b>{c.n}</b></div>
+                    ))}</div>}
+                    <button className={`row ${acc === 'systems' ? 'on' : ''}`} onClick={() => setAcc('systems')}><span>Upstream systems</span><i>{acc === 'systems' ? '–' : '+'}</i></button>
+                    {acc === 'systems' && <div className="body">{m.upstream.map((u) => (
+                      <div className="srow" key={u.name}><span className={`dot ${u.sig}`} /><span className="nm">{u.name}</span><span className="st">{u.sig === 'bad' ? `${u.f} failing` : u.sig === 'warn' ? `${u.f} to watch` : 'nominal'}</span></div>
+                    ))}</div>}
+                  </section>
+                </div>
 
-            <div className="bd-row3">
-              <section className="bd-tile"><h2>What needs a person</h2>
-                {m.causes.length ? (
-                  <div className="bd-bars">
-                    {m.causes.map((c) => (
-                      <div className="b" key={c.k}><span className="nm">{KLABEL[c.k]}</span>
-                        <span className="t"><i style={{ width: `${Math.max(6, c.n / m.causeMax * 100)}%`, background: `linear-gradient(90deg,${REDA},${REDB})` }} /></span>
-                        <span className="n">{c.n}</span></div>
+                {/* Pill bars */}
+                <section className="cl-card cl-bars">
+                  <div className="hd"><div><div className="t">Applications received</div><div className="v">{m.T}<span> total</span></div></div><button className="go" aria-label="expand"><I n="spark" s={16} /></button></div>
+                  <div className="bars">
+                    {m.flow.map((f, i) => (
+                      <button className="b" key={i} onMouseMove={(e) => setTip({ x: e.clientX, y: e.clientY, t: `${f.full} · ${f.n}` })} onMouseLeave={() => setTip(null)}>
+                        {i === m.peakI && f.n > 0 && <span className="tip">{f.n}</span>}
+                        <i className={i === m.peakI && f.n > 0 ? 'hi' : ''} style={{ height: f.n ? `${Math.max(8, f.n / m.flowMax * 100)}%` : '6px' }} />
+                        <em>{f.label}</em>
+                      </button>
                     ))}
                   </div>
-                ) : <div className="bd-clear">Every check passed first time.</div>}
-              </section>
+                </section>
 
-              <section className="bd-tile"><h2>How work arrives</h2>
-                <div className="bd-bars">
-                  {m.channels.map((c) => (
-                    <div className="b" key={c.k}><span className="nm">{c.label}</span>
-                      <span className="t"><i style={{ width: `${m.chTotal ? Math.max(5, c.n / m.chTotal * 100) : 0}%`, background: c.color }} /></span>
-                      <span className="n">{c.n}</span></div>
-                  ))}
-                </div>
-              </section>
+                {/* Ring */}
+                <section className="cl-card cl-ring">
+                  <div className="hd"><div><div className="t">Activation</div><div className="v">{m.activatedPct}<span>% fully active</span></div></div></div>
+                  <Ring pct={m.activatedPct} />
+                  <div className="ring-legend"><span><i style={{ background: NAVY }} />Activated {m.activated}</span><span><i style={{ background: '#e7ecf7' }} />In flight {m.T - m.activated}</span></div>
+                </section>
 
-              <section className="bd-tile"><h2>Pipeline reach</h2>
-                <div className="bd-bars">
-                  {m.funnel.map((f) => (
-                    <div className="b" key={f.label}><span className="nm">{f.label}</span>
-                      <span className="t"><i style={{ width: `${m.funnel[0].n ? Math.max(4, f.n / m.funnel[0].n * 100) : 0}%`, background: `color-mix(in srgb, ${NAVY} 82%, #6f8fd6)` }} /></span>
-                      <span className="n">{f.n}</span></div>
-                  ))}
-                </div>
-              </section>
-            </div>
-          </>
-        )}
+                {/* Wide: reach by stage (funnel) */}
+                <section className="cl-card cl-wide">
+                  <div className="hd"><div><div className="t">Reach by stage</div><div className="v">{m.funnel[0].n}<span> arrived → {m.activated} activated</span></div></div></div>
+                  <div className="cl-funnel">
+                    {m.funnel.map((f, i) => {
+                      const pct = m.funnel[0].n ? f.n / m.funnel[0].n * 100 : 0;
+                      const drop = i > 0 ? m.funnel[i - 1].n - f.n : 0;
+                      return (
+                        <div className="fr" key={f.label}>
+                          <span className="fl">{f.label}</span>
+                          <span className="ft"><i style={{ width: `${Math.max(3, pct)}%`, background: `color-mix(in srgb, ${NAVY} ${100 - i * 15}%, #8aa2dc)` }} /></span>
+                          <span className="fn">{f.n}</span>
+                          <span className="fd">{i > 0 && drop > 0 ? `−${drop}` : ''}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                {/* Onboarding / attention checklist */}
+                <section className="cl-onb">
+                  <div className="onb-hd"><div className="t">Onboarding</div><div className="pct">{m.activatedPct}%</div></div>
+                  <div className="onb-seg">
+                    {m.funnel.slice(1).map((f, i) => <div key={f.label} className="s"><i style={{ width: `${m.funnel[0].n ? f.n / m.funnel[0].n * 100 : 0}%`, background: i === 2 ? NAVY : '#c3d0ec' }} /><span>{f.label}</span></div>)}
+                  </div>
+                  <div className="onb-task">
+                    <div className="th"><span>Needs attention</span><b>{m.openCount}</b></div>
+                    <div className="tl">
+                      {m.attn.length ? m.attn.map((a, i) => (
+                        <div className="ti" key={i}>
+                          <span className="ic"><I n={a.icon} s={15} /></span>
+                          <span className="tx"><b>{a.title}</b><em>{a.sub}</em></span>
+                          <span className={`ck ${a.sig}`}>{a.sig === 'ok' ? <I n="check" s={12} /> : ''}</span>
+                        </div>
+                      )) : <div className="clear">All clear — nothing waiting on a person.</div>}
+                    </div>
+                  </div>
+                </section>
+              </div>
+            </>
+          )}
+        </div>
       </div>
-
-      {tip && <div className="bd-tip" style={{ left: tip.x, top: tip.y }} role="status"><b>{tip.title}</b><span>{tip.v}</span></div>}
+      {tip && <div className="cl-tip" style={{ left: tip.x, top: tip.y }}>{tip.t}</div>}
     </div>
   );
 }
 
-// Smooth throughput curve (Catmull-Rom → Bézier) with gold peak marker.
-function Curve({ series, onTip }: { series: Pt[]; onTip: (e: { clientX: number; clientY: number }, p: Pt) => void }) {
-  const W = 720, H = 150, PB = 14, PT = 12;
-  const max = Math.max(1, ...series.map((p) => p.n));
-  const X = (i: number) => (series.length === 1 ? W / 2 : (i / (series.length - 1)) * W);
-  const Y = (v: number) => PT + (1 - v / max) * (H - PT - PB);
-  const p = series.map((s, i) => ({ x: X(i), y: Y(s.n) }));
-  let d = `M${p[0].x},${p[0].y}`;
-  for (let i = 0; i < p.length - 1; i++) {
-    const p0 = p[i - 1] ?? p[i], p1 = p[i], p2 = p[i + 1], p3 = p[i + 2] ?? p[i + 1];
-    const c1x = p1.x + (p2.x - p0.x) / 6, c1y = p1.y + (p2.y - p0.y) / 6;
-    const c2x = p2.x - (p3.x - p1.x) / 6, c2y = p2.y - (p3.y - p1.y) / 6;
-    d += ` C${c1x.toFixed(1)},${Math.min(H - PB, Math.max(PT, c1y)).toFixed(1)} ${c2x.toFixed(1)},${Math.min(H - PB, Math.max(PT, c2y)).toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
-  }
-  const peakI = series.reduce((a, b, i) => (b.n > series[a].n ? i : a), 0);
+function Stat({ icon, label, v, bad }: { icon: string; label: string; v: number; bad?: boolean }) {
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="bd-curve" preserveAspectRatio="none" role="img" aria-label="Applications received over time">
-      <defs><linearGradient id="bdG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={NAVY} stopOpacity="0.16" /><stop offset="1" stopColor={NAVY} stopOpacity="0" /></linearGradient></defs>
-      <path d={`${d} L${W},${H} L0,${H} Z`} fill="url(#bdG)" />
-      <path d={d} fill="none" stroke={NAVY} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-      {series[peakI].n > 0 && <circle cx={X(peakI)} cy={Y(series[peakI].n)} r="5" fill={GOLD} />}
-      {series.map((s, i) => <rect key={i} x={X(i) - W / series.length / 2} y="0" width={W / series.length} height={H} fill="transparent" onMouseMove={(e) => onTip(e, s)} />)}
-    </svg>
+    <div className="cl-stat">
+      <span className={`ic${bad ? ' bad' : ''}`}><I n={icon} s={19} /></span>
+      <div><div className="l">{label}</div><div className="n">{v}</div></div>
+    </div>
+  );
+}
+
+function Ring({ pct, size = 168 }: { pct: number; size?: number }) {
+  const stroke = 20, r = (size - stroke) / 2, c = size / 2, circ = 2 * Math.PI * r;
+  return (
+    <div className="cl-donut">
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden>
+        <circle cx={c} cy={c} r={r} fill="none" stroke="#e7ecf7" strokeWidth={stroke} />
+        <g transform={`rotate(-90 ${c} ${c})`}><circle cx={c} cy={c} r={r} fill="none" stroke={NAVY} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={`${pct / 100 * circ} ${circ}`} /></g>
+      </svg>
+      <div className="ring-c"><b>{pct}<em>%</em></b></div>
+    </div>
   );
 }
 
