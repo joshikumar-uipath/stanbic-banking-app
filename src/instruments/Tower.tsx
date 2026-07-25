@@ -7,8 +7,11 @@
 // Recoloured to Stanbic navy and rebuilt around the account-opening line — same
 // chart types, our data, all live off the shared store.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { store, type OnboardingCase, type ValidationKind } from '../onboarding';
+import { getActiveCountry, kycLabelAuthority } from '../config/countries';
+import { runStory } from '../demo/story';
+import { useConfig } from '../config';
 import { InstrumentProvider, TopBar } from './shell';
 import { useBrandVars } from './brand';
 
@@ -31,7 +34,8 @@ const touched = (c: OnboardingCase) =>
 const failedK = (c: OnboardingCase, k: ValidationKind) =>
   c.validations.some((v) => v.kind === k && (v.status === 'failed' || v.status === 'timeout'));
 const KINDS: ValidationKind[] = ['NIN', 'BVN', 'AML', 'PEP', 'FRAUD', 'LIVENESS'];
-const KLABEL: Record<string, string> = { NIN: 'NIN · NIMC', BVN: 'BVN · NIBSS', AML: 'AML screening', PEP: 'PEP screening', FRAUD: 'Fraud screening', LIVENESS: 'Selfie check' };
+const CO = getActiveCountry();
+const KLABEL: Record<string, string> = Object.fromEntries(KINDS.map((k) => [k, kycLabelAuthority(k, ' · ', CO)]));
 
 // ── Icons (monoline) ─────────────────────────────────────────────────────────
 const IP: Record<string, string> = {
@@ -53,10 +57,29 @@ interface Tip { x: number; y: number; t: string }
 
 function TowerInner() {
   useBrandVars('Control Tower');
+  const stpTarget = useConfig().operations?.stpTarget ?? 80;
   const [range, setRange] = useState<Range>('48h');
   const [acc, setAcc] = useState<'channels' | 'systems'>('channels');
   const [tip, setTip] = useState<Tip | null>(null);
   const [{ cases, now }, setData] = useState<{ cases: OnboardingCase[]; now: number }>({ cases: [], now: 0 });
+
+  // Simulate an application: drives one case through the store; the dashboard
+  // recomputes live off its subscription, so the numbers, funnel, Sankey and
+  // Needs-attention panel all move as the case flows.
+  const [sim, setSim] = useState<{ i: number; total: number; label: string } | null>(null);
+  const simRunning = sim !== null && sim.i < sim.total;
+  const cancelSim = useRef<(() => void) | null>(null);
+  const clearTimer = useRef<number | null>(null);
+  const playSim = () => {
+    cancelSim.current?.();
+    if (clearTimer.current) window.clearTimeout(clearTimer.current);
+    setSim({ i: 0, total: 6, label: 'Starting…' });
+    cancelSim.current = runStory((t) => {
+      setSim({ i: t.i, total: t.total, label: t.label });
+      if (t.done) clearTimer.current = window.setTimeout(() => setSim(null), 3200);
+    });
+  };
+  useEffect(() => () => { cancelSim.current?.(); if (clearTimer.current) window.clearTimeout(clearTimer.current); }, []);
 
   useEffect(() => {
     let alive = true;
@@ -103,7 +126,7 @@ function TowerInner() {
       const f = s.filter((c) => kinds.some((k) => failedK(c, k))).length;
       return { name, f, sig: (f >= 3 ? 'bad' : f > 0 ? 'warn' : 'ok') as 'bad' | 'warn' | 'ok' };
     };
-    const upstream = [svc(['NIN'], 'NIMC'), svc(['BVN'], 'NIBSS'), svc(['LIVENESS'], 'Liveness'), { name: 'Finacle', f: 0, sig: 'ok' as const }];
+    const upstream = [svc(['NIN'], CO.secondaryId.authority), svc(['BVN'], CO.primaryId.authority), svc(['LIVENESS'], 'Liveness'), { name: 'Finacle', f: 0, sig: 'ok' as const }];
 
     const funnel = [
       { label: 'Arrived', n: T }, { label: 'Validated', n: s.filter((c) => opened(c) || (c.state === 'VALIDATED' && !stuck(c))).length },
@@ -127,7 +150,7 @@ function TowerInner() {
     const outcomeOf = (c: OnboardingCase) => stuck(c) ? 'person'
       : c.state === 'FULLY_ACTIVATED' ? 'active'
       : (c.state === 'PENDING_LIVENESS' || c.state === 'PENDING_DOCUMENTS') ? 'kyc' : 'progress';
-    const FAIL_META: Record<string, [string, string]> = { BVN: ['BVN · NIBSS', RED], NIN: ['NIN · NIMC', AMB], AML: ['AML', BLUE], PEP: ['PEP', BLUE], FRAUD: ['Fraud', BLUE], LIVENESS: ['Selfie', BLUE] };
+    const FAIL_META: Record<string, [string, string]> = { BVN: [kycLabelAuthority('BVN', ' · ', CO), RED], NIN: [kycLabelAuthority('NIN', ' · ', CO), AMB], AML: ['AML', BLUE], PEP: ['PEP', BLUE], FRAUD: ['Fraud', BLUE], LIVENESS: ['Selfie', BLUE] };
     const FAIL_ORDER: ValidationKind[] = ['BVN', 'NIN', 'AML', 'PEP', 'FRAUD', 'LIVENESS'];
     const primaryFail = (c: OnboardingCase) => FAIL_ORDER.find((k) => failedK(c, k)) ?? null;
     const pathOf = (c: OnboardingCase) => {
@@ -166,7 +189,15 @@ function TowerInner() {
           {/* Header */}
           <div className="cl-head">
             <div><h1>Account Opening</h1><p>Live view of the automated line</p></div>
-            <div className="cl-seg">{RANGES.map((r) => <button key={r.id} aria-pressed={range === r.id} onClick={() => setRange(r.id)}>{r.label}</button>)}</div>
+            <div className="cl-head-r">
+              <div className="cl-sim">
+                {sim && <span className="st"><span className="dot" />{sim.i}/{sim.total} · {sim.label}</span>}
+                <button className="cl-sim-btn" onClick={playSim} disabled={simRunning}>
+                  {simRunning ? 'Running…' : '▶ Simulate an application'}
+                </button>
+              </div>
+              <div className="cl-seg">{RANGES.map((r) => <button key={r.id} aria-pressed={range === r.id} onClick={() => setRange(r.id)}>{r.label}</button>)}</div>
+            </div>
           </div>
 
           {m.T === 0 ? (
@@ -195,6 +226,10 @@ function TowerInner() {
                   <section className="cl-feature">
                     <div className="k">Straight-through rate</div>
                     <div className="big">{m.stp}<em>%</em></div>
+                    <div className="cl-target">
+                      <span className={`dot ${m.stp >= stpTarget ? 'ok' : 'under'}`} />
+                      {m.stp >= stpTarget ? `On target — goal ${stpTarget}%` : `${stpTarget - m.stp} pts under the ${stpTarget}% goal`}
+                    </div>
                     <div className="tag">{m.clean} of {m.T} opened with no one touching them</div>
                     <div className="foot">
                       <div><b>{m.opn}</b><span>opened</span></div>
@@ -235,19 +270,25 @@ function TowerInner() {
                   <div className="ring-legend"><span><i style={{ background: NAVY }} />Activated {m.activated}</span><span><i style={{ background: '#e7ecf7' }} />In flight {m.T - m.activated}</span></div>
                 </section>
 
-                {/* Wide: reach by stage (funnel) */}
+                {/* Wide: reach by stage — an attrition funnel. Navy is what carries
+                    through; the soft red tail is what dropped out at that step. */}
                 <section className="cl-card cl-wide">
-                  <div className="hd"><div><div className="t">Reach by stage</div><div className="v">{m.funnel[0].n}<span> arrived → {m.activated} activated</span></div></div></div>
+                  <div className="hd"><div><div className="t">Reach by stage</div><div className="v">{m.funnel[0].n}<span> arrived → {m.activated} activated · {m.activatedPct}% through</span></div></div></div>
                   <div className="cl-funnel">
                     {m.funnel.map((f, i) => {
-                      const pct = m.funnel[0].n ? f.n / m.funnel[0].n * 100 : 0;
+                      const arrived = m.funnel[0].n || 1;
+                      const pct = f.n / arrived * 100;
+                      const prevPct = i > 0 ? m.funnel[i - 1].n / arrived * 100 : 100;
                       const drop = i > 0 ? m.funnel[i - 1].n - f.n : 0;
+                      const worst = drop === Math.max(...m.funnel.map((g, j) => (j > 0 ? m.funnel[j - 1].n - g.n : 0))) && drop > 0;
                       return (
                         <div className="fr" key={f.label}>
-                          <span className="fl">{f.label}</span>
-                          <span className="ft"><i style={{ width: `${Math.max(3, pct)}%`, background: `color-mix(in srgb, ${NAVY} ${100 - i * 15}%, #8aa2dc)` }} /></span>
-                          <span className="fn">{f.n}</span>
-                          <span className="fd">{i > 0 && drop > 0 ? `−${drop}` : ''}</span>
+                          <div className="fl"><b>{f.label}</b><em>{Math.round(pct)}% of intake</em></div>
+                          <div className="fbar">
+                            <span className="fill" style={{ width: `${Math.max(1.5, pct)}%` }} />
+                            {drop > 0 && <span className={`leak${worst ? ' worst' : ''}`} style={{ left: `${pct}%`, width: `${prevPct - pct}%` }} />}
+                          </div>
+                          <div className="fn">{f.n}<em>{drop > 0 ? <>−{drop} dropped</> : 'in the door'}</em></div>
                         </div>
                       );
                     })}
@@ -315,7 +356,7 @@ function Sankey({ columns, flows, growKey, onTip, clearTip }: {
   const [focus, setFocus] = useState<string | null>(null);
 
   const geo = useMemo(() => {
-    const W = 940, H = 320, NW = 13, GAP = 26, PAD = 12;
+    const W = 1320, H = 320, NW = 13, GAP = 26, PAD = 12;
     const T = columns[0].reduce((a, b) => a + b.n, 0) || 1;
     const nCols = columns.length;
     const maxNodes = Math.max(...columns.map((c) => c.length), 1);

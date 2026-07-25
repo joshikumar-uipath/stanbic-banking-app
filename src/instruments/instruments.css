@@ -189,6 +189,15 @@
 .cl-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:22px; }
 .cl-head h1 { font-family:var(--disp); font-size:30px; font-weight:700; letter-spacing:-.025em; color:var(--ink); }
 .cl-head p { font-size:13px; color:var(--ink-2); margin-top:3px; }
+.cl-head-r { display:flex; align-items:center; gap:14px; }
+.cl-sim { display:flex; align-items:center; gap:12px; }
+.cl-sim-btn { font-family:var(--disp); font-weight:600; font-size:13px; color:#fff; background:var(--navy); border:none; border-radius:999px; padding:11px 18px; cursor:pointer; box-shadow:0 8px 20px -10px rgba(1,33,105,.5); white-space:nowrap; }
+.cl-sim-btn:hover:not(:disabled) { filter:brightness(1.08); }
+.cl-sim-btn:disabled { opacity:.62; cursor:default; }
+.cl-sim .st { display:inline-flex; align-items:center; gap:8px; font-size:12.5px; color:var(--ink-2); max-width:34ch; }
+.cl-sim .st .dot { width:8px; height:8px; border-radius:999px; background:#2f9e6f; flex:0 0 auto; animation:clPulse 1s ease-in-out infinite; }
+@keyframes clPulse { 0%,100% { opacity:1; } 50% { opacity:.35; } }
+@media (prefers-reduced-motion:reduce) { .cl-sim .st .dot { animation:none; } }
 .cl-seg { display:flex; gap:3px; background:#fff; border-radius:999px; padding:5px; box-shadow:0 6px 18px -10px rgba(1,33,105,.25); }
 .cl-seg button { font-family:var(--disp); font-weight:600; font-size:13px; color:var(--ink-2); padding:9px 18px; border-radius:999px; }
 .cl-seg button[aria-pressed="true"] { background:var(--navy); color:#fff; }
@@ -221,6 +230,10 @@
 .cl-feature .k { font-size:12px; letter-spacing:.04em; color:#9db0dd; text-transform:uppercase; }
 .cl-feature .big { font-family:var(--disp); font-size:64px; font-weight:700; line-height:.9; letter-spacing:-.03em; margin:12px 0 8px; }
 .cl-feature .big em { font-style:normal; font-size:26px; color:var(--gold,#C8A24A); }
+.cl-feature .cl-target { display:flex; align-items:center; gap:7px; font-size:12px; color:rgba(255,255,255,.72); margin:0 0 10px; }
+.cl-feature .cl-target .dot { width:7px; height:7px; border-radius:999px; flex:0 0 auto; }
+.cl-feature .cl-target .dot.ok { background:#4fc28c; }
+.cl-feature .cl-target .dot.under { background:#e5a343; }
 .cl-feature .tag { font-size:13px; color:#c7d3ee; line-height:1.5; max-width:22ch; }
 .cl-feature .foot { display:flex; gap:26px; margin-top:20px; padding-top:18px; border-top:1px solid rgba(255,255,255,.14); }
 .cl-feature .foot b { font-family:var(--disp); font-size:22px; font-weight:600; display:block; }
@@ -290,13 +303,17 @@
 .cl-onb .onb-task .ck.ok { background:#2f9e6f; } .cl-onb .onb-task .ck.warn { background:#e0a13c; } .cl-onb .onb-task .ck.bad { background:#d1344b; }
 .cl-onb .onb-task .clear { color:#c7d3ee; font-size:12.5px; padding:8px 0 12px; }
 
-.cl-funnel { display:flex; flex-direction:column; gap:13px; padding-top:2px; }
-.cl-funnel .fr { display:grid; grid-template-columns:104px minmax(0,1fr) 34px 34px; align-items:center; gap:12px; }
-.cl-funnel .fl { font-size:13px; color:var(--ink-2); }
-.cl-funnel .ft { height:14px; background:var(--tint); border-radius:7px; overflow:hidden; }
-.cl-funnel .ft i { display:block; height:100%; border-radius:7px; }
-.cl-funnel .fn { font-family:var(--disp); font-size:15px; font-weight:700; color:var(--ink); text-align:right; }
-.cl-funnel .fd { font-size:12px; color:#d1344b; text-align:right; }
+.cl-funnel { display:flex; flex-direction:column; gap:17px; padding-top:8px; }
+.cl-funnel .fr { display:grid; grid-template-columns:128px minmax(0,1fr) 96px; align-items:center; gap:18px; }
+.cl-funnel .fl b { display:block; font-size:13.5px; font-weight:600; color:var(--ink); }
+.cl-funnel .fl em { display:block; font-style:normal; font-size:11px; color:var(--ink-3); margin-top:2px; }
+.cl-funnel .fbar { position:relative; height:24px; background:var(--tint); border-radius:8px; }
+.cl-funnel .fill { position:absolute; left:0; top:0; height:100%; border-radius:8px; background:var(--navy); }
+.cl-funnel .leak { position:absolute; top:0; height:100%; border-radius:2px 8px 8px 2px; background:rgba(224,86,107,.2); }
+.cl-funnel .leak.worst { background:rgba(224,86,107,.34); }
+.cl-funnel .fn { text-align:right; font-family:var(--disp); font-size:19px; font-weight:700; color:var(--ink); line-height:1.05; }
+.cl-funnel .fn em { display:block; font-style:normal; font-family:var(--sans,inherit); font-size:10.5px; font-weight:500; color:var(--ink-3); margin-top:3px; }
+.cl-funnel .fr:has(.leak.worst) .fn em { color:#c0334a; }
 .cl svg, .cl .cl-donut { outline:none !important; border:none; }
 .cl button:focus-visible { outline:2px solid var(--navy); outline-offset:2px; }
 
@@ -307,7 +324,7 @@
 .cl-sankey .sk-key .col { font-size:11px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-3); }
 .cl-sankey .sk-key span { display:inline-flex; align-items:center; gap:7px; font-size:12.5px; color:var(--ink-2); }
 .cl-sankey .sk-key i { width:9px; height:9px; border-radius:3px; }
-.cl-sk-svg { width:100%; height:340px; display:block; overflow:visible; }
+.cl-sk-svg { width:100%; height:400px; display:block; overflow:visible; }
 .cl-sk-svg .rb { fill-opacity:.34; transition:fill-opacity .16s, opacity .16s; }
 .cl-sk-svg .rb.hi { fill-opacity:.66; }
 .cl-sk-svg .rb.dim { opacity:.1; }
