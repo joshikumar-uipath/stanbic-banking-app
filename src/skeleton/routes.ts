@@ -25,10 +25,10 @@ export type RouteKey =
   | 'customer-mobile' | 'customer-web'
   | 'kyc'
   | 'admin' | 'consumer'
-  | 'kafka' | 'finacle' | 'comms' | 'tower';
+  | 'kafka' | 'finacle' | 'comms' | 'tower' | 'faceid' | 'faceid-kiosk';
 
 // Routes that render full-width (no phone bezel). The rest render phone-framed.
-export const WEB_SHELLS: RouteKey[] = ['launcher', 'employee-web', 'ops', 'customer-web', 'admin', 'kafka', 'finacle', 'comms', 'tower', 'consumer'];
+export const WEB_SHELLS: RouteKey[] = ['launcher', 'employee-web', 'ops', 'customer-web', 'admin', 'kafka', 'finacle', 'comms', 'tower', 'faceid', 'faceid-kiosk', 'consumer'];
 
 export function detectRoute(): RouteKey {
   const path = window.location.pathname.replace(/\/+$/, '');
@@ -46,6 +46,8 @@ export function detectRoute(): RouteKey {
   if (at('finacle')) return 'finacle';
   if (at('comms') || at('notifications')) return 'comms';
   if (at('tower') || at('control-tower')) return 'tower';
+  if (at('faceid-kiosk') || at('face-id-verify')) return 'faceid-kiosk';
+  if (at('faceid') || at('faceid-verify-console')) return 'faceid';
   if (/\/aura-consumer(\/|$)/i.test(path) || hash.includes('aura-consumer')) return 'consumer';
   return 'launcher';
 }

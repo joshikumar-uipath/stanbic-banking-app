@@ -1,0 +1,35 @@
+.signin-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  gap: 14px;
+  background: radial-gradient(120% 120% at 50% 0%, #1d2b31 0%, #182126 60%);
+  color: #b6c4ca;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+.signin-spinner {
+  width: 22px; height: 22px; border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.2); border-top-color: #0BA2B3;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.signin-card {
+  background: #fff; color: #1c252b; border-radius: 20px; padding: 42px 40px;
+  width: min(380px, 92vw); text-align: center;
+  box-shadow: 0 30px 80px rgba(0,0,0,.4);
+}
+.signin-mark {
+  width: 56px; height: 56px; margin: 0 auto 18px; border-radius: 16px;
+  background: linear-gradient(135deg, #FA4616, #ff7a4d);
+  display: grid; place-items: center;
+  box-shadow: 0 10px 24px rgba(250,70,22,.4);
+}
+.signin-card h1 { font-family: 'Plus Jakarta Sans', Inter, sans-serif; font-size: 22px; margin: 0 0 6px; }
+.signin-card p { color: #6b7a82; font-size: 13px; margin: 0 0 24px; }
+.signin-error { background: #fff5f4; color: #b42318; border: 1px solid #f3c0bb; border-radius: 10px; padding: 10px; font-size: 13px; margin-bottom: 16px; }
+.signin-card button {
+  width: 100%; padding: 13px; border: 0; border-radius: 11px; cursor: pointer;
+  background: #0BA2B3; color: #fff; font: inherit; font-weight: 600; font-size: 15px;
+  transition: background .15s;
+}
+.signin-card button:hover { background: #0c8a99; }
