@@ -55,6 +55,8 @@ if (route === 'admin') {
   import('./instruments/Comms').then((mod) => render(<mod.default />))
 } else if (route === 'tower') {
   import('./instruments/Tower').then((mod) => render(<mod.default />))
+} else if (route === 'cases') {
+  import('./instruments/Cases').then((mod) => render(<mod.default />))
 } else if (route === 'faceid-kiosk') {
   // FaceID kiosk — the walk-up liveness/identity capture (public, no login).
   import('./faceid/FaceIdKiosk').then((mod) => render(<mod.default />))

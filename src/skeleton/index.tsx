@@ -88,6 +88,7 @@ const TOOLS: Tool[] = [
   { key: 'finacle', name: 'Mock Finacle UI', url: '/finacle', icon: 'landmark', accent: SLATE, desc: 'Core banking back office — CIFs and accounts.' },
   { key: 'comms', name: 'Notification service', url: '/comms', icon: 'message', accent: DEMO, desc: 'Every SMS and email the customer receives, per step.' },
   { key: 'tower', name: 'Control tower', url: '/tower', icon: 'dashboard', accent: SLATE, desc: 'Throughput, straight-through rate and what breaks.' },
+  { key: 'cases', name: 'Case management', url: '/cases', icon: 'monitor', accent: DEMO, desc: 'The onboarding case as a Maestro-style stage & task flow.' },
   { key: 'faceid', name: 'FaceID Verify console', url: '/faceid', icon: 'user', accent: DEMO, desc: 'Liveness & identity — the board behind the selfie check.' },
   { key: 'faceid-kiosk', name: 'FaceID kiosk', url: '/faceid-kiosk', icon: 'phone', accent: SLATE, desc: 'The walk-up camera check — live liveness capture.' },
 ];

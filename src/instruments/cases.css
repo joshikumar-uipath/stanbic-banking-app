@@ -1,0 +1,109 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Case management (/cases) — a Maestro-style stage/task flow for onboarding.
+   Scoped under .inst .cm; inherits the instrument tokens (--i-*). The stage
+   colour language mirrors the reference: green = done, blue = active, grey =
+   not started.
+   ───────────────────────────────────────────────────────────────────────────── */
+.inst.cm {
+  --cm-done: #1f9d57; --cm-done-bg: #f1faf4; --cm-done-line: #bfe6cd;
+  --cm-active: #2f6bd6; --cm-active-bg: #f2f6fd; --cm-active-line: #bcd2f4;
+  --cm-att: #dc4a3d; --cm-att-bg: #fdf3f2; --cm-att-line: #f3ccc7;
+  --cm-pend: #9aa6b2; --cm-pend-line: #e3e7ec;
+  display: flex; flex-direction: column; min-height: 100vh;
+  background: #f4f6f9; color: var(--i-ink); font-family: var(--i-num);
+}
+
+/* ── Control row ── */
+.cm-ctrl { display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 14px 22px; background: #fff; border-bottom: 1px solid var(--i-line); }
+.cm-ctrl-l { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cm-eyebrow { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--i-ink-3); }
+.cm-pick { font: inherit; font-size: 13px; font-weight: 500; color: var(--i-ink); background: #fff;
+  border: 1px solid var(--i-line-2); border-radius: 9px; padding: 8px 11px; min-width: 320px; max-width: 60vw; outline: none; cursor: pointer; }
+.cm-pick:focus { border-color: var(--i-brand); }
+.cm-badge { font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
+.cm-badge.progress { background: var(--cm-active-bg); color: var(--cm-active); border-color: var(--cm-active-line); }
+.cm-badge.good { background: var(--cm-done-bg); color: var(--cm-done-ink, #15803d); border-color: var(--cm-done-line); }
+.cm-badge.pending { background: #fbf6ea; color: var(--i-warn-ink); border-color: #f0e2c2; }
+.cm-badge.exception { background: var(--cm-att-bg); color: var(--cm-att); border-color: var(--cm-att-line); }
+
+.cm-legend { margin-left: auto; display: flex; gap: 14px; flex-wrap: wrap; }
+.cm-leg { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--i-ink-2); }
+
+/* ── Task-kind icon chips ── */
+.cm-ti { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; flex: 0 0 auto; }
+.cm-ti.agent  { background: #eef0ff; color: #4c53c9; }
+.cm-ti.robot  { background: #eaf4fb; color: #2f7fb8; }
+.cm-ti.human  { background: #fdeef4; color: #c0468a; }
+.cm-ti.app    { background: #eef6f0; color: #2f9e6f; }
+.cm-ti.gateway{ background: #f3eefb; color: #7a52c4; }
+
+/* ── Canvas ── */
+.cm-canvas { position: relative; flex: 1; overflow-x: auto; overflow-y: hidden; padding: 34px 22px 12px; }
+.cm-flow { display: flex; align-items: flex-start; gap: 0; min-width: min-content; }
+
+/* Start node */
+.cm-start { display: flex; flex-direction: column; align-items: center; gap: 10px; padding-top: 34px; flex: 0 0 auto; }
+.cm-start-node { width: 70px; height: 70px; border-radius: 50%; display: grid; place-items: center;
+  background: #fff; border: 2px solid var(--cm-pend-line); color: var(--cm-pend); box-shadow: 0 2px 10px -4px rgba(20,40,70,.25); }
+.cm-start-node.on { border-color: var(--cm-done); color: var(--cm-done); }
+.cm-start-l { font-size: 12.5px; font-weight: 600; color: var(--i-ink-2); white-space: nowrap; }
+
+/* Connector arrows */
+.cm-arrow { flex: 0 0 auto; align-self: flex-start; margin-top: 68px; width: 34px; height: 2px;
+  background: var(--cm-pend-line); position: relative; }
+.cm-arrow::after { content: ""; position: absolute; right: -1px; top: -3px; width: 8px; height: 8px;
+  border-top: 2px solid var(--cm-pend-line); border-right: 2px solid var(--cm-pend-line); transform: rotate(45deg); }
+
+.cm-stagewrap { display: flex; align-items: flex-start; flex: 0 0 auto; }
+
+/* ── Stage card ── */
+.cm-stage { width: 264px; flex: 0 0 auto; background: #fff; border: 2px solid var(--cm-pend-line);
+  border-radius: 16px; padding: 15px 15px 8px; box-shadow: 0 4px 20px -12px rgba(20,40,70,.3); }
+.cm-stage.done   { border-color: var(--cm-done-line); }
+.cm-stage.active { border-color: var(--cm-active-line); box-shadow: 0 6px 24px -10px rgba(47,107,214,.4); }
+.cm-stage.attention { border-color: var(--cm-att-line); }
+
+.cm-stage-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.cm-stage-title b { display: block; font-size: 16px; font-weight: 700; letter-spacing: -.01em; color: var(--i-ink); }
+.cm-stage-title span { display: block; font-size: 11.5px; color: var(--i-ink-3); margin-top: 1px; }
+.cm-stage-meta { display: flex; flex-direction: column; gap: 2px; margin: 10px 0 12px; }
+.cm-stage-meta span { font-size: 11.5px; color: var(--i-ink-2); }
+
+.cm-group { border-top: 1px solid var(--i-line-3); padding-top: 10px; margin-top: 2px; }
+.cm-group + .cm-group { margin-top: 10px; }
+.cm-group-l { display: block; font-size: 11px; font-weight: 600; color: var(--i-ink-2); margin-bottom: 8px; }
+.cm-tasks { display: flex; flex-direction: column; gap: 7px; }
+
+/* ── Task row ── */
+.cm-task { display: flex; align-items: center; gap: 9px; padding: 8px 9px; border-radius: 9px;
+  border: 1px solid var(--i-line-2); background: #fff; }
+.cm-task.done { border-color: var(--cm-done-line); background: linear-gradient(0deg, var(--cm-done-bg), var(--cm-done-bg)); }
+.cm-task.active { border-color: var(--cm-active-line); background: var(--cm-active-bg); }
+.cm-task.attention { border-color: var(--cm-att-line); background: var(--cm-att-bg); }
+.cm-task.gw { border-style: dashed; }
+.cm-task-n { flex: 1; min-width: 0; font-size: 12.5px; color: var(--i-ink); line-height: 1.25;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cm-star { color: var(--cm-att); font-style: normal; font-weight: 700; margin-left: 3px; }
+
+/* ── Status glyphs ── */
+.cm-st { width: 20px; height: 20px; border-radius: 50%; flex: 0 0 auto; display: grid; place-items: center; }
+.cm-st.done { background: var(--cm-done); color: #fff; }
+.cm-st.active { background: transparent; color: var(--cm-active); }
+.cm-st.att { background: transparent; color: var(--cm-att); border: 1.5px solid var(--cm-att); }
+.cm-st.wait { background: transparent; color: #7a52c4; }
+.cm-st.pend { background: transparent; border: 1.5px solid var(--cm-pend-line); width: 18px; height: 18px; }
+.cm-spin { width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--cm-active-line); border-top-color: var(--cm-active); animation: cmspin .7s linear infinite; }
+@keyframes cmspin { to { transform: rotate(360deg); } }
+
+/* ── Orchestrating agent ── */
+.cm-agent { position: sticky; left: 22px; display: inline-flex; align-items: center; gap: 10px; margin: 18px 0 4px;
+  background: #fff; border: 1px solid var(--i-line-2); border-radius: 12px; padding: 9px 14px 9px 10px;
+  box-shadow: 0 6px 22px -12px rgba(20,40,70,.4); width: max-content; }
+.cm-agent-mark { width: 30px; height: 30px; border-radius: 8px; background: #eef0ff; color: #4c53c9; display: grid; place-items: center; }
+.cm-agent-t b { display: block; font-size: 13px; font-weight: 700; color: var(--i-ink); }
+.cm-agent-t em { display: block; font-style: normal; font-size: 11px; color: var(--i-ink-3); }
+
+.cm-note { margin: 0; padding: 12px 22px 22px; font-size: 12px; color: var(--i-ink-3); max-width: 90ch; }
+
+@media (prefers-reduced-motion: reduce) { .cm-spin { animation: none; } }
