@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { store, fullName, stateMeta, type OnboardingCase, type OnboardingState, type ValidationKind } from '../onboarding';
 import { InstrumentProvider, TopBar } from './shell';
 import { useBrandVars } from './brand';
+import { maestroReady, startCase, getState, approve, instanceUrl, STAGES as MAESTRO_STAGES, type LiveState } from '../onboarding/maestro';
 import './cases.css';
 
 // ── Task + stage model ───────────────────────────────────────────────────────
@@ -155,6 +156,9 @@ function CasesInner() {
   useBrandVars('Case Management');
   const [cases, setCases] = useState<OnboardingCase[]>([]);
   const [sel, setSel] = useState<string | null>(null);
+  // Live bridge to the REAL Maestro case deployed on the tenant.
+  const [run, setRun] = useState<{ id: string; state: LiveState } | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -163,6 +167,18 @@ function CasesInner() {
     const un = store.subscribe(refresh);
     return () => { alive = false; un(); };
   }, []);
+
+  // Poll the real Maestro instance while a run is active and not yet done.
+  useEffect(() => {
+    if (!run || run.state.done) return;
+    let alive = true;
+    const iv = setInterval(() => {
+      void getState(run.id).then((s) => { if (alive) setRun((r) => (r && r.id === run.id ? { id: r.id, state: s } : r)); }).catch(() => {});
+    }, 4000);
+    return () => { alive = false; clearInterval(iv); };
+    // deliberately keyed on id + done only — polling restarts on a new run or when it finishes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [run?.id, run?.state.done]);
 
   // Default selection: the most recently touched case that's still in motion.
   const current = useMemo(() => {
@@ -179,6 +195,26 @@ function CasesInner() {
     const tasks = stg.tasks.map((t) => ({ t, s: taskState(t, i, activeIdx, current) }));
     return { stg, i, tasks, head: stageState(tasks.map((x) => x.s)) };
   }), [activeIdx, current]);
+
+  const launch = async () => {
+    if (!current) return;
+    setBusy(true);
+    try {
+      const id = await startCase({ applicantId: current.id, firstName: current.firstName, lastName: current.lastName, bvn: current.bvn, nin: current.nin, channel: current.channel });
+      setRun({ id, state: await getState(id) });
+    } catch (e) { alert('Could not start the Maestro case:\n' + (e as Error).message); }
+    finally { setBusy(false); }
+  };
+  const doApprove = async () => {
+    if (!run?.state.pendingTaskId) return;
+    setBusy(true);
+    try {
+      await approve(run.state.pendingTaskId);
+      await new Promise((r) => setTimeout(r, 1600));
+      setRun({ id: run.id, state: await getState(run.id) });
+    } catch (e) { alert('Approve failed:\n' + (e as Error).message); }
+    finally { setBusy(false); }
+  };
 
   return (
     <div className="inst cm">
@@ -197,6 +233,11 @@ function CasesInner() {
           {current && (
             <span className={`cm-badge ${stateMeta(current.state).tone}`}>{stateMeta(current.state).label}</span>
           )}
+          {maestroReady() && current && !run && (
+            <button className="cm-run" disabled={busy} onClick={launch} title="Start a live instance of the real UiPath Maestro case">
+              {busy ? 'Starting…' : '▶ Run in Maestro'}
+            </button>
+          )}
         </div>
         <div className="cm-legend">
           {(['agent', 'robot', 'human', 'app', 'gateway'] as TaskKind[]).map((k) => (
@@ -204,6 +245,29 @@ function CasesInner() {
           ))}
         </div>
       </div>
+
+      {run && (
+        <div className={`cm-live ${run.state.done ? 'done' : ''}`}>
+          <div className="cm-live-head">
+            <span className="cm-live-dot" />
+            <b>Live in Maestro</b>
+            <span className="cm-live-id">instance {run.id.slice(0, 8)}…</span>
+            <span className={`cm-live-state ${run.state.done ? 'ok' : ''}`}>{run.state.done ? 'Completed' : run.state.jobState}</span>
+          </div>
+          <div className="cm-live-stages">
+            {MAESTRO_STAGES.map((s) => {
+              const st = run.state.done || run.state.completedStages.includes(s) ? 'done' : run.state.activeStage === s ? 'active' : 'pend';
+              return <span key={s} className={`cm-live-stage ${st}`}>{st === 'done' ? '✓ ' : st === 'active' ? '● ' : ''}{s}</span>;
+            })}
+          </div>
+          <div className="cm-live-actions">
+            {!run.state.done && run.state.pendingTaskId && (
+              <button className="cm-run" disabled={busy} onClick={doApprove}>{busy ? '…' : `Approve ${run.state.activeStage ?? ''}`}</button>
+            )}
+            <a className="cm-live-link" href={instanceUrl(run.id)} target="_blank" rel="noreferrer">Open in Maestro ↗</a>
+          </div>
+        </div>
+      )}
 
       <div className="cm-canvas">
         <div className="cm-flow">

@@ -106,4 +106,31 @@
 
 .cm-note { margin: 0; padding: 12px 22px 22px; font-size: 12px; color: var(--i-ink-3); max-width: 90ch; }
 
-@media (prefers-reduced-motion: reduce) { .cm-spin { animation: none; } }
+/* ── Live bridge to the real Maestro case ── */
+.cm-run { font: inherit; font-size: 12.5px; font-weight: 600; color: #fff; background: var(--i-brand);
+  border: 1px solid var(--i-brand); border-radius: 9px; padding: 7px 13px; cursor: pointer; white-space: nowrap; }
+.cm-run:hover:not(:disabled) { filter: brightness(1.06); }
+.cm-run:disabled { opacity: .6; cursor: default; }
+
+.cm-live { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; padding: 11px 22px;
+  background: linear-gradient(0deg, color-mix(in srgb, var(--i-brand) 5%, #fff), color-mix(in srgb, var(--i-brand) 5%, #fff));
+  border-bottom: 1px solid var(--i-line); border-top: 2px solid var(--i-brand); }
+.cm-live.done { border-top-color: var(--cm-done); background: var(--cm-done-bg); }
+.cm-live-head { display: flex; align-items: center; gap: 9px; }
+.cm-live-head b { font-size: 13px; color: var(--i-ink); }
+.cm-live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--i-brand); animation: cmpulse 1.6s infinite; }
+.cm-live.done .cm-live-dot { background: var(--cm-done); animation: none; }
+@keyframes cmpulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+.cm-live-id { font-family: var(--i-mono); font-size: 11px; color: var(--i-ink-3); }
+.cm-live-state { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--cm-active);
+  background: var(--cm-active-bg); border: 1px solid var(--cm-active-line); border-radius: 999px; padding: 2px 9px; }
+.cm-live-state.ok { color: var(--cm-done); background: var(--cm-done-bg); border-color: var(--cm-done-line); }
+.cm-live-stages { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.cm-live-stage { font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--cm-pend-line); color: var(--i-ink-3); background: #fff; white-space: nowrap; }
+.cm-live-stage.done { color: var(--cm-done); border-color: var(--cm-done-line); background: var(--cm-done-bg); }
+.cm-live-stage.active { color: var(--cm-active); border-color: var(--cm-active-line); background: var(--cm-active-bg); box-shadow: 0 0 0 2px color-mix(in srgb, var(--cm-active) 14%, transparent); }
+.cm-live-actions { margin-left: auto; display: flex; align-items: center; gap: 12px; }
+.cm-live-link { font-size: 12px; font-weight: 600; color: var(--i-brand); text-decoration: none; white-space: nowrap; }
+.cm-live-link:hover { text-decoration: underline; }
+
+@media (prefers-reduced-motion: reduce) { .cm-spin, .cm-live-dot { animation: none; } }
