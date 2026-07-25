@@ -9,6 +9,8 @@
 // Schema version is bumped any time this shape changes incompatibly.
 // Older cached configs run through ./migrate.ts before being applied.
 
+import type { CountryCode } from './countries';
+
 export const SCHEMA_VERSION = 1;
 
 // ── Branding ─────────────────────────────────────────────────────────────
@@ -18,6 +20,10 @@ export interface Branding {
   appName: string;
   tagline: string;
   greeting: string;
+  /** ISO country code driving all market-specific demo content — currency,
+   *  people names, phone/ID formats, KYC authority labels. See config/countries.ts.
+   *  Undefined → Nigeria (the bundled baseline). Backfilled by migrate.ts. */
+  country?: CountryCode;
   primaryColor: string;
   /** A subtle, less-prominent brand color used alongside primary (e.g. the
    *  alternating Home showcase accents). Distinct from `accentColor`. */
@@ -184,6 +190,30 @@ export interface ConnectionConfig {
   defaultFolderId: string;
 }
 
+// ── Operations ─────────────────────────────────────────────────────────────
+// The account-opening factory's operating parameters: the straight-through goal
+// the control tower measures against, how long an exception may age before it
+// breaches SLA, the retry backoff the validation robots follow, and the rules
+// that route each kind of exception to a queue (and optionally an owner).
+export interface RoutingRule {
+  /** The exception cause this rule matches, e.g. "Identity check failed". */
+  cause: string;
+  /** The queue it routes into, e.g. "Exceptions", "Retry queue". */
+  queue: string;
+  /** Optional default assignee; empty = leave unassigned for triage. */
+  assignTo?: string;
+}
+export interface OperationsConfig {
+  /** Straight-through-processing target, percent (control tower compares to it). */
+  stpTarget: number;
+  /** Minutes an exception may age before it breaches SLA. */
+  slaMinutes: number;
+  /** Retry backoff in minutes between validation attempts, e.g. [5,15,30,60]. */
+  retryBackoffMins: number[];
+  /** Cause → queue (+ optional owner) routing rules. */
+  routing: RoutingRule[];
+}
+
 // ── Top-level ────────────────────────────────────────────────────────────
 export interface TenantConfig {
   schemaVersion: number;
@@ -195,4 +225,6 @@ export interface TenantConfig {
   notifications: NotificationsConfig;
   features: FeatureFlags;
   strings: StringsConfig;
+  /** Optional so older saved configs stay valid; migrate.ts backfills the default. */
+  operations?: OperationsConfig;
 }

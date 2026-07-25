@@ -5,7 +5,7 @@ import { useNav } from '../nav';
 import { Card, SegTabs, Sparkline, Tag, Amount } from '../components';
 import {
   customer, depositAccounts, depositsTotal, cards, cardsOutstanding,
-  mpesa, netWorth, insights, money, type Account, type CardAccount,
+  mpesa, netWorth, insights, money, CURRENCY, type Account, type CardAccount,
 } from '../data';
 
 const TREND = [792, 805, 788, 831, 856, 844, 870, 909]; // demo balance trend (000s)
@@ -82,7 +82,7 @@ function BalanceHero() {
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: 8, gap: 12 }}>
           <div>
             <div style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 32, letterSpacing: -0.8, fontVariantNumeric: 'tabular-nums' }}>
-              {nav.hideBalances ? 'NGN ••••••' : money(depositsTotal + mpesa.balance)}
+              {nav.hideBalances ? `${CURRENCY} ••••••` : money(depositsTotal + mpesa.balance)}
             </div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8, background: 'rgba(255,255,255,0.16)', borderRadius: 999, padding: '4px 10px', fontSize: 12.5, fontWeight: 600 }}>
               <Icon name="wealth" size={13} color="#fff" /> +2.4% this month

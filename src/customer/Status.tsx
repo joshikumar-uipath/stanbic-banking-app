@@ -5,12 +5,14 @@
 import { useEffect, useState } from 'react';
 import { store, stateMeta, VALIDATION_KINDS, type OnboardingCase, type OnboardingState } from '../onboarding';
 import { useConfig } from '../config';
+import { getActiveCountry, kycLabel, kycLabelAuthority } from '../config/countries';
 import { Button, Chip, Note, Brand } from './ui';
 import Icon from './icons';
 
+const CO = getActiveCountry();
 const MAIN: { s: OnboardingState; label: string; desc: string }[] = [
   { s: 'PRE_REGISTERED', label: 'Application received', desc: 'We have your details' },
-  { s: 'VALIDATION_IN_PROGRESS', label: 'Verifying your identity', desc: 'NIN, BVN and screening' },
+  { s: 'VALIDATION_IN_PROGRESS', label: 'Verifying your identity', desc: `${kycLabel('NIN', CO)}, ${kycLabel('BVN', CO)} and screening` },
   { s: 'VALIDATED', label: 'Identity verified', desc: 'All checks passed' },
   { s: 'ACCOUNT_CREATED', label: 'Account created', desc: 'Your account number is ready' },
   { s: 'FULLY_ACTIVATED', label: 'Fully activated', desc: 'Everything is complete' },
@@ -109,7 +111,7 @@ export default function Status({ c, onBack, onKyc }: { c: OnboardingCase; onBack
               <div className="cx-check" key={k}>
                 <span className="l">
                   <span className="ic" style={{ background: VC[st] }}>{st === 'passed' ? <Icon name="check" size={11} strokeWidth={3} /> : st === 'failed' || st === 'timeout' ? '!' : ''}</span>
-                  {k === 'LIVENESS' ? 'Selfie check' : k === 'NIN' ? 'NIN (NIMC)' : k === 'BVN' ? 'BVN (NIBSS)' : k === 'AML' ? 'AML screening' : k === 'PEP' ? 'PEP screening' : 'Fraud screening'}
+                  {k === 'NIN' || k === 'BVN' ? kycLabelAuthority(k, ' · ', CO) : k === 'LIVENESS' ? 'Selfie check' : k === 'AML' ? 'AML screening' : k === 'PEP' ? 'PEP screening' : 'Fraud screening'}
                 </span>
                 <span style={{ fontSize: 12, color: 'var(--soft)', textTransform: 'capitalize' }}>{st === 'passed' ? 'Verified' : st}</span>
               </div>

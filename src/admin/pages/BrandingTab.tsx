@@ -1,11 +1,18 @@
 import { useRef } from 'react';
 import type { Branding, LogoSize } from '../../config';
 import { generatedFavicon } from '../../config';
+import { COUNTRY_OPTIONS, getCountry, type CountryCode } from '../../config/countries';
 import { fieldLabel, fieldInput } from '../components/AdminShell';
 
 export default function BrandingTab({ branding, onChange }: { branding: Branding; onChange: (next: Branding) => void }) {
   const set = <K extends keyof Branding>(key: K, value: Branding[K]) =>
     onChange({ ...branding, [key]: value });
+
+  // Switching country rewrites every market-specific reference across the apps
+  // (currency, people names, phone/ID formats, KYC authorities) and also sets the
+  // Home greeting to that market's dialect word — editable below afterwards.
+  const setCountry = (code: CountryCode) =>
+    onChange({ ...branding, country: code, greeting: getCountry(code).greeting });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -24,6 +31,17 @@ export default function BrandingTab({ branding, onChange }: { branding: Branding
           <SizeSelector value={branding.logoSize ?? 'large'} onChange={(v) => set('logoSize', v)} />
         </Field>
       )}
+
+      <SectionHeader
+        title="Market"
+        subtitle="Sets the country everything is localised to — currency, customer names, phone & ID formats, and the KYC authorities — across every app and page."
+      />
+      <Field label="Country">
+        <CountrySelect value={branding.country ?? 'NG'} onChange={setCountry} />
+      </Field>
+      <p style={{ fontSize: 11, color: 'rgba(24,33,38,0.5)', margin: '-6px 0 0' }}>
+        Changing this reseeds the demo people and accounts. Save, then reload the app tab to see it applied.
+      </p>
 
       <SectionHeader
         title="Inside the app"
@@ -117,6 +135,21 @@ function ColorInput({ value, onChange }: { value: string; onChange: (v: string) 
 
 function isValidHex(s: string): boolean {
   return /^#[0-9a-fA-F]{6}$/.test(s);
+}
+
+// Country — the market everything localises to. A plain select (the list may
+// grow); picking one is wired to also set the dialect greeting in the parent.
+function CountrySelect({ value, onChange }: { value: CountryCode; onChange: (v: CountryCode) => void }) {
+  return (
+    <select
+      className="admin-input"
+      style={{ ...fieldInput, cursor: 'pointer' }}
+      value={value}
+      onChange={(e) => onChange(e.target.value as CountryCode)}
+    >
+      {COUNTRY_OPTIONS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+    </select>
+  );
 }
 
 // Logo size — Small / Medium / Large segmented control. Maps to LOGO_SIZES in

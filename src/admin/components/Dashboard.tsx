@@ -17,6 +17,7 @@ import FeaturesTab from '../pages/FeaturesTab';
 import HomeShowcaseTab from '../pages/HomeShowcaseTab';
 import DemoContentTab from '../pages/DemoContentTab';
 import StringsTab from '../pages/StringsTab';
+import OperationsTab from '../pages/OperationsTab';
 
 type TabId =
   | 'branding'
@@ -25,6 +26,7 @@ type TabId =
   | 'showcase'
   | 'demo'
   | 'notifications'
+  | 'operations'
   | 'features'
   | 'strings';
 
@@ -40,6 +42,7 @@ const TABS: Tab[] = [
   { id: 'showcase',      label: 'Home Showcase' },
   { id: 'demo',          label: 'Demo Content' },
   { id: 'notifications', label: 'Notifications' },
+  { id: 'operations',    label: 'Operations' },
   { id: 'features',      label: 'Features' },
   { id: 'strings',       label: 'Strings' },
 ];
@@ -192,6 +195,8 @@ export default function Dashboard({ tenant, profileName, localMode = false, onSw
         return <DemoContentTab demoContent={config.demoContent} onChange={(v) => updateSection('demoContent', v)} />;
       case 'notifications':
         return <NotificationsTab notifications={config.notifications} onChange={(v) => updateSection('notifications', v)} />;
+      case 'operations':
+        return <OperationsTab operations={config.operations ?? defaultConfig.operations!} onChange={(v) => updateSection('operations', v)} />;
       case 'features':
         return <FeaturesTab features={config.features} onChange={(v) => updateSection('features', v)} />;
       case 'strings':

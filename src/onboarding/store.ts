@@ -12,6 +12,7 @@ import type {
 } from './types';
 import { VALIDATION_KINDS, fullName } from './types';
 import { nextApplicationId, kycToken, uid, mockCif, mockAccountNumber } from './ids';
+import { getActiveCountry } from '../config/countries';
 
 export interface ListFilter {
   state?: OnboardingState | OnboardingState[];
@@ -39,8 +40,9 @@ export interface OnboardingStore {
 const CASES_KEY = 'aof_cases';
 const EVENTS_KEY = 'aof_events';
 const SEED_VERSION_KEY = 'aof_seed_v';
-const SEED_VERSION = '6';   // bump to force a reseed when the demo data changes
+const SEED_VERSION = '7';   // bump to force a reseed when the demo data changes
 const SEED_AT_KEY = 'aof_seed_at';   // wall-clock of the last seed, for staleness
+const SEED_COUNTRY_KEY = 'aof_seed_country';   // market the current seed was localised to
 // Seeded cases freeze their createdAt at seed time, so "opened 2h ago" drifts to
 // "opened 3d ago" once the seed sits overnight. A new demo sitting should start
 // with fresh ages — so if the last seed is older than this, reseed on load.
@@ -59,20 +61,25 @@ class MockOnboardingStore implements OnboardingStore {
     this.load();
     let v: string | null = null;
     let seededAt = 0;
+    let seededCountry: string | null = null;
     try {
       v = localStorage.getItem(SEED_VERSION_KEY);
       seededAt = Number(localStorage.getItem(SEED_AT_KEY)) || 0;
+      seededCountry = localStorage.getItem(SEED_COUNTRY_KEY);
     } catch { /* ignore */ }
-    // Reseed when: never seeded, the seed shape changed, OR the seed has gone
-    // stale (last seeded > 12h ago — a new sitting, so refresh the ages). A stale
-    // reseed also resets any in-session resolutions, which is intended: >12h means
-    // a new demo, not a continuation. Within a session nothing is touched.
+    // Reseed when: never seeded, the seed shape changed, the admin switched the
+    // market (country differs), OR the seed has gone stale (last seeded > 12h ago
+    // — a new sitting, so refresh the ages). A stale/country reseed also resets any
+    // in-session resolutions, which is intended: it means a new demo, not a
+    // continuation. Within a session, same country, nothing is touched.
+    const activeCountry = getActiveCountry().code;
     const stale = seededAt > 0 && Date.now() - seededAt > SEED_STALE_AFTER_MS;
-    if (this.cases.length === 0 || v !== SEED_VERSION || stale) {
+    if (this.cases.length === 0 || v !== SEED_VERSION || seededCountry !== activeCountry || stale) {
       this.cases = []; this.log = [];
       try {
         localStorage.setItem(SEED_VERSION_KEY, SEED_VERSION);
         localStorage.setItem(SEED_AT_KEY, String(Date.now()));
+        localStorage.setItem(SEED_COUNTRY_KEY, activeCountry);
       } catch { /* ignore */ }
       seed(this);
     }
@@ -203,22 +210,30 @@ interface SeedRow extends NewCaseInput {
 
 const BEYOND_VALIDATION: OnboardingState[] = ['VALIDATED', 'ACCOUNT_CREATED', 'PENDING_DOCUMENTS', 'PENDING_LIVENESS', 'FULLY_ACTIVATED'];
 
+// All seeded people/addresses/IDs are drawn from the active country's profile
+// (config/countries.ts) so switching market in the admin relocalises the whole
+// account-opening pipeline. The KYC engine still runs on internal BVN/NIN keys.
+type SeedCtx = ReturnType<typeof getActiveCountry>;
+
+const seedFirst = (co: SeedCtx, n: number) => co.firstNames[n % co.firstNames.length];
+const seedLast = (co: SeedCtx, n: number) => co.lastNames[(n * 7 + 3) % co.lastNames.length];
+const seedPhone = (co: SeedCtx, n: number) => `${co.phoneTrunk}${String(2000000 + n).slice(-7)}`;
+const seedPrimaryId = (co: SeedCtx, n: number) => `${co.primaryId.numPrefix}${String(20000000 + n).slice(-8)}`;
+const seedSecondaryId = (co: SeedCtx, n: number) => `${co.secondaryId.numPrefix}${String(30000000 + n).slice(-8)}`;
+const seedAddr = (co: SeedCtx, n: number) =>
+  `${(n % 60) + 1} ${co.streets[n % co.streets.length]}, ${co.cities[n % co.cities.length]}`;
+
 // Filler for the payroll batches. A real bulk upload is tens of people, and a
 // one-row "batch" makes the grouped pipeline look broken — so the seeded batches
 // carry a believable roster with the usual mix: most straight through, a few
 // waiting on the customer, one or two that need a person.
-const BULK_FIRST = ['Ibrahim', 'Amina', 'Emeka', 'Ngozi', 'Yakubu', 'Funke', 'Sadiq', 'Chioma', 'Tunde', 'Halima',
-  'Peter', 'Grace', 'Musa', 'Zainab', 'Obinna', 'Folake', 'Bashir', 'Adaeze', 'Segun', 'Hauwa'];
-const BULK_LAST = ['Musa', 'Sule', 'Obi', 'Umeh', 'Bello', 'Ade', 'Idris', 'Nwankwo', 'Balogun', 'Yusuf',
-  'Okon', 'Effiong', 'Danladi', 'Abubakar', 'Chukwu', 'Adeyemi', 'Garba', 'Eze', 'Ogundipe', 'Lawal'];
-
 /** Deterministic rows for one payroll batch — same set on every reseed. */
-function bulkRows(employer: string, batchId: string, count: number, offset: number, agoMin: number): SeedRow[] {
+function bulkRows(co: SeedCtx, employer: string, batchId: string, count: number, offset: number, agoMin: number): SeedRow[] {
   const out: SeedRow[] = [];
   for (let i = 0; i < count; i++) {
     const n = offset + i;
-    const firstName = BULK_FIRST[n % BULK_FIRST.length];
-    const lastName = BULK_LAST[(n * 7 + 3) % BULK_LAST.length];
+    const firstName = seedFirst(co, n);
+    const lastName = seedLast(co, n);
     const m = i % 10;
     const state: OnboardingState =
       m === 3 ? 'EXCEPTION'
@@ -232,11 +247,11 @@ function bulkRows(employer: string, batchId: string, count: number, offset: numb
       : undefined;
     out.push({
       firstName, lastName,
-      phone: `0803${String(2000000 + n).slice(-7)}`,
+      phone: seedPhone(co, n),
       email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}${n}@example.com`,
-      bvn: `222${String(20000000 + n).slice(-8)}`,
-      nin: `101${String(30000000 + n).slice(-8)}`,
-      address: `${(n % 60) + 1} Station Rd, Lagos`,
+      bvn: seedPrimaryId(co, n),
+      nin: seedSecondaryId(co, n),
+      address: seedAddr(co, n),
       channel: 'bulk', source: 'rm', employer, batchId,
       state, account: state !== 'EXCEPTION', vals,
       agoMin: agoMin + (i % 12),
@@ -246,19 +261,37 @@ function bulkRows(employer: string, batchId: string, count: number, offset: numb
 }
 
 function seed(s: MockOnboardingStore) {
+  const co = getActiveCountry();
+  const emp1 = co.companies[0], emp2 = co.companies[1];
+  // A named person built from the pool at a fixed index, so the demo narrative is
+  // stable within a country but relocalises when the country changes.
+  const named = (idx: number, over: Omit<SeedRow, 'firstName' | 'lastName' | 'phone' | 'email' | 'bvn' | 'nin' | 'address'>): SeedRow => {
+    const firstName = co.firstNames[idx % co.firstNames.length];
+    const lastName = co.lastNames[(idx * 3 + 1) % co.lastNames.length];
+    return {
+      firstName, lastName,
+      phone: seedPhone(co, idx),
+      email: `${firstName.toLowerCase()}.${lastName.toLowerCase()}@example.com`,
+      bvn: seedPrimaryId(co, idx),
+      nin: seedSecondaryId(co, idx),
+      address: seedAddr(co, idx),
+      ...over,
+    };
+  };
   const rows: SeedRow[] = [
-    { firstName: 'Amara', lastName: 'Okafor', phone: '08031234571', email: 'amara.okafor@example.com', bvn: '22212345671', nin: '10123456781', address: '14 Marina Rd, Lagos', source: 'rm', state: 'FULLY_ACTIVATED', account: true, agoMin: 2880 },
-    { firstName: 'Tunde', lastName: 'Adeyemi', phone: '08067654322', email: 'tunde.adeyemi@example.com', bvn: '22212345672', nin: '10123456782', address: '22 Ahmadu Bello Way, Abuja', channel: 'self', source: 'customer', state: 'ACCOUNT_CREATED', account: true, agoMin: 180 },
-    { firstName: 'Ngozi', lastName: 'Eze', phone: '07051239873', email: 'ngozi.eze@example.com', bvn: '22212345673', nin: '10123456783', address: '9 Aba Rd, Port Harcourt', source: 'branch', state: 'VALIDATED', agoMin: 22 },
-    { firstName: 'Chidi', lastName: 'Balogun', phone: '08039876544', email: 'chidi.balogun@example.com', bvn: '22212345674', nin: '10123456784', address: '5 Awolowo Way, Ikeja', source: 'rm', state: 'PENDING_LIVENESS', account: true, vals: { LIVENESS: 'pending' }, agoMin: 65 },
-    { firstName: 'Fatima', lastName: 'Bello', phone: '09012345675', email: 'fatima.bello@example.com', bvn: '22212345675', nin: '10123456785', address: '3 Ibrahim Rd, Kano', channel: 'bulk', source: 'rm', employer: 'NYSC', batchId: 'BATCH-001', state: 'PENDING_DOCUMENTS', account: true, agoMin: 1800 },
-    { firstName: 'Emeka', lastName: 'Nwosu', phone: '08023456786', email: 'emeka.nwosu@example.com', bvn: '22212345676', nin: '10123456786', address: '41 Chime Ave, Enugu', source: 'contact-centre', state: 'VALIDATION_IN_PROGRESS', vals: { NIN: 'running', BVN: 'passed', AML: 'running', PEP: 'pending', FRAUD: 'pending', LIVENESS: 'pending' }, agoMin: 4 },
-    { firstName: 'Aisha', lastName: 'Yusuf', phone: '08134567897', email: 'aisha.yusuf@example.com', bvn: '22212345677', nin: '10123456787', address: '7 Sultan Rd, Sokoto', source: 'rm', state: 'EXCEPTION', vals: { NIN: 'timeout', BVN: 'passed', AML: 'passed', PEP: 'passed', FRAUD: 'passed', LIVENESS: 'pending' }, agoMin: 35 },
-    { firstName: 'Blessing', lastName: 'Okoro', phone: '08098765438', email: 'blessing.okoro@example.com', bvn: '22212345678', nin: '10123456788', address: '12 Warri Rd, Delta', channel: 'bulk', source: 'rm', employer: 'Delta Co-op', batchId: 'BATCH-002', state: 'EXCEPTION', vals: { BVN: 'failed', NIN: 'passed', AML: 'passed', PEP: 'passed', FRAUD: 'passed', LIVENESS: 'pending' }, agoMin: 120 },
+    named(1, { source: 'rm', state: 'FULLY_ACTIVATED', account: true, agoMin: 2880 }),
+    named(2, { channel: 'self', source: 'customer', state: 'ACCOUNT_CREATED', account: true, agoMin: 180 }),
+    named(3, { source: 'branch', state: 'VALIDATED', agoMin: 22 }),
+    named(4, { source: 'rm', state: 'PENDING_LIVENESS', account: true, vals: { LIVENESS: 'pending' }, agoMin: 65 }),
+    named(5, { channel: 'bulk', source: 'rm', employer: emp1, batchId: 'BATCH-001', state: 'PENDING_DOCUMENTS', account: true, agoMin: 1800 }),
+    named(6, { source: 'contact-centre', state: 'VALIDATION_IN_PROGRESS', vals: { NIN: 'running', BVN: 'passed', AML: 'running', PEP: 'pending', FRAUD: 'pending', LIVENESS: 'pending' }, agoMin: 4 }),
+    named(7, { source: 'rm', state: 'EXCEPTION', vals: { NIN: 'timeout', BVN: 'passed', AML: 'passed', PEP: 'passed', FRAUD: 'passed', LIVENESS: 'pending' }, agoMin: 35 }),
+    named(8, { channel: 'bulk', source: 'rm', employer: emp2, batchId: 'BATCH-002', state: 'EXCEPTION', vals: { BVN: 'failed', NIN: 'passed', AML: 'passed', PEP: 'passed', FRAUD: 'passed', LIVENESS: 'pending' }, agoMin: 120 },
+    ),
     // The two named rows above anchor the demo narrative; these fill their
-    // batches out to a believable size — NYSC 10, Delta Co-op 20.
-    ...bulkRows('NYSC', 'BATCH-001', 9, 100, 1800),
-    ...bulkRows('Delta Co-op', 'BATCH-002', 19, 200, 120),
+    // batches out to a believable size — batch 1 → 10, batch 2 → 20.
+    ...bulkRows(co, emp1, 'BATCH-001', 9, 100, 1800),
+    ...bulkRows(co, emp2, 'BATCH-002', 19, 200, 120),
   ];
   rows.forEach((r) => { void seedCase(s, r); });
 }
@@ -284,10 +317,12 @@ async function seedCase(s: MockOnboardingStore, r: SeedRow) {
   // Kafka console shows a realistic multi-topic stream on load (create() already
   // logged 'account-opening-requested'). Best-effort, in rough chronological order.
   const nm = `${r.firstName} ${r.lastName}`;
+  const co = getActiveCountry();
+  const P = co.primaryId, Sc = co.secondaryId;   // primary=BVN slot, secondary=NIN slot
   const nin = validations.find((v) => v.kind === 'NIN')?.status;
   const bvn = validations.find((v) => v.kind === 'BVN')?.status;
-  if (nin && nin !== 'pending') await s.publish(c.id, 'nin-validation', nin === 'timeout' ? `NIN check timed out for ${nm}` : nin === 'passed' ? `NIN verified with NIMC for ${nm}` : `NIN check ${nin} for ${nm}`);
-  if (bvn && bvn !== 'pending') await s.publish(c.id, 'bvn-validation', bvn === 'failed' ? `BVN did not verify for ${nm}` : `BVN verified with NIBSS for ${nm}`);
+  if (nin && nin !== 'pending') await s.publish(c.id, 'nin-validation', nin === 'timeout' ? `${Sc.label} check timed out for ${nm}` : nin === 'passed' ? `${Sc.label} verified with ${Sc.authority} for ${nm}` : `${Sc.label} check ${nin} for ${nm}`);
+  if (bvn && bvn !== 'pending') await s.publish(c.id, 'bvn-validation', bvn === 'failed' ? `${P.label} did not verify for ${nm}` : `${P.label} verified with ${P.authority} for ${nm}`);
   if (r.channel === 'bulk') await s.publish(c.id, 'bulk-upload', `Row loaded from bulk batch ${r.batchId ?? ''}`.trim());
   if (r.state === 'EXCEPTION') await s.publish(c.id, 'exception-queue', `Routed to Operations for review — ${nm}`);
   if (BEYOND_VALIDATION.includes(r.state)) await s.publish(c.id, 'account-creation-requested', `Account creation requested in Finacle for ${nm}`);

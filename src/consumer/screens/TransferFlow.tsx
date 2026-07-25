@@ -3,7 +3,7 @@ import { C, FONT_HEAD, FONT_BODY } from '../theme';
 import Icon from '../icons';
 import { useNav, type ScreenRoute } from '../nav';
 import { Card } from '../components';
-import { depositAccounts, mpesa, recipients, money, fmt, type Account } from '../data';
+import { depositAccounts, mpesa, recipients, money, fmt, CURRENCY, type Account } from '../data';
 
 type Step = 'form' | 'review' | 'success';
 
@@ -106,7 +106,7 @@ export default function TransferFlow({ route }: { route: ScreenRoute }) {
               <FieldLabel>Amount</FieldLabel>
               <Card>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '16px 16px' }}>
-                  <span style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 22, color: C.textSoft }}>NGN</span>
+                  <span style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 22, color: C.textSoft }}>{CURRENCY}</span>
                   <input value={amount} onChange={(e) => setAmount(e.target.value.replace(/[^\d.]/g, ''))} inputMode="decimal" placeholder="0.00" style={{ flex: 1, border: 'none', outline: 'none', background: 'transparent', fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 28, color: C.text, minWidth: 0 }} />
                 </div>
               </Card>
@@ -125,7 +125,7 @@ export default function TransferFlow({ route }: { route: ScreenRoute }) {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ textAlign: 'center', padding: '8px 0 4px' }}>
               <div style={{ fontSize: 13, color: C.textSoft }}>You're sending</div>
-              <div style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 34, color: C.text, marginTop: 4 }}>NGN {fmt(amt)}</div>
+              <div style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 34, color: C.text, marginTop: 4 }}>{CURRENCY} {fmt(amt)}</div>
             </div>
             <Card>
               <ReviewRow label="From" value={from.name} sub={from.sub} />
@@ -144,7 +144,7 @@ export default function TransferFlow({ route }: { route: ScreenRoute }) {
             <span style={{ width: 76, height: 76, borderRadius: 999, background: 'rgba(31,157,87,0.12)', color: C.good, display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 16 }}>
               <Icon name="checkCircle" size={44} strokeWidth={1.8} />
             </span>
-            <div style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 22, color: C.text }}>NGN {fmt(amt)} sent</div>
+            <div style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 22, color: C.text }}>{CURRENCY} {fmt(amt)} sent</div>
             <div style={{ fontSize: 14, color: C.textSoft, marginTop: 4 }}>to {recipient ? recipient.name : to}</div>
             <Card style={{ width: '100%', marginTop: 22 }}>
               <ReviewRow label="From" value={from.name} />

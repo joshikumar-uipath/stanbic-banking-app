@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState } from 'react';
 import { store, mockCif, mockAccountNumber, type OnboardingCase, type ValidationKind, type ValidationStatus } from '../onboarding';
+import { getActiveCountry, kycLabel } from '../config/countries';
 import Apply, { type ApplyMode } from './Apply';
 import Status, { useCase } from './Status';
 import Kyc from './Kyc';
@@ -12,6 +13,8 @@ import { rememberMyApp } from './mine';
 import { Button, Note, Brand } from './ui';
 import Icon from './icons';
 import './customer.css';
+
+const CO = getActiveCountry();
 
 // ── Demo lifecycle simulator ────────────────────────────────────────────────
 // Stands in for the validation robots + Finacle creation so the Progress-First
@@ -25,7 +28,7 @@ async function setVals(id: string, patch: Partial<Record<ValidationKind, Validat
 export function simulate(id: string) {
   const timers: number[] = [];
   const at = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
-  at(1200, () => { void store.advance(id, 'VALIDATION_IN_PROGRESS', 'Validation started — NIN, BVN and screening running'); void setVals(id, { NIN: 'running', BVN: 'running' }); });
+  at(1200, () => { void store.advance(id, 'VALIDATION_IN_PROGRESS', `Validation started — ${kycLabel('NIN', CO)}, ${kycLabel('BVN', CO)} and screening running`); void setVals(id, { NIN: 'running', BVN: 'running' }); });
   at(3400, () => { void setVals(id, { BVN: 'passed', NIN: 'passed', AML: 'running', PEP: 'running', FRAUD: 'running' }); });
   at(5200, () => { void setVals(id, { AML: 'passed', PEP: 'passed', FRAUD: 'passed' }); void store.advance(id, 'VALIDATED', 'All mandatory validations passed'); });
   at(7000, () => { void store.update(id, { cif: mockCif(), accountNumber: mockAccountNumber() }); void store.advance(id, 'ACCOUNT_CREATED', 'Finacle CIF and account created'); });

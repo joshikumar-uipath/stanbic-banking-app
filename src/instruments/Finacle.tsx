@@ -10,6 +10,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { store, fullName, type OnboardingCase } from '../onboarding';
 import { InstrumentProvider, TopBar } from './shell';
 import { useBrandVars } from './brand';
+import { getActiveCountry, kycLabel as idLabel } from '../config/countries';
+
+const CO = getActiveCountry();
 
 // A case is in Finacle once it has an account number.
 const hasAccount = (c: OnboardingCase) => Boolean(c.accountNumber);
@@ -107,13 +110,13 @@ function FinacleInner() {
             <div className="acctcard">
               <div className="k">{acctType(open)} account</div>
               <div className="v num">{open.accountNumber}</div>
-              <div className="sub">Opening balance ₦0.00 · {isFull(open) ? 'Active' : 'Active, limited until KYC'}</div>
+              <div className="sub">Opening balance {CO.currency.symbol}0.00 · {isFull(open) ? 'Active' : 'Active, limited until KYC'}</div>
             </div>
 
             <div className="eyebrow">Customer</div>
             <dl>
-              <div><dt>BVN</dt><dd className="mono">{open.bvn || '—'}</dd></div>
-              <div><dt>NIN</dt><dd className="mono">{open.nin || '—'}</dd></div>
+              <div><dt>{idLabel('BVN', CO)}</dt><dd className="mono">{open.bvn || '—'}</dd></div>
+              <div><dt>{idLabel('NIN', CO)}</dt><dd className="mono">{open.nin || '—'}</dd></div>
               <div><dt>Phone</dt><dd>{open.phone || '—'}</dd></div>
               <div><dt>Email</dt><dd>{open.email || '—'}</dd></div>
               <div><dt>Address</dt><dd>{open.address || '—'}</dd></div>

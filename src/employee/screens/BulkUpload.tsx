@@ -10,6 +10,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { store, stateMeta, fullName, type OnboardingCase } from '../../onboarding';
 import { parseCsv, runBulk, SAMPLE_CSV, type BulkRow } from '../bulk';
 import { I, Tag, Dot, Stat, type Tone } from '../ui';
+import { getActiveCountry, kycLabel } from '../../config/countries';
+
+const CO = getActiveCountry();
 
 const TONE: Record<string, Tone> = { good: 'good', pending: 'warn', exception: 'crit', progress: 'info', neutral: 'idle' };
 
@@ -65,11 +68,11 @@ export default function BulkUpload({ onExit }: { onExit: () => void }) {
       <div className="dk-bulk-body">
         <label className="dk-field">
           <span>Employer / batch name</span>
-          <input value={employer} onChange={(e) => setEmployer(e.target.value)} placeholder="e.g. Ashaka Cement payroll" />
+          <input value={employer} onChange={(e) => setEmployer(e.target.value)} placeholder={`e.g. ${CO.companies[3] ?? CO.companies[0]} payroll`} />
         </label>
 
         <label className="dk-field">
-          <span>Rows (CSV: first name, last name, phone, email, BVN, NIN, address)</span>
+          <span>Rows (CSV: first name, last name, phone, email, {kycLabel('BVN', CO)}, {kycLabel('NIN', CO)}, address)</span>
           <textarea value={csv} onChange={(e) => setCsv(e.target.value)} placeholder="Paste rows here, upload a .csv, or load the sample…" spellCheck={false} />
         </label>
 
@@ -83,7 +86,7 @@ export default function BulkUpload({ onExit }: { onExit: () => void }) {
 
         {rows.length > 0 && (
           <div className="dk-rows" style={{ marginTop: 4 }}>
-            <div className="dk-cols" style={GRID}><span>Applicant</span><span>Phone</span><span>BVN</span><span>NIN</span></div>
+            <div className="dk-cols" style={GRID}><span>Applicant</span><span>Phone</span><span>{kycLabel('BVN', CO)}</span><span>{kycLabel('NIN', CO)}</span></div>
             {rows.slice(0, 8).map((r, i) => (
               <div key={i} className="dk-row" style={{ ...GRID, cursor: 'default' }}>
                 <span className="nm">{`${r.firstName} ${r.lastName}`.trim() || '—'}</span>

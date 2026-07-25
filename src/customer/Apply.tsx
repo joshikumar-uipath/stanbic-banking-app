@@ -6,8 +6,12 @@
 import { useState } from 'react';
 import { store, type OnboardingCase, type DuplicateOutcome } from '../onboarding';
 import { useConfig } from '../config';
+import { getActiveCountry } from '../config/countries';
 import { Button, Field, Note, Rail, KV, Brand } from './ui';
 import Icon from './icons';
+
+const CO = getActiveCountry();
+const P = CO.primaryId, Sc = CO.secondaryId;   // primary=BVN slot, secondary=NIN slot
 
 type Vals = { firstName: string; lastName: string; phone: string; email: string; bvn: string; nin: string; address: string };
 const EMPTY: Vals = { firstName: '', lastName: '', phone: '', email: '', bvn: '', nin: '', address: '' };
@@ -73,7 +77,7 @@ export default function Apply({ onBack, onDone, mode = 'self' }: { onBack: () =>
         {step === 0 && (
           <>
             <h1 className="cx-h1">{rm ? 'Customer details' : 'Let’s start with you'}</h1>
-            <p className="cx-p" style={{ marginBottom: 18 }}>{rm ? 'Enter their name exactly as it appears on their NIN.' : 'Use your name exactly as it appears on your NIN.'}</p>
+            <p className="cx-p" style={{ marginBottom: 18 }}>{rm ? `Enter their name exactly as it appears on their ${Sc.label}.` : `Use your name exactly as it appears on your ${Sc.label}.`}</p>
             <div className="cx-row">
               <Field label="First name" name="firstName" value={v.firstName} onChange={set('firstName')} autoComplete="given-name" />
               <Field label="Last name" name="lastName" value={v.lastName} onChange={set('lastName')} autoComplete="family-name" />
@@ -86,9 +90,9 @@ export default function Apply({ onBack, onDone, mode = 'self' }: { onBack: () =>
         {step === 1 && (
           <>
             <h1 className="cx-h1">{rm ? 'Identity' : 'Your identity'}</h1>
-            <p className="cx-p" style={{ marginBottom: 18 }}>{rm ? 'Verified with NIBSS and NIMC in the background — the account opens without waiting.' : 'We verify these with NIBSS and NIMC in the background. You won’t wait for it.'}</p>
-            <Field label="BVN" name="bvn" value={v.bvn} onChange={set('bvn')} inputMode="numeric" placeholder="22212345678" hint={rm ? 'Bank Verification Number — 11 digits.' : 'Dial *565*0# on your registered line to get your BVN.'} />
-            <Field label="NIN" name="nin" value={v.nin} onChange={set('nin')} inputMode="numeric" placeholder="10123456789" hint={rm ? 'National Identity Number — 11 digits.' : 'Your 11-digit National Identity Number.'} />
+            <p className="cx-p" style={{ marginBottom: 18 }}>{rm ? `Verified with ${P.authority} and ${Sc.authority} in the background — the account opens without waiting.` : `We verify these with ${P.authority} and ${Sc.authority} in the background. You won’t wait for it.`}</p>
+            <Field label={P.label} name="bvn" value={v.bvn} onChange={set('bvn')} inputMode="numeric" placeholder={`${P.numPrefix}12345678`} hint={rm ? `Verified with ${P.authority}.` : `Your ${P.label}, issued by ${P.authority}.`} />
+            <Field label={Sc.label} name="nin" value={v.nin} onChange={set('nin')} inputMode="numeric" placeholder={`${Sc.numPrefix}23456789`} hint={rm ? `Verified with ${Sc.authority}.` : `Your ${Sc.label}, issued by ${Sc.authority}.`} />
             {dup === 'existing' && (
               <Note tone="warn" icon="alert">
                 <b>These details match an existing customer.</b> In production this stops here — we never open a duplicate account.
@@ -106,7 +110,7 @@ export default function Apply({ onBack, onDone, mode = 'self' }: { onBack: () =>
           <>
             <h1 className="cx-h1">{rm ? 'Address' : 'Where do you live?'}</h1>
             <p className="cx-p" style={{ marginBottom: 18 }}>{rm ? 'Proof of address can follow later — it won’t hold up the account.' : 'You can send proof of address later — it won’t hold up your account.'}</p>
-            <Field label="Residential address" name="address" value={v.address} onChange={set('address')} placeholder="7 Sultan Rd, Sokoto" autoComplete="street-address" />
+            <Field label="Residential address" name="address" value={v.address} onChange={set('address')} placeholder={`7 ${CO.streets[0]}, ${CO.cities[0]}`} autoComplete="street-address" />
           </>
         )}
 
@@ -118,16 +122,16 @@ export default function Apply({ onBack, onDone, mode = 'self' }: { onBack: () =>
               <KV k="Name" v={`${v.firstName} ${v.lastName}`} />
               <KV k="Phone" v={digits(v.phone)} />
               <KV k="Email" v={v.email} />
-              <KV k="BVN" v={digits(v.bvn)} />
-              <KV k="NIN" v={digits(v.nin)} />
+              <KV k={P.label} v={digits(v.bvn)} />
+              <KV k={Sc.label} v={digits(v.nin)} />
               <KV k="Address" v={v.address} />
             </div>
             <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 16, cursor: 'pointer' }}>
               <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: 2, width: 18, height: 18, accentColor: '#0033A1' }} />
               <span style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--soft)' }}>
                 {rm
-                  ? `The customer confirms these details are theirs and consents to ${appName} verifying them with NIBSS, NIMC and screening partners.`
-                  : `I confirm these details are mine and consent to ${appName} verifying them with NIBSS, NIMC and screening partners.`}
+                  ? `The customer confirms these details are theirs and consents to ${appName} verifying them with ${P.authority}, ${Sc.authority} and screening partners.`
+                  : `I confirm these details are mine and consent to ${appName} verifying them with ${P.authority}, ${Sc.authority} and screening partners.`}
               </span>
             </label>
           </>

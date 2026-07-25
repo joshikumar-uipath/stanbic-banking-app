@@ -11,6 +11,9 @@
 // up on the customer's own tracker and in the event log immediately.
 // ─────────────────────────────────────────────────────────────────────────────
 import { store, mockCif, mockAccountNumber, type OnboardingCase, type ValidationKind, type ValidationStatus } from '../onboarding';
+import { getActiveCountry, kycLabel } from '../config/countries';
+
+const CO = getActiveCountry();
 
 export type NbaKind = 'do' | 'wait' | 'done';
 
@@ -31,8 +34,8 @@ export interface Nba {
 }
 
 const MANDATORY: ValidationKind[] = ['NIN', 'BVN', 'AML', 'PEP', 'FRAUD'];
-const label = (k: ValidationKind) => (k === 'NIN' ? 'NIN' : k === 'BVN' ? 'BVN' : k === 'AML' ? 'AML screening' : k === 'PEP' ? 'PEP screening' : k === 'FRAUD' ? 'fraud screening' : 'selfie check');
-const bureau = (k: ValidationKind) => (k === 'NIN' ? 'NIMC' : k === 'BVN' ? 'NIBSS' : 'the screening partner');
+const label = (k: ValidationKind) => (k === 'NIN' ? kycLabel('NIN', CO) : k === 'BVN' ? kycLabel('BVN', CO) : k === 'AML' ? 'AML screening' : k === 'PEP' ? 'PEP screening' : k === 'FRAUD' ? 'fraud screening' : 'selfie check');
+const bureau = (k: ValidationKind) => (k === 'NIN' ? CO.secondaryId.authority : k === 'BVN' ? CO.primaryId.authority : 'the screening partner');
 
 async function setVal(id: string, kind: ValidationKind, status: ValidationStatus, bumpAttempt = false) {
   const c = await store.get(id);

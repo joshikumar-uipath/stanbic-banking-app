@@ -11,6 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { ConfigProvider, useConfig, loadLocalConfig, stanbicConfig, applyFavicon } from '../config';
+import { getCountry } from '../config/countries';
 import './ops.css';
 
 function OpsInner() {
@@ -20,6 +21,7 @@ function OpsInner() {
   // a white-on-transparent variant would vanish against it (same rule as the desk).
   const logo = branding.logo || '';
   const { appName } = branding;
+  const country = getCountry(branding.country);
 
   useEffect(() => {
     document.title = `${appName} — Operations`;
@@ -27,11 +29,20 @@ function OpsInner() {
   }, [appName, branding.favicon, branding.deepBlue, branding.primaryColor]);
 
   // The console is its own document, so it can't read the config directly. Hand it
-  // the tenant logo instead of letting it ship a hard-coded asset — that way an
-  // admin logo change lands on this rail exactly as it does on the desk.
+  // the tenant logo and the active market instead of letting it ship hard-coded
+  // values — so an admin logo/country change lands on this rail exactly as it does
+  // on the desk. Country carries the KYC document labels + authorities (internal
+  // BVN slot = primary, NIN slot = secondary) so the console reads in local terms.
   const pushBrand = useCallback(() => {
-    frame.current?.contentWindow?.postMessage({ type: 'aof-brand', logo, appName }, window.location.origin);
-  }, [logo, appName]);
+    const w = frame.current?.contentWindow;
+    if (!w) return;
+    w.postMessage({ type: 'aof-brand', logo, appName }, window.location.origin);
+    w.postMessage({
+      type: 'aof-country', code: country.code,
+      pLabel: country.primaryId.label, pAuth: country.primaryId.authority,
+      sLabel: country.secondaryId.label, sAuth: country.secondaryId.authority,
+    }, window.location.origin);
+  }, [logo, appName, country]);
   useEffect(() => { pushBrand(); }, [pushBrand]);
 
   return (

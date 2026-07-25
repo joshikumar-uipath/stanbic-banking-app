@@ -25,6 +25,7 @@ export const defaultConfig: TenantConfig = {
     appName: 'Aura AI',
     tagline: 'Your AI assistant, at your fingertips',
     greeting: 'Hello',
+    country: 'NG',
     primaryColor: ORANGE,
     secondaryColor: TEAL,
     accentColor: TEAL,
@@ -448,4 +449,19 @@ export const defaultConfig: TenantConfig = {
   // Empty by default — Aura uses its bundled TRANSLATIONS until an admin
   // adds language-specific overrides here. Shape: `{ [lang]: { [key]: value } }`.
   strings: {},
+
+  // ── Operations ───────────────────────────────────────────────────────
+  // The account-opening factory's operating parameters. The control tower reads
+  // stpTarget; the rest describe how exceptions age, retry and route.
+  operations: {
+    stpTarget: 80,
+    slaMinutes: 240,
+    retryBackoffMins: [5, 15, 30, 60],
+    routing: [
+      { cause: 'Identity check failed', queue: 'Exceptions', assignTo: '' },
+      { cause: 'Gateway timeout', queue: 'Retry queue', assignTo: '' },
+      { cause: 'Liveness below threshold', queue: 'Manual review', assignTo: '' },
+      { cause: 'Documents outstanding', queue: 'Customer chaser', assignTo: '' },
+    ],
+  },
 };

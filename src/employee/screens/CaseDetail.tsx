@@ -16,11 +16,13 @@ import Kyc from '../../customer/Kyc';
 import { nextBestActions, type Nba } from '../nba';
 import { I, Tag, type Tone } from '../ui';
 import { ago } from '../time';
+import { getActiveCountry, kycLabel, kycLabelAuthority } from '../../config/countries';
 
+const CO = getActiveCountry();
 const TONE: Record<string, Tone> = { good: 'good', pending: 'warn', exception: 'crit', progress: 'info', neutral: 'idle' };
 
 const CHECK_LABEL: Record<ValidationKind, string> = {
-  NIN: 'NIN — NIMC', BVN: 'BVN — NIBSS', AML: 'AML screening',
+  NIN: kycLabelAuthority('NIN', ' — ', CO), BVN: kycLabelAuthority('BVN', ' — ', CO), AML: 'AML screening',
   PEP: 'PEP screening', FRAUD: 'Fraud screening', LIVENESS: 'Selfie check',
 };
 const CHECK_TONE: Record<string, Tone> = {
@@ -31,8 +33,8 @@ const CHECK_TONE: Record<string, Tone> = {
 // journey rather than a log of raw topic strings.
 const TOPIC_META: Record<string, { label: string; color: string }> = {
   'account-opening-requested': { label: 'Application', color: '#0091DA' },
-  'nin-validation': { label: 'NIN check', color: '#7C6CF0' },
-  'bvn-validation': { label: 'BVN check', color: '#2EA8C0' },
+  'nin-validation': { label: `${kycLabel('NIN', CO)} check`, color: '#7C6CF0' },
+  'bvn-validation': { label: `${kycLabel('BVN', CO)} check`, color: '#2EA8C0' },
   'account-creation-requested': { label: 'Account requested', color: '#D97706' },
   'account-created': { label: 'Account created', color: '#16A34A' },
   'bulk-upload': { label: 'Bulk', color: '#C8A24A' },
@@ -150,8 +152,8 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
             <div className="dk-kv">
               {c.phone && <div><span>Phone</span><a className="num" href={`tel:${c.phone}`}>{c.phone}</a></div>}
               {c.email && <div><span>Email</span><a href={`mailto:${c.email}`}>{c.email}</a></div>}
-              {c.bvn && <div><span>BVN</span><b className="num">{c.bvn}</b></div>}
-              {c.nin && <div><span>NIN</span><b className="num">{c.nin}</b></div>}
+              {c.bvn && <div><span>{kycLabel('BVN', CO)}</span><b className="num">{c.bvn}</b></div>}
+              {c.nin && <div><span>{kycLabel('NIN', CO)}</span><b className="num">{c.nin}</b></div>}
             </div>
           </div>
         )}

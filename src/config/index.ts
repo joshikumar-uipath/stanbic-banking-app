@@ -42,4 +42,6 @@ export type {
   DemoContent,
   NotificationsConfig,
   FeatureFlags,
+  OperationsConfig,
+  RoutingRule,
 } from './types';

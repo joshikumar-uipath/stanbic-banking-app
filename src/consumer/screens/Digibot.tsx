@@ -6,7 +6,7 @@ import { C, FONT_HEAD, FONT_BODY } from '../theme';
 import Icon from '../icons';
 import { useNav } from '../nav';
 import { useConfig } from '../../config';
-import { customer, depositAccounts, cards, mpesa, money } from '../data';
+import { customer, depositAccounts, cards, mpesa, money, supportPhone } from '../data';
 
 interface Action { label: string; do: string } // do: an intent, or "nav:<kind>[:<param>]"
 interface Block {
@@ -40,7 +40,7 @@ function respond(intent: string): Block[] {
         { label: 'To my own account', do: 'nav:transfer:ownaccount' },
       ] }];
     case 'paybill':
-      return [{ text: 'I can help you pay a bill (KPLC, water, TV, school fees and more).', replies: [{ label: 'Pay a bill now', do: 'nav:transfer:paybill' }] }];
+      return [{ text: 'I can help you pay a bill (electricity, water, TV, school fees and more).', replies: [{ label: 'Pay a bill now', do: 'nav:transfer:paybill' }] }];
     case 'replace':
       return [{
         text: 'Lost or stolen card? I can block it immediately and order a replacement. Which would you like to do?',
@@ -69,13 +69,13 @@ function respond(intent: string): Block[] {
         faqs: ['What are the current loan rates?', 'How is my loan limit calculated?', 'How do I repay early?'],
       }];
     case 'fuliza':
-      return [{ text: 'Overdraft lets you complete Mobile Wallet payments even with insufficient funds. Your available limit is NGN 8,800 and it auto-repays from your next deposit.', feedback: true, replies: [{ label: 'Back to menu', do: 'menu' }] }];
+      return [{ text: `Overdraft lets you complete Mobile Wallet payments even with insufficient funds. Your available limit is ${money(8800, 0)} and it auto-repays from your next deposit.`, feedback: true, replies: [{ label: 'Back to menu', do: 'menu' }] }];
     case 'applyloan':
       return [{ text: 'Great — loan applications are handled in the Apply section. I can take you there.', replies: [{ label: 'Open Apply', do: 'nav:more' }, { label: 'Back to menu', do: 'menu' }] }];
     case 'statement':
       return [{ text: 'Your May 2026 eStatement is ready, and your recent transactions are up to date.', replies: [{ label: 'View transactions', do: 'nav:transactions' }] }];
     case 'support':
-      return [{ text: 'Our contact centre is available 24/7:\n📞 +234 802 336 1244\n✉️ contact@ncba.co.ke', replies: [{ label: 'Back to menu', do: 'menu' }] }];
+      return [{ text: `Our contact centre is available 24/7:\n📞 ${supportPhone}\n💬 Live chat right here in the app`, replies: [{ label: 'Back to menu', do: 'menu' }] }];
     case 'menu':
       return [{ text: 'What else can I help you with?', replies: SUGGESTIONS }];
     default:

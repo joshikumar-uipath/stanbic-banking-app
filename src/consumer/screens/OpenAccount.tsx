@@ -9,10 +9,12 @@ import Icon from '../icons';
 import { useNav } from '../nav';
 import { store, fullName, stateMeta, type OnboardingCase } from '../../onboarding';
 import { myAppIds } from '../../customer/mine';
+import { getActiveCountry, kycLabel } from '../../config/countries';
 
+const CO = getActiveCountry();
 const PERKS = [
   { icon: 'check', b: 'Open in about five minutes', s: 'Your account opens while checks run in the background' },
-  { icon: 'shield', b: 'Verified with NIMC & NIBSS', s: 'We confirm your NIN and BVN at source' },
+  { icon: 'shield', b: `Verified with ${CO.secondaryId.authority} & ${CO.primaryId.authority}`, s: `We confirm your ${kycLabel('NIN', CO)} and ${kycLabel('BVN', CO)} at source` },
   { icon: 'face', b: 'Finish KYC whenever', s: 'Send documents and your selfie later, from a link' },
 ];
 
@@ -55,7 +57,7 @@ export default function OpenAccount() {
             A bank account in about five minutes.
           </h1>
           <p style={{ fontSize: 13.5, lineHeight: 1.5, color: 'rgba(255,255,255,0.86)', maxWidth: '34ch' }}>
-            Start with your BVN and NIN. We verify everything in the background — you never wait on a queue.
+            Start with your {kycLabel('BVN', CO)} and {kycLabel('NIN', CO)}. We verify everything in the background — you never wait on a queue.
           </p>
         </div>
       </div>
@@ -84,7 +86,7 @@ export default function OpenAccount() {
         <Icon name="plus" size={19} strokeWidth={2.4} />Open an account
       </button>
       <p style={{ fontSize: 11.5, color: C.textFaint, textAlign: 'center', marginTop: 10 }}>
-        Takes about 5 minutes · You&rsquo;ll need your BVN and NIN
+        Takes about 5 minutes · You&rsquo;ll need your {kycLabel('BVN', CO)} and {kycLabel('NIN', CO)}
       </p>
 
       {/* In-flight applications */}

@@ -7,6 +7,9 @@
 // fraction hit an exception — which then appears in Operations, at scale.
 // ─────────────────────────────────────────────────────────────────────────────
 import { store, mockCif, mockAccountNumber, type ValidationKind, type ValidationStatus } from '../onboarding';
+import { getActiveCountry, kycLabel } from '../config/countries';
+
+const CO = getActiveCountry();
 
 export interface BulkRow {
   firstName: string; lastName: string; phone: string; email: string;
@@ -41,11 +44,11 @@ async function setVals(id: string, patch: Partial<Record<ValidationKind, Validat
 // Drive one row's lifecycle, offset by `base` ms so the batch processes as a wave.
 function processRow(id: string, fail: boolean, base: number) {
   const at = (ms: number, fn: () => void) => window.setTimeout(fn, base + ms);
-  at(700, () => { void store.advance(id, 'VALIDATION_IN_PROGRESS', 'Validation started — NIN, BVN and screening running'); void setVals(id, { NIN: 'running', BVN: 'running' }); });
+  at(700, () => { void store.advance(id, 'VALIDATION_IN_PROGRESS', `Validation started — ${kycLabel('NIN', CO)}, ${kycLabel('BVN', CO)} and screening running`); void setVals(id, { NIN: 'running', BVN: 'running' }); });
   if (fail) {
     at(2600, () => {
       void setVals(id, { NIN: 'passed', BVN: 'failed' });
-      void store.advance(id, 'EXCEPTION', 'BVN did not verify with NIBSS — routed to Operations');
+      void store.advance(id, 'EXCEPTION', `${CO.primaryId.label} did not verify with ${CO.primaryId.authority} — routed to Operations`);
       void store.publish(id, 'exception-queue', 'Bulk row routed to Operations for review');
     });
   } else {
@@ -79,17 +82,20 @@ export async function runBulk(rows: BulkRow[], employer: string, batchId: string
   return ids;
 }
 
-/** A realistic sample payroll so a demo needs no file to hand. */
-export const SAMPLE_CSV = `First name,Last name,Phone,Email,BVN,NIN,Address
-Ibrahim,Musa,08030001001,ibrahim.musa@ashaka.com,22200010001,10100010001,12 Ring Rd, Gombe
-Amina,Sule,08030001002,amina.sule@ashaka.com,22200010002,10100010002,4 Biu Rd, Gombe
-Emeka,Obi,08030001003,emeka.obi@ashaka.com,22200010003,10100010003,7 Ashaka Ave, Gombe
-Ngozi,Umeh,08030001004,ngozi.umeh@ashaka.com,22200010004,10100010004,9 Cement Rd, Gombe
-Yakubu,Bello,08030001005,yakubu.bello@ashaka.com,22200010005,10100010005,2 Plant Rd, Gombe
-Funke,Ade,08030001006,funke.ade@ashaka.com,22200010006,10100010006,15 Staff Qtrs, Gombe
-Sadiq,Idris,08030001007,sadiq.idris@ashaka.com,22200010007,10100010007,3 Kiln St, Gombe
-Chioma,Nwankwo,08030001008,chioma.nwankwo@ashaka.com,22200010008,10100010008,6 Quarry Rd, Gombe
-Tunde,Balogun,08030001009,tunde.balogun@ashaka.com,22200010009,10100010009,1 Loader Ave, Gombe
-Halima,Yusuf,08030001010,halima.yusuf@ashaka.com,22200010010,10100010010,8 Depot Rd, Gombe
-Peter,Okon,08030001011,peter.okon@ashaka.com,22200010011,10100010011,5 Mill Rd, Gombe
-Grace,Effiong,08030001012,grace.effiong@ashaka.com,22200010012,10100010012,10 Silo St, Gombe`;
+/** A realistic sample payroll for the active market, so a demo needs no file to hand. */
+function buildSampleCsv(): string {
+  const co = CO;
+  const header = `First name,Last name,Phone,Email,${co.primaryId.label},${co.secondaryId.label},Address`;
+  const lines = Array.from({ length: 12 }, (_, i) => {
+    const f = co.firstNames[i % co.firstNames.length];
+    const l = co.lastNames[(i * 7 + 3) % co.lastNames.length];
+    const phone = `${co.phoneTrunk}${String(3000001 + i).slice(-7)}`;
+    const email = `${f.toLowerCase()}.${l.toLowerCase()}@payroll.example`;
+    const pid = `${co.primaryId.numPrefix}${String(10000001 + i).slice(-8)}`;
+    const sid = `${co.secondaryId.numPrefix}${String(20000001 + i).slice(-8)}`;
+    const addr = `${i + 1} ${co.streets[i % co.streets.length]}, ${co.cities[i % co.cities.length]}`;
+    return `${f},${l},${phone},${email},${pid},${sid},${addr}`;
+  });
+  return [header, ...lines].join('\n');
+}
+export const SAMPLE_CSV = buildSampleCsv();

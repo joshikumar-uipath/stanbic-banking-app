@@ -4,7 +4,7 @@ import Icon from '../icons';
 import { Card, Pill, Tag, RiskMeter, Amount, ScreenTitle, ChipTabs } from '../components';
 import {
   wealthProducts, investmentSummary, coverageNeeds, retirement, cashflow,
-  transactions, money,
+  transactions, money, CURRENCY, advisor,
 } from '../data';
 
 type WTab = 'invest' | 'protect' | 'retire' | 'cashflow';
@@ -122,10 +122,10 @@ function Invest() {
           <div style={{ fontWeight: 700, fontSize: 14.5, color: C.text }}>Questions about investing?</div>
           <div style={{ fontSize: 13, color: C.textSoft, marginTop: 2 }}>Speak to your Relationship Manager.</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 14 }}>
-            <span style={{ width: 44, height: 44, borderRadius: 999, background: `rgba(${C.brandRgb},0.12)`, color: C.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>MK</span>
+            <span style={{ width: 44, height: 44, borderRadius: 999, background: `rgba(${C.brandRgb},0.12)`, color: C.brand, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{advisor.initials}</span>
             <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>Mwangi Kariuki</div>
-              <div style={{ fontSize: 12, color: C.textSoft }}>+234 802 118 7420</div>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{advisor.name}</div>
+              <div style={{ fontSize: 12, color: C.textSoft }}>{advisor.phone}</div>
             </div>
             <OutlineBtn>Call</OutlineBtn>
           </div>
@@ -176,9 +176,9 @@ function Protect() {
       <SectionTitle>Your policy payouts</SectionTitle>
       <Card>
         <div style={{ padding: 16 }}>
-          <Timeline color={C.brand} title="Education endowment" value="NGN 2,000,000" />
+          <Timeline color={C.brand} title="Education endowment" value={`${CURRENCY} 2,000,000`} />
           <div style={{ height: 14 }} />
-          <Timeline color="#e0a500" title="Income stream" value="NGN 50,000 / month for 10 years" />
+          <Timeline color="#e0a500" title="Income stream" value={`${CURRENCY} 50,000 / month for 10 years`} />
         </div>
       </Card>
     </>
@@ -215,7 +215,7 @@ function Retire() {
       <Card style={{ background: `rgba(${C.brandRgb},0.06)`, border: `1px solid rgba(${C.brandRgb},0.18)` }}>
         <div style={{ padding: 16 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}><Icon name="wealth" size={18} color={C.brand} /><span style={{ fontWeight: 700, fontSize: 14, color: C.brand }}>Boost your retirement</span></div>
-          <div style={{ fontSize: 13, color: C.textSoft, lineHeight: 1.5, margin: '6px 0 12px' }}>Top up your Stanbic IBTC Pension Plan and enjoy tax relief on contributions up to NGN 240,000 a year.</div>
+          <div style={{ fontSize: 13, color: C.textSoft, lineHeight: 1.5, margin: '6px 0 12px' }}>Top up your Pension Plan and enjoy tax relief on contributions up to {CURRENCY} 240,000 a year.</div>
           <FilledBtn>Top up pension</FilledBtn>
         </div>
       </Card>

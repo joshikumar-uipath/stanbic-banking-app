@@ -36,6 +36,11 @@ export function migrate(raw: unknown): TenantConfig {
   if (cfg && cfg.branding) {
     cfg.branding = { ...defaultConfig.branding, ...cfg.branding };
   }
+  // Backfill whole sections added after a config was saved (e.g. operations),
+  // so older saved/local configs keep working without a schema bump.
+  if (cfg && !cfg.operations) {
+    cfg.operations = defaultConfig.operations;
+  }
 
   // We don't validate the shape at runtime in Phase 0; once Zod arrives in
   // Phase 2 (Data Service loader), this is where parse() goes.

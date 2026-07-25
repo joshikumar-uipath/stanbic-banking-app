@@ -12,9 +12,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { store, fullName, type OnboardingCase } from '../onboarding';
+import { getActiveCountry, kycLabel } from '../config/countries';
 import { Button, Note, Brand } from './ui';
 import Icon from './icons';
 import { FACE_ID_URL, useFaceIdComplete } from './faceid';
+
+const CO = getActiveCountry();
 
 type Stage = 'intro' | 'docs' | 'liveness' | 'signature' | 'done';
 
@@ -82,7 +85,7 @@ export default function Kyc({ c, onExit }: { c: OnboardingCase; onExit: () => vo
             <h1 className="cx-h1">Your documents</h1>
             <p className="cx-p" style={{ marginBottom: 16 }}>Photos are fine — just make sure all four corners are visible.</p>
             {[
-              { k: 'id', ic: 'id', b: 'Means of identification', s: "NIN slip, driver's licence or passport" },
+              { k: 'id', ic: 'id', b: 'Means of identification', s: `${kycLabel('NIN', CO)}, driver's licence or passport` },
               { k: 'address', ic: 'home', b: 'Proof of address', s: 'A utility bill from the last 90 days' },
             ].map((d) => (
               <button key={d.k} className={`cx-drop ${docs[d.k] ? 'done' : ''}`} onClick={() => setDocs((p) => ({ ...p, [d.k]: true }))}>
