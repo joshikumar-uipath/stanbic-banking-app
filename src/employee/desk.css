@@ -281,7 +281,10 @@
 .dk-bulk-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--d-line-2); flex: 0 0 auto; }
 .dk-bulk-head h2 { font-size: 16px; font-weight: 700; letter-spacing: -.01em; }
 .dk-bulk-head .sub { font-size: 12.5px; color: var(--d-ink-2); margin-top: 3px; max-width: 46ch; }
-.dk-bulk-body { flex: 1; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+.dk-bulk-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 14px; }
+/* Children must keep their natural height — otherwise the flex column compresses a
+   tall table (extraction / results) to fit and the body never scrolls. */
+.dk-bulk-body > * { flex-shrink: 0; }
 .dk-field { display: block; }
 .dk-field > span { display: block; font-size: 12px; font-weight: 600; color: var(--d-ink-2); margin-bottom: 6px; }
 .dk-field input, .dk-field textarea { width: 100%; border: 1px solid var(--d-line-2); border-radius: 9px; background: #fff; font: inherit; font-size: 13px; color: var(--d-ink); padding: 9px 11px; outline: none; }
@@ -295,6 +298,22 @@
 .dk-bulk-bar { height: 8px; border-radius: 999px; background: var(--d-wash); overflow: hidden; }
 .dk-bulk-bar i { display: block; height: 100%; border-radius: 999px; transition: width .4s ease; }
 .dk-bulk-status { font-size: 12.5px; color: var(--d-ink-2); margin-top: 2px; }
+
+/* ── Bulk mode toggle (CSV vs ZIP) ── */
+.dk-bseg { display: inline-flex; padding: 3px; gap: 3px; background: var(--d-wash); border: 1px solid var(--d-line-2); border-radius: 10px; }
+.dk-bseg button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border: 0; background: transparent; border-radius: 7px; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--d-ink-2); cursor: pointer; }
+.dk-bseg button.on { background: #fff; color: var(--d-ink); box-shadow: 0 1px 2px rgba(16,24,40,.08); }
+
+/* ── IXP extraction ── */
+.dk-ixp-scan { display: flex; align-items: center; gap: 9px; padding: 12px 14px; border: 1px solid var(--d-line-2); border-radius: 10px; background: var(--d-wash); font-size: 12.5px; color: var(--d-ink-2); }
+.dk-ixp-scan .spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--d-line-2); border-top-color: var(--d-brand); animation: dkspin .7s linear infinite; }
+@keyframes dkspin { to { transform: rotate(360deg); } }
+.dk-ixp-note { font-size: 12.5px; color: var(--d-ink-2); }
+.dk-ixp-note b { color: var(--d-ink); }
+.dk-docchips { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+.dk-docchip { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
+.dk-docchip.ok { background: color-mix(in srgb, var(--d-good, #12805c) 12%, #fff); color: var(--d-good, #12805c); border-color: color-mix(in srgb, var(--d-good, #12805c) 26%, #fff); }
+.dk-docchip.miss { background: var(--d-wash); color: var(--d-ink-3); border-color: var(--d-line-2); text-decoration: line-through; text-decoration-color: color-mix(in srgb, var(--d-ink-3) 55%, transparent); }
 
 /* ── Case detail (the desk's right pane) ── */
 .dk-case { position: relative; height: 100%; display: flex; flex-direction: column; background: #fff; min-height: 0; }
