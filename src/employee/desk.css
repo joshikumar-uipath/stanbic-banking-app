@@ -73,10 +73,6 @@
    every logo is guaranteed to have been designed against. A logo carrying its
    own plate simply reads as a card on it, exactly as it does on the phone. */
 .dk-logo { display: flex; align-items: center; gap: 10px; padding: 0 18px; height: var(--d-bar); flex: 0 0 auto; }
-/* A white plate behind the tenant logo: most brand marks are drawn for light
-   backgrounds, so on the navy rail they'd otherwise disappear. */
-.dk-plate { display: inline-flex; align-items: center; background: #fff; border-radius: 9px; padding: 7px 10px; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
-.dk-wordmark { max-height: 26px; max-width: 152px; object-fit: contain; object-position: left center; display: block; }
 /* Square brand mark on a white chip so it reads against the navy rail, whether
    it's the generated navy-initial mark or an uploaded transparent icon. */
 .dk-mark { width: 30px; height: 30px; border-radius: 8px; background: #fff; flex: 0 0 auto; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,.25); }

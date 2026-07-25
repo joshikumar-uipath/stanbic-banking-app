@@ -82,12 +82,8 @@ export default function DeskShell({ userName, userEmail, unreadAlerts = 0, onLog
     <div className="dk">
       <nav className="dk-side" aria-label="Main">
         <div className="dk-logo">
-          {branding.logo
-            ? <span className="dk-plate"><img className="dk-wordmark" src={branding.logo} alt={branding.appName} /></span>
-            : <>
-                <span className="dk-mark"><img src={mark} alt="" /></span>
-                <span className="wm"><b>{branding.appName}</b><em>Employee</em></span>
-              </>}
+          <span className="dk-mark"><img src={mark} alt="" /></span>
+          <span className="wm"><b>{branding.appName}</b><em>Employee</em></span>
         </div>
 
         {/* Who am I, and what else could I be? The desk and the Operations
