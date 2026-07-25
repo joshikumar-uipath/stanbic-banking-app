@@ -500,12 +500,18 @@
       <div class="up" id="upstream"></div>
 
       <h2>TOOLS</h2>
-      <!-- The FaceID Verify Console: the system of record behind the Liveness row
-           above. A separate product with its own screens, so it opens in its own
-           tab rather than being framed inside this one. target="_blank" is enough
-           from here — unlike the role links, a new tab escapes the /ops iframe by
-           definition. rel=noopener: never hand another origin a handle to us. -->
-      <a class="nav" href="https://mea.staging.uipath.host/faceid-verify-console" target="_blank" rel="noopener noreferrer">
+      <!-- FaceID Verify — the system of record behind the Liveness row above. Two
+           faces, both now native to this app and branded off the admin config: the
+           KIOSK (/faceid-kiosk) is the walk-up live-camera capture, and the CONSOLE
+           (/faceid) is the admin board reading the SAME cases as this Ops board.
+           Both open in their own tab; a new tab escapes the /ops iframe by
+           definition. rel=noopener always. -->
+      <a class="nav" href="/faceid-kiosk" target="_blank" rel="noopener noreferrer">
+        <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
+        FaceID kiosk
+        <span class="ext" aria-label="opens in a new tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-8 8"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></span>
+      </a>
+      <a class="nav" href="/faceid" target="_blank" rel="noopener noreferrer">
         <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="11" r="2.5"/><path d="M8 16a4 4 0 0 1 8 0"/></svg></span>
         FaceID console
         <span class="ext" aria-label="opens in a new tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-8 8"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></span>
@@ -545,6 +551,15 @@
 
 <script>
 const AVA = ["#0033A1", "#3B6FB6", "#0A2240", "#0060A9", "#0091DA", "#5A82C2", "#334E7B"];
+
+// Active market — the parent SPA posts the real values (see the aof-country
+// bridge below); these Nigeria defaults keep the console working standalone.
+// pLabel/pAuth = the internal BVN slot (primary identity); sLabel/sAuth = the NIN
+// slot (secondary). The hand-authored seed cases are Nigerian narratives, so they
+// only show when the market IS Nigeria — every other market shows the (already
+// country-correct) live cases from the shared store instead.
+var CTRY = { code: "NG", pLabel: "BVN", pAuth: "NIBSS", sLabel: "NIN", sAuth: "NIMC" };
+
 const CHECK_META = [
   { key: "nin", label: "NIN verification" },
   { key: "bvn", label: "BVN match" },
@@ -829,9 +844,9 @@ function mapStoreCase(c) {
     const t = new Date(e.at); const hh = String(t.getHours()).padStart(2, "0"), mm = String(t.getMinutes()).padStart(2, "0");
     return [hh + ":" + mm, e.message];
   });
-  const reason = cause === "nimc_timeout" ? "NIN check timed out at the gateway"
-    : cause === "name_mismatch" ? "NIN did not match NIMC"
-    : cause === "bvn_check" ? "BVN did not verify with NIBSS"
+  const reason = cause === "nimc_timeout" ? CTRY.sLabel + " check timed out at the gateway"
+    : cause === "name_mismatch" ? CTRY.sLabel + " did not match " + CTRY.sAuth
+    : cause === "bvn_check" ? CTRY.pLabel + " did not verify with " + CTRY.pAuth
     : cause === "liveness_low" ? "Liveness below threshold"
     : cause === "doc_stale" ? "Proof of address outstanding"
     : cause ? "Captured on the desk, needs review" : (STATE_META[st] ? STATE_META[st].label : st);
@@ -850,7 +865,7 @@ function mapStoreCase(c) {
       detail: "Captured on the branch desk" + (failed.length ? " · " + failed.map(function (v) { return v.kind; }).join(", ") + " did not pass" : "") + ". Live from the shared store." } : null,
     factors: [[reason, st === "exception" ? 25 : 5]],
     trail: trail.length ? trail : [["—", "Captured on the branch desk"]],
-    fields: [["Phone", c.phone || "—"], ["Email", c.email || "—"], ["BVN", c.bvn || "—"], ["NIN", c.nin || "—"], ["Address", c.address || "—"], ["Source", c.source || "—"]],
+    fields: [["Phone", c.phone || "—"], ["Email", c.email || "—"], [CTRY.pLabel, c.bvn || "—"], [CTRY.sLabel, c.nin || "—"], ["Address", c.address || "—"], ["Source", c.source || "—"]],
     primary: cause === "bvn_check" ? "Retry the BVN check" : cause === "nimc_timeout" ? "Retry the NIN check" : cause === "liveness_low" ? "Request a new selfie" : "Accept and continue",
     alt: "Escalate to a supervisor",
     block: "Resolving here writes back to the customer's application.",
@@ -867,9 +882,12 @@ function syncFromStore() {
     const m = mapStoreCase(c);
     if (m.st === "exception") liveCases.push(m); else liveDone.push(m);
   });
-  // Seeded cases the store doesn't own and the analyst hasn't cleared.
-  const seededCases = SEED_CASES.filter(function (c) { return !storeIds.has(c.id) && !resolvedSeedIds.has(c.id); });
-  const seededDone = SEED_DONE.filter(function (c) { return !storeIds.has(c.id); });
+  // Seeded cases the store doesn't own and the analyst hasn't cleared. The seeds
+  // are hand-authored Nigerian narratives, so they only join the pool for the NG
+  // market; other markets run purely on the (country-correct) live store cases.
+  const useSeeds = CTRY.code === "NG";
+  const seededCases = useSeeds ? SEED_CASES.filter(function (c) { return !storeIds.has(c.id) && !resolvedSeedIds.has(c.id); }) : [];
+  const seededDone = useSeeds ? SEED_DONE.filter(function (c) { return !storeIds.has(c.id); }) : [];
   CASES = liveCases.concat(seededCases);
   DONE = liveDone.concat(seededDone);
 }
@@ -961,8 +979,8 @@ function upstream() {
   const bvnBad = CASES.some(function (c) { return c.checks.bvn !== "pass"; });
   const created = DONE.filter(function (c) { return c.step >= 3; }).sort(function (a, b) { return a.age - b.age; })[0];
   return [
-    { n: "NIMC", tone: ninDown ? "#f0b429" : "#3fbf7f", s: ninDown && recovery ? "recovered " + recovery[0] : ninDown ? "degraded" : "healthy" },
-    { n: "NIBSS", tone: bvnBad ? "#dc2626" : "#3fbf7f", s: bvnBad ? "degraded" : "healthy" },
+    { n: CTRY.sAuth, tone: ninDown ? "#f0b429" : "#3fbf7f", s: ninDown && recovery ? "recovered " + recovery[0] : ninDown ? "degraded" : "healthy" },
+    { n: CTRY.pAuth, tone: bvnBad ? "#dc2626" : "#3fbf7f", s: bvnBad ? "degraded" : "healthy" },
     { n: "Liveness", tone: "#3fbf7f", s: "healthy" },
     { n: "Finacle", tone: created ? "#3fbf7f" : "#5f7ab5", s: created ? "last create " + fmtAge(created.age) : "no calls yet" }
   ];
@@ -1482,14 +1500,45 @@ window.addEventListener("storage", function (e) {
 // The /ops wrapper owns the tenant config; it posts the branding in so this rail
 // follows an admin logo change instead of shipping a hard-coded asset. Falls back
 // to the bundled Stanbic mark in the markup when opened standalone.
+// Re-label everything that names the KYC identity documents / authorities to the
+// active market. Only the KYC tokens move; the hand-authored timings and copy stay.
+function applyCountry(c) {
+  CTRY = { code: c.code || "NG", pLabel: c.pLabel || "BVN", pAuth: c.pAuth || "NIBSS", sLabel: c.sLabel || "NIN", sAuth: c.sAuth || "NIMC" };
+  var pL = CTRY.pLabel, pA = CTRY.pAuth, sL = CTRY.sLabel, sA = CTRY.sAuth;
+  CHECK_META[0].label = sL + " verification";
+  CHECK_META[1].label = pL + " match";
+  CAUSES.nimc_timeout.title = sA + " gateway timeout";
+  CAUSES.nimc_timeout.detail = "stalled at the " + sL + " check between 14:02 and 14:20. The gateway recovered at 14:31.";
+  CAUSES.nimc_timeout.bulk = "Retry " + sL + " check on all";
+  CAUSES.name_mismatch.title = sL + " name mismatch";
+  CAUSES.name_mismatch.detail = "where the name on the form differs from " + sA + " by one or two characters.";
+  CAUSES.bvn_check.title = pL + " did not verify";
+  CAUSES.bvn_check.detail = "where " + pA + " returned no match on the " + pL + ". Usually a mistyped number.";
+  CAUSES.bvn_check.bulk = "Retry " + pL + " check on all";
+  CAUSES.bulk_partial.detail = "with 12 of 180 rows stuck behind the same " + sA + " window. The other 168 are already live.";
+  STAGES[0].k = sL;   // NIN slot → secondary document label
+  STAGES[1].k = pL;   // BVN slot → primary document label
+  // The rule-promotion story (an analyst + the 47 NIMC name-mismatch decisions) is
+  // a hand-authored Nigerian narrative — hide it outside Nigeria, like the seeds.
+  if (CTRY.code !== "NG") PROMO.shown = false;
+}
+
 window.addEventListener("message", function (e) {
   if (e.origin !== window.location.origin) return;
   var d = e.data;
-  if (!d || d.type !== "aof-brand") return;
-  if (d.logo) {
-    var el = document.querySelector(".side .logo .wordmark");
-    if (el && el.getAttribute("src") !== d.logo) el.setAttribute("src", d.logo);
-    if (el && d.appName) el.setAttribute("alt", d.appName);
+  if (!d) return;
+  if (d.type === "aof-brand") {
+    if (d.logo) {
+      var el = document.querySelector(".side .logo .wordmark");
+      if (el && el.getAttribute("src") !== d.logo) el.setAttribute("src", d.logo);
+      if (el && d.appName) el.setAttribute("alt", d.appName);
+    }
+    return;
+  }
+  if (d.type === "aof-country") {
+    applyCountry(d);
+    syncFromStore();
+    render();
   }
 });
 
