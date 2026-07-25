@@ -37,8 +37,32 @@ const STAGE_BY_TASK: Record<string, string> = {
 /** True when the app was built with a UiPath demo token — otherwise the loop is disabled. */
 export const maestroReady = (): boolean => Boolean(TOKEN);
 
+// ── Record ↔ real Maestro instance link (localStorage; shared with the Ops app) ──
+const LINK_KEY = 'aof_maestro_links';
+function readLinks(): Record<string, string> {
+  try { return JSON.parse(localStorage.getItem(LINK_KEY) || '{}'); } catch { return {}; }
+}
+export function getLinkedInstance(recordId: string): string | null {
+  return readLinks()[recordId] ?? null;
+}
+export function linkInstance(recordId: string, instanceId: string): void {
+  const m = readLinks(); m[recordId] = instanceId; localStorage.setItem(LINK_KEY, JSON.stringify(m));
+}
+export function unlinkInstance(recordId: string): void {
+  const m = readLinks(); delete m[recordId]; localStorage.setItem(LINK_KEY, JSON.stringify(m));
+}
+
 export function instanceUrl(instanceId: string): string {
   return `https://staging.uipath.com/${ORG}/${TENANT}/maestro_/cases/${RELEASE_KEY}/instances/${instanceId}?folderKey=${FOLDER_KEY}`;
+}
+
+/**
+ * The bridge config, for handing to the standalone Ops console (public/ops-console.html)
+ * over postMessage — so the token lives only in the app bundle, never in static HTML,
+ * and the console drives the SAME real case on the SAME orchestrator_ proxy.
+ */
+export function maestroConfig() {
+  return { token: TOKEN, base: BASE, folderId: FOLDER_ID, folderKey: FOLDER_KEY, releaseKey: RELEASE_KEY, org: ORG, tenant: TENANT };
 }
 
 async function orch<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
@@ -98,11 +122,12 @@ export async function getState(instanceId: string): Promise<LiveState> {
 
   if (done) return { jobState, done: true, activeStage: null, completedStages: [...STAGES], pendingTaskId: null, pendingTitle: null };
 
-  const tr = await orch<{ value: { Id: number; Title: string; OrganizationUnitId: number }[] }>(
+  const tr = await orch<{ value: { Id: number; Title: string; OrganizationUnitId: number; CreatorJobKey: string }[] }>(
     'GET',
-    `/odata/Tasks/UiPath.Server.Configuration.OData.GetTasksAcrossFolders?%24filter=Status%20ne%20'Completed'&%24orderby=CreationTime%20desc&%24top=20`,
+    `/odata/Tasks/UiPath.Server.Configuration.OData.GetTasksAcrossFolders?%24filter=Status%20ne%20'Completed'&%24orderby=CreationTime%20desc&%24top=40`,
   );
-  const pending = (tr.value ?? []).find((t) => t.OrganizationUnitId === FOLDER_ID && STAGE_BY_TASK[t.Title]);
+  // Scope strictly to THIS instance — CreatorJobKey is the case job that spawned the task.
+  const pending = (tr.value ?? []).find((t) => t.OrganizationUnitId === FOLDER_ID && t.CreatorJobKey === instanceId && STAGE_BY_TASK[t.Title]);
   const activeStage = pending ? STAGE_BY_TASK[pending.Title] : null;
   const idx = activeStage ? STAGES.indexOf(activeStage as (typeof STAGES)[number]) : -1;
   const completedStages = idx > 0 ? STAGES.slice(0, idx) : [];

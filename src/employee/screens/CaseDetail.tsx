@@ -9,8 +9,9 @@
 // (The capture wizard still shows the customer-facing screens — during capture
 // the screen is turned toward the customer, which is exactly who they're for.)
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { store, stateMeta, fullName, commsFor, CHANNEL_META, MSG_CHANNELS, VALIDATION_KINDS, type OnboardingCase, type ValidationKind, type MsgChannel } from '../../onboarding';
+import { maestroReady, startCase, getState, approve, instanceUrl, getLinkedInstance, linkInstance, STAGES as MAESTRO_STAGES, type LiveState } from '../../onboarding/maestro';
 import { ChannelIcon } from '../../onboarding/ChannelIcon';
 import Kyc from '../../customer/Kyc';
 import { nextBestActions, type Nba } from '../nba';
@@ -50,6 +51,37 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
   const [busy, setBusy] = useState<string | null>(null);
   const [tab, setTab] = useState<CaseTab>('overview');
   const [picker, setPicker] = useState(false);
+  // Live link to the real Maestro case for this record.
+  const [linked, setLinked] = useState<string | null>(() => getLinkedInstance(c.id));
+  const [mstate, setMstate] = useState<LiveState | null>(null);
+  const [mbusy, setMbusy] = useState(false);
+
+  useEffect(() => { setLinked(getLinkedInstance(c.id)); setMstate(null); }, [c.id]);
+  useEffect(() => {
+    if (!linked) return;
+    let alive = true;
+    const tick = () => void getState(linked).then((s) => { if (alive) setMstate(s); }).catch(() => {});
+    tick();
+    const iv = setInterval(() => { if (!mstate?.done) tick(); }, 4000);
+    return () => { alive = false; clearInterval(iv); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linked]);
+
+  const runMaestro = async () => {
+    setMbusy(true);
+    try {
+      const id = await startCase({ applicantId: c.id, firstName: c.firstName, lastName: c.lastName, bvn: c.bvn, nin: c.nin, channel: c.channel });
+      linkInstance(c.id, id); setLinked(id); setMstate(await getState(id));
+    } catch (e) { setToast('Maestro: ' + (e as Error).message); window.setTimeout(() => setToast(null), 4000); }
+    finally { setMbusy(false); }
+  };
+  const approveMaestro = async () => {
+    if (!linked || !mstate?.pendingTaskId) return;
+    setMbusy(true);
+    try { await approve(mstate.pendingTaskId); await new Promise((r) => setTimeout(r, 1600)); setMstate(await getState(linked)); }
+    catch (e) { setToast('Approve failed: ' + (e as Error).message); window.setTimeout(() => setToast(null), 4000); }
+    finally { setMbusy(false); }
+  };
 
   if (kyc) return <div className="dk-flow"><Kyc c={c} onExit={() => setKyc(false)} /></div>;
 
@@ -103,8 +135,15 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
       </div>
 
       <div className="dk-case-body">
-        {/* The point of the pane: what to do, and why — always in view, above the tabs. */}
-        <Action actions={actions} busy={busy} onFire={fire} />
+        {/* The point of the pane: what to do, and why — always in view, above the tabs.
+            When the record is linked to a real Maestro case, the action becomes the
+            live stage approval that advances the real instance. */}
+        {maestroReady() && linked
+          ? <MaestroAction instanceId={linked} state={mstate} busy={mbusy} onApprove={approveMaestro} />
+          : <>
+              <Action actions={actions} busy={busy} onFire={fire} />
+              {maestroReady() && <button className="dk-run-maestro" disabled={mbusy} onClick={runMaestro}>{mbusy ? 'Starting…' : '▶ Run this case in Maestro'}</button>}
+            </>}
 
         <div className="dk-tabs" role="tablist">
           {(['overview', 'messages', 'activity'] as const).map((t) => (
@@ -291,6 +330,45 @@ function Action({ actions, busy, onFire }: { actions: Nba[]; busy: string | null
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// When the record is linked to a real Maestro case, the action panel becomes the
+// live stage approval — completing it advances the actual instance in Maestro.
+function MaestroAction({ instanceId, state, busy, onApprove }: { instanceId: string; state: LiveState | null; busy: boolean; onApprove: () => void }) {
+  const done = Boolean(state?.done);
+  const stage = state?.activeStage ?? null;
+  return (
+    <div className={`dk-nba ${done ? 'done' : 'do'} dk-nba-maestro`}>
+      <div className="hd">
+        <span className="ic"><I n={done ? 'check' : 'zap'} s={14} w={2.2} /></span>
+        <span>Live in Maestro</span>
+        <span className={`dk-nba-live ${done ? 'ok' : ''}`}>{done ? 'Completed' : state?.jobState ?? 'starting…'}</span>
+      </div>
+
+      <div className="ttl">{done ? 'Onboarding case completed' : stage ? `${stage} · awaiting approval` : 'Case running in Maestro'}</div>
+      <p className="why">
+        {done
+          ? 'The real UiPath Maestro case ran through all five stages to completion.'
+          : stage
+            ? `The real Maestro case is parked at ${stage}. Approving here completes the stage in Maestro and advances the case.`
+            : 'A real Maestro instance is starting — its next decision will appear here.'}
+      </p>
+
+      <div className="dk-mstrip">
+        {MAESTRO_STAGES.map((s) => {
+          const st = done || state?.completedStages.includes(s) ? 'done' : stage === s ? 'active' : 'pend';
+          return <span key={s} className={`dk-mstage ${st}`}>{st === 'done' ? '✓ ' : st === 'active' ? '● ' : ''}{s}</span>;
+        })}
+      </div>
+
+      <div className="acts">
+        {!done && state?.pendingTaskId && (
+          <button className="dk-btn pri lg" disabled={busy} onClick={onApprove}>{busy ? 'Working…' : `Approve ${stage ?? 'stage'} & advance`}</button>
+        )}
+        <a className="dk-mlink" href={instanceUrl(instanceId)} target="_blank" rel="noreferrer">Open in Maestro ↗</a>
+      </div>
     </div>
   );
 }

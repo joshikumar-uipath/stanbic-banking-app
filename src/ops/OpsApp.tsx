@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { ConfigProvider, useConfig, loadLocalConfig, stanbicConfig, applyFavicon } from '../config';
 import { getCountry } from '../config/countries';
+import { maestroConfig } from '../onboarding/maestro';
 import './ops.css';
 
 function OpsInner() {
@@ -42,6 +43,9 @@ function OpsInner() {
       pLabel: country.primaryId.label, pAuth: country.primaryId.authority,
       sLabel: country.secondaryId.label, sAuth: country.secondaryId.authority,
     }, window.location.origin);
+    // Hand the console the Maestro bridge config so it can start/drive the real
+    // onboarding case per record — the token stays in the app bundle, not the HTML.
+    w.postMessage({ type: 'aof-maestro', ...maestroConfig() }, window.location.origin);
   }, [logo, appName, country]);
   useEffect(() => { pushBrand(); }, [pushBrand]);
 

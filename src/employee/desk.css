@@ -329,6 +329,24 @@
 .dk-nba { border: 1px solid var(--d-line-2); border-radius: 12px; padding: 14px; background: var(--d-surface); }
 .dk-nba.do { border-color: rgba(var(--d-brand-rgb), .3); background: rgba(var(--d-brand-rgb), .04); }
 .dk-nba.done { border-color: #cfe9d9; background: var(--d-green-bg); }
+
+/* ── Live Maestro link inside a case record ── */
+.dk-nba-maestro { border-top: 2px solid var(--d-brand); }
+.dk-nba-live { margin-left: auto; font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--d-brand); background: rgba(var(--d-brand-rgb), .1); border-radius: 999px; padding: 2px 8px; }
+.dk-nba-live.ok { color: var(--d-green-ink); background: var(--d-green-bg); }
+.dk-mstrip { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 11px; }
+.dk-mstage { font-size: 10.5px; font-weight: 600; padding: 3px 8px; border-radius: 999px; border: 1px solid var(--d-line-2);
+  color: var(--d-ink-4); background: #fff; white-space: nowrap; }
+.dk-mstage.done { color: var(--d-green-ink); border-color: #cfe9d9; background: var(--d-green-bg); }
+.dk-mstage.active { color: var(--d-brand); border-color: rgba(var(--d-brand-rgb), .35); background: rgba(var(--d-brand-rgb), .06);
+  box-shadow: 0 0 0 2px rgba(var(--d-brand-rgb), .12); }
+.dk-mlink { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--d-brand); text-decoration: none; }
+.dk-mlink:hover { text-decoration: underline; }
+.dk-run-maestro { margin-top: 10px; width: 100%; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--d-brand);
+  background: rgba(var(--d-brand-rgb), .06); border: 1px dashed rgba(var(--d-brand-rgb), .4); border-radius: 10px; padding: 9px; cursor: pointer; }
+.dk-run-maestro:hover:not(:disabled) { background: rgba(var(--d-brand-rgb), .1); }
+.dk-run-maestro:disabled { opacity: .6; cursor: default; }
 .dk-nba .hd { display: flex; align-items: center; gap: 7px; font-family: var(--d-num); font-size: 10.5px; font-weight: 700;
   letter-spacing: .1em; text-transform: uppercase; color: var(--d-ink-4); margin-bottom: 9px; }
 .dk-nba.do .hd { color: var(--d-brand); }
