@@ -250,6 +250,9 @@ function GroupedTable({ groups, active, onPick, isOpen, toggle, mstates }: {
       {groups.map((g) => {
         const open = isOpen(g);
         const s = summarize(g.rows);
+        // How many of this group's cases are live in Maestro right now (a real running or
+        // awaiting instance — not completed, not still loading, not unlinked).
+        const live = g.rows.filter((c) => { const m = mstates[c.id]; return m && m.jobState !== 'Loading' && m.jobState !== 'Unknown' && !m.done; }).length;
         return (
           <div className="dk-group" data-open={open} key={g.key}>
             <button className="dk-group-hd" aria-expanded={open} onClick={() => toggle(g)}>
@@ -264,6 +267,7 @@ function GroupedTable({ groups, active, onPick, isOpen, toggle, mstates }: {
                 {s.opened > 0 && <span className="dk-chip green">{s.opened} opened</span>}
                 {s.exc > 0 && <span className="dk-chip red">{s.exc} exception{s.exc === 1 ? '' : 's'}</span>}
                 {s.proc > 0 && <span className="dk-chip amber">{s.proc} in flight</span>}
+                {live > 0 && <span className="dk-chip live" title={`${live} case${live === 1 ? '' : 's'} live in Maestro`}><i />{live} live in Maestro</span>}
               </span>
             </button>
             {open && (

@@ -8,10 +8,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { fullName, stateMeta, type OnboardingCase } from '../onboarding';
 import { approvals, money } from '../approvalsData';
 import { customers } from '../customersData';
+import { getLinkedInstance, getCachedState } from '../onboarding/maestro';
 import { I, Tag, type Tone } from './ui';
 import type { Dest } from './DeskShell';
 
-type Hit = { key: string; who: string; sub: string; kind: string; tone: Tone; go: () => void };
+type Hit = { key: string; who: string; sub: string; kind: string; tone: Tone; maestro?: string; go: () => void };
 
 export default function Find({ cases, onNavigate, onOpenCase }: { cases: OnboardingCase[]; onNavigate: (d: Dest) => void; onOpenCase: (id: string) => void }) {
   const [q, setQ] = useState('');
@@ -33,9 +34,18 @@ export default function Find({ cases, onNavigate, onOpenCase }: { cases: Onboard
       const n = fullName(c).trim();
       if (n.toLowerCase().includes(t) || c.id.toLowerCase().includes(t) || (c.accountNumber ?? '').includes(t)) {
         const m = stateMeta(c.state);
+        // If the record is live in Maestro, surface its stage here too (read from the warm
+        // cache the desk list keeps — no network call).
+        const inst = getLinkedInstance(c.id);
+        const ms = inst ? getCachedState(inst) : null;
+        const maestro = ms && !ms.done && ms.jobState !== 'Unknown'
+          ? ms.pendingTaskId
+            ? ms.activeStage ? `${ms.activeStage} · awaiting` : 'Awaiting approval'
+            : ms.activeStage ? `${ms.activeStage} · running` : 'Running'
+          : undefined;
         out.push({ key: `c-${c.id}`, who: n || 'Unnamed applicant', sub: c.id, kind: m.label,
           tone: m.tone === 'exception' ? 'crit' : m.tone === 'pending' ? 'warn' : m.tone === 'good' ? 'good' : 'info',
-          go: () => onOpenCase(c.id) });
+          maestro, go: () => onOpenCase(c.id) });
       }
     }
     for (const a of approvals) {
@@ -77,6 +87,7 @@ export default function Find({ cases, onNavigate, onOpenCase }: { cases: Onboard
                 <b>{h.who}</b>
                 <span>{h.sub}</span>
               </span>
+              {h.maestro && <span className="dk-hit-live"><i />{h.maestro}</span>}
               <Tag tone={h.tone}>{h.kind}</Tag>
             </button>
           )) : <div className="dk-hit none">No match for “{q.trim()}”</div>}

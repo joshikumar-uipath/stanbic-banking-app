@@ -137,7 +137,10 @@
   padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--d-line-3, #f2f2ec); }
 .dk-hit:last-child { border-bottom: none; }
 .dk-hit:hover { background: #fafaf7; }
-.dk-hit .hw { min-width: 0; }
+.dk-hit .hw { min-width: 0; flex: 1; }
+.dk-hit-live { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; font-size: 10.5px; font-weight: 600;
+  color: var(--d-brand); background: rgba(var(--d-brand-rgb), .08); padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.dk-hit-live i { width: 5px; height: 5px; border-radius: 50%; background: var(--d-brand); animation: dkPulse 1.6s infinite; }
 .dk-hit .hw b { display: block; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dk-hit .hw span { display: block; font-family: var(--d-num); font-size: 11.5px; color: var(--d-ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dk-hit.none { font-size: 12.5px; color: var(--d-ink-2); cursor: default; }
@@ -284,6 +287,8 @@
 .dk-chip.green { background: var(--d-green-bg); color: var(--d-green-ink); }
 .dk-chip.red { background: var(--d-red-bg); color: var(--d-red-ink); }
 .dk-chip.amber { background: var(--d-amber-bg); color: var(--d-amber-ink); }
+.dk-chip.live { background: rgba(var(--d-brand-rgb), .08); color: var(--d-brand); display: inline-flex; align-items: center; gap: 5px; }
+.dk-chip.live i { width: 6px; height: 6px; border-radius: 50%; background: var(--d-brand); animation: dkPulse 1.6s infinite; }
 .dk-group-body { background: #fcfcfa; border-left: 2px solid rgba(var(--d-brand-rgb), .16); }
 .dk-group-body .dk-row { background: transparent; padding-left: 26px; }
 .dk-group-body .dk-row:hover { background: #fafaf7; }
