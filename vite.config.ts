@@ -46,6 +46,11 @@ export default defineConfig(({ mode }) => {
           target: uipathBaseUrl,
           changeOrigin: true,
         },
+        // Maestro case-instance state (persistent live stage) lives on pims_.
+        '^/[^/]+/[^/]+/pims_': {
+          target: uipathBaseUrl,
+          changeOrigin: true,
+        },
       },
     },
     build: {

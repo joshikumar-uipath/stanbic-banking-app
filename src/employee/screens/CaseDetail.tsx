@@ -11,7 +11,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react';
 import { store, stateMeta, fullName, commsFor, CHANNEL_META, MSG_CHANNELS, VALIDATION_KINDS, type OnboardingCase, type ValidationKind, type MsgChannel } from '../../onboarding';
-import { maestroReady, startCase, getState, approve, instanceUrl, getLinkedInstance, linkInstance, STAGES as MAESTRO_STAGES, type LiveState } from '../../onboarding/maestro';
+import { maestroReady, startCase, getState, getCachedState, approve, instanceUrl, actionCenterUrl, getLinkedInstance, linkInstance, LINKS_EVENT, STAGES as MAESTRO_STAGES, type LiveState } from '../../onboarding/maestro';
 import { ChannelIcon } from '../../onboarding/ChannelIcon';
 import Kyc from '../../customer/Kyc';
 import { nextBestActions, type Nba } from '../nba';
@@ -53,10 +53,24 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
   const [picker, setPicker] = useState(false);
   // Live link to the real Maestro case for this record.
   const [linked, setLinked] = useState<string | null>(() => getLinkedInstance(c.id));
-  const [mstate, setMstate] = useState<LiveState | null>(null);
+  // Seed from the per-instance cache so a reopened case shows its last-known stage at once.
+  const [mstate, setMstate] = useState<LiveState | null>(() => { const i = getLinkedInstance(c.id); return i ? getCachedState(i) : null; });
   const [mbusy, setMbusy] = useState(false);
 
-  useEffect(() => { setLinked(getLinkedInstance(c.id)); setMstate(null); }, [c.id]);
+  useEffect(() => { const i = getLinkedInstance(c.id); setLinked(i); setMstate(i ? getCachedState(i) : null); }, [c.id]);
+  // Esc closes the detail pane.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+  // Data Fabric hydrate can land after mount (or a colleague may link this record on
+  // another machine) — re-read the shared link when it changes so we flip to live.
+  useEffect(() => {
+    const onLinks = () => setLinked(getLinkedInstance(c.id));
+    window.addEventListener(LINKS_EVENT, onLinks);
+    return () => window.removeEventListener(LINKS_EVENT, onLinks);
+  }, [c.id]);
   useEffect(() => {
     if (!linked) return;
     let alive = true;
@@ -126,7 +140,7 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
   return (
     <div className="dk-case">
       <div className="dk-case-head">
-        <button className="x" onClick={onClose} aria-label="Close"><I n="chevron" s={16} /></button>
+        <button className="x" onClick={onClose} aria-label="Close" title="Close (Esc)"><I n="x" s={17} /></button>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="nm">{name}</div>
           <div className="rf num">{c.id} · opened {ago(c.createdAt)}</div>
@@ -339,6 +353,7 @@ function Action({ actions, busy, onFire }: { actions: Nba[]; busy: string | null
 function MaestroAction({ instanceId, state, busy, onApprove }: { instanceId: string; state: LiveState | null; busy: boolean; onApprove: () => void }) {
   const done = Boolean(state?.done);
   const stage = state?.activeStage ?? null;
+  const awaiting = Boolean(state?.pendingTaskId);   // human approval pending at this stage
   return (
     <div className={`dk-nba ${done ? 'done' : 'do'} dk-nba-maestro`}>
       <div className="hd">
@@ -347,13 +362,17 @@ function MaestroAction({ instanceId, state, busy, onApprove }: { instanceId: str
         <span className={`dk-nba-live ${done ? 'ok' : ''}`}>{done ? 'Completed' : state?.jobState ?? 'starting…'}</span>
       </div>
 
-      <div className="ttl">{done ? 'Onboarding case completed' : stage ? `${stage} · awaiting approval` : 'Case running in Maestro'}</div>
+      <div className="ttl">
+        {done ? 'Onboarding case completed' : stage ? `${stage} · ${awaiting ? 'awaiting approval' : 'in progress'}` : 'Case running in Maestro'}
+      </div>
       <p className="why">
         {done
           ? 'The real UiPath Maestro case ran through all five stages to completion.'
-          : stage
-            ? `The real Maestro case is parked at ${stage}. Approving here completes the stage in Maestro and advances the case.`
-            : 'A real Maestro instance is starting — its next decision will appear here.'}
+          : !stage
+            ? 'A real Maestro instance is starting — its live stage will appear here.'
+            : awaiting
+              ? `The real Maestro case is parked at ${stage}. Approving here completes the stage in Maestro and advances the case.`
+              : `The real Maestro case is running the ${stage} stage — automated checks are in flight. The next approval will surface here.`}
       </p>
 
       <div className="dk-mstrip">
@@ -362,6 +381,17 @@ function MaestroAction({ instanceId, state, busy, onApprove }: { instanceId: str
           return <span key={s} className={`dk-mstage ${st}`}>{st === 'done' ? '✓ ' : st === 'active' ? '● ' : ''}{s}</span>;
         })}
       </div>
+
+      {!done && state?.pendingTaskId && (
+        <div className="dk-actask">
+          <span className="dk-actask-ic"><I n="idcard" s={15} w={2} /></span>
+          <div className="dk-actask-t">
+            <b>{state.pendingTitle ?? 'Human task'}</b>
+            <span>Action Center · app task · Unassigned</span>
+          </div>
+          <a className="dk-actask-open" href={actionCenterUrl(state.pendingTaskId)} target="_blank" rel="noreferrer">Open in Action Center ↗</a>
+        </div>
+      )}
 
       <div className="acts">
         {!done && state?.pendingTaskId && (

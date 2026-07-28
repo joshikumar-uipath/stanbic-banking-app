@@ -54,7 +54,7 @@ export function runStory(onTick: (t: StoryTick) => void, speed = 1): () => void 
           firstName: first, lastName: last,
           phone: `${co.phoneTrunk}${String(4000000 + Math.floor(Math.random() * 900000)).slice(-7)}`,
           email: `${first.toLowerCase()}.${last.toLowerCase()}@example.com`,
-          bvn: `${P.numPrefix}45500123`, nin: `${Sc.numPrefix}67800456`,
+          bvn: `${P.numPrefix}4550012`, nin: `${Sc.numPrefix}6780045`,
           address: `12 ${co.streets[0]}, ${co.cities[0]}`,
           channel: 'self', source: 'rm',
         });

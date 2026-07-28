@@ -12,6 +12,7 @@ const P: Record<string, ReactNode> = {
   user: <><circle cx="12" cy="8" r="3.6" /><path d="M5 20a7 7 0 0 1 14 0" /></>,
   out: <><path d="M15 17l5-5-5-5" /><path d="M20 12H9" /><path d="M13 4H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h7" /></>,
   chevron: <><path d="M9 6l6 6-6 6" /></>,
+  x: <><path d="M6 6l12 12M18 6L6 18" /></>,
   search: <><circle cx="11" cy="11" r="7" /><path d="m20 20-3-3" /></>,
   plus: <><path d="M12 5v14M5 12h14" /></>,
   alert: <><path d="M12 9v4M12 17h.01" /><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /></>,

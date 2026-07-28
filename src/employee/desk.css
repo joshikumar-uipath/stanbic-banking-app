@@ -223,6 +223,34 @@
 .dk-src.single { background: var(--d-wash); color: var(--d-ink-3); }
 .dk-row .ch { color: var(--d-ink-4); display: grid; place-items: center; }
 
+/* Column headers for the two status lanes (Maestro stage · Outcome). Aligned to the
+   row grid: rows sit 29px in (group border + body border + row pad) and 15px from the
+   right, so the header uses the same insets. */
+.dk-colhead { display: grid; align-items: center; gap: 14px; padding: 3px 15px 7px 29px;
+  font-family: var(--d-num); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--d-ink-4); }
+
+/* Maestro-stage lane — a 5-segment stage bar + status word, with a "live" badge on real
+   instances. Amber = parked on a human approval (needs intervention), blue = running
+   automated steps, green = completed; "Not started" when there's no Maestro instance. */
+.dk-mcell { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.dk-mcell.empty { color: var(--d-ink-3); font-size: 12.5px; font-weight: 500; }
+.dk-mcell.loading .seg { animation: dkPulse 1.2s infinite; }
+.dk-mcell.loading .dk-mlabel { color: var(--d-ink-4); }
+.dk-mbar { display: flex; align-items: center; gap: 3px; }
+.dk-mlive { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px;
+  font-family: var(--d-num); font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--d-ink-3); }
+.dk-mlive i { width: 4px; height: 4px; border-radius: 50%; background: var(--d-green); animation: dkPulse 1.6s infinite; }
+.dk-mbar .seg { width: 13px; height: 4px; border-radius: 2px; background: var(--d-line-2); transition: background .2s ease; }
+.dk-mcell.await .seg.done, .dk-mcell.await .seg.on { background: var(--d-amber); }
+.dk-mcell.run  .seg.done, .dk-mcell.run  .seg.on  { background: var(--d-accent); }
+.dk-mcell.done .seg { background: var(--d-green); }
+.dk-mcell .seg.on { animation: dkPulse 1.6s infinite; }
+.dk-mcell.done .seg.on { animation: none; }
+.dk-mlabel { font-size: 11px; font-weight: 600; letter-spacing: -.005em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-mcell.await .dk-mlabel { color: var(--d-amber-ink); }
+.dk-mcell.run  .dk-mlabel { color: var(--d-accent); }
+.dk-mcell.done .dk-mlabel { color: var(--d-green-ink); }
+
 .dk-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: var(--d-gray-dot); }
 .dk-dot.good { background: var(--d-green); } .dk-dot.warn { background: var(--d-amber); }
 .dk-dot.crit { background: var(--d-red); }   .dk-dot.info { background: var(--d-accent); }
@@ -261,15 +289,20 @@
 .dk-group-body .dk-row:hover { background: #fafaf7; }
 .dk-group-body .dk-row:last-child { border-bottom: none; }
 
-/* ── Two-pane (Open an account) ── */
-.dk-split { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr) minmax(400px, 520px); overflow: hidden; }
+/* ── Two-pane (Open an account) ──
+   The detail pane only exists while something is open. With nothing open the list
+   takes the full width — closing a case collapses the pane instead of leaving a
+   "Nothing open" placeholder squeezing the list. */
+.dk-split { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr); overflow: hidden; }
+.dk-split.busy { grid-template-columns: minmax(0, 1fr) minmax(400px, 520px); }
 .dk-split > .p { min-width: 0; overflow: hidden; display: flex; flex-direction: column; }
-.dk-split > .p.r { border-left: 1px solid var(--d-line); background: var(--d-surface); }
+.dk-split > .p.r { display: none; }
+.dk-split.busy > .p.r { display: flex; border-left: 1px solid var(--d-line); background: var(--d-surface); }
 @media (max-width: 1180px) {
-  .dk-split { grid-template-columns: minmax(0, 1fr); }
-  .dk-split > .p.r { display: none; }
+  /* One pane at a time: the open case takes over, the list hides behind it. */
+  .dk-split.busy { grid-template-columns: minmax(0, 1fr); }
   .dk-split.busy > .p.l { display: none; }
-  .dk-split.busy > .p.r { display: flex; border-left: none; }
+  .dk-split.busy > .p.r { border-left: none; }
 }
 /* The capture wizard is phone-shaped by design — sit it in the pane, don't stretch it. */
 .dk-flow { flex: 1; min-height: 0; display: grid; place-items: center; padding: 20px; }
@@ -320,7 +353,6 @@
 .dk-case-head { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--d-line-2); flex: 0 0 auto; }
 .dk-case-head .x { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--d-ink-3); flex: 0 0 auto; }
 .dk-case-head .x:hover { background: var(--d-wash); color: var(--d-ink); }
-.dk-case-head .x svg { transform: rotate(180deg); }
 .dk-case-head .nm { font-size: 15px; font-weight: 700; letter-spacing: -.01em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dk-case-head .rf { font-size: 11.5px; color: var(--d-ink-3); margin-top: 2px; }
 .dk-case-body { flex: 1; overflow-y: auto; padding: 16px 18px 24px; }
@@ -343,6 +375,17 @@
   box-shadow: 0 0 0 2px rgba(var(--d-brand-rgb), .12); }
 .dk-mlink { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--d-brand); text-decoration: none; }
 .dk-mlink:hover { text-decoration: underline; }
+
+/* Inline Action Center task box — the human task backing the current stage */
+.dk-actask { display: flex; align-items: center; gap: 11px; margin-top: 12px; padding: 10px 12px;
+  background: #fff; border: 1px solid var(--d-line-2); border-radius: 11px; }
+.dk-actask-ic { width: 30px; height: 30px; flex: 0 0 auto; border-radius: 8px; display: grid; place-items: center;
+  background: rgba(var(--d-brand-rgb), .09); color: var(--d-brand); }
+.dk-actask-t { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.dk-actask-t b { font-size: 13px; color: var(--d-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dk-actask-t span { font-size: 11px; color: var(--d-ink-4); margin-top: 1px; }
+.dk-actask-open { flex: 0 0 auto; font-size: 12px; font-weight: 600; color: var(--d-brand); text-decoration: none; white-space: nowrap; }
+.dk-actask-open:hover { text-decoration: underline; }
 .dk-run-maestro { margin-top: 10px; width: 100%; font: inherit; font-size: 12.5px; font-weight: 600; color: var(--d-brand);
   background: rgba(var(--d-brand-rgb), .06); border: 1px dashed rgba(var(--d-brand-rgb), .4); border-radius: 10px; padding: 9px; cursor: pointer; }
 .dk-run-maestro:hover:not(:disabled) { background: rgba(var(--d-brand-rgb), .1); }

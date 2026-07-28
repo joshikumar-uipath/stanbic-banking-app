@@ -11,7 +11,7 @@ import type {
   CaseEvent, KafkaTopic, ValidationResult, ValidationKind, ValidationStatus,
 } from './types';
 import { VALIDATION_KINDS, fullName } from './types';
-import { nextApplicationId, kycToken, uid, mockCif, mockAccountNumber } from './ids';
+import { nextApplicationId, setApplicationSeq, kycToken, uid, mockCif, mockAccountNumber } from './ids';
 import { getActiveCountry } from '../config/countries';
 
 export interface ListFilter {
@@ -40,7 +40,7 @@ export interface OnboardingStore {
 const CASES_KEY = 'aof_cases';
 const EVENTS_KEY = 'aof_events';
 const SEED_VERSION_KEY = 'aof_seed_v';
-const SEED_VERSION = '7';   // bump to force a reseed when the demo data changes
+const SEED_VERSION = '8';   // bump to force a reseed when the demo data changes
 const SEED_AT_KEY = 'aof_seed_at';   // wall-clock of the last seed, for staleness
 const SEED_COUNTRY_KEY = 'aof_seed_country';   // market the current seed was localised to
 // Seeded cases freeze their createdAt at seed time, so "opened 2h ago" drifts to
@@ -218,8 +218,10 @@ type SeedCtx = ReturnType<typeof getActiveCountry>;
 const seedFirst = (co: SeedCtx, n: number) => co.firstNames[n % co.firstNames.length];
 const seedLast = (co: SeedCtx, n: number) => co.lastNames[(n * 7 + 3) % co.lastNames.length];
 const seedPhone = (co: SeedCtx, n: number) => `${co.phoneTrunk}${String(2000000 + n).slice(-7)}`;
-const seedPrimaryId = (co: SeedCtx, n: number) => `${co.primaryId.numPrefix}${String(20000000 + n).slice(-8)}`;
-const seedSecondaryId = (co: SeedCtx, n: number) => `${co.secondaryId.numPrefix}${String(30000000 + n).slice(-8)}`;
+// numPrefix is 4 chars for NG (BVN 2221 / NIN 1012); a 7-digit body makes the total 11 —
+// the correct length for a Nigerian BVN/NIN. (Shorter prefixes for other markets shift down.)
+const seedPrimaryId = (co: SeedCtx, n: number) => `${co.primaryId.numPrefix}${String(2000000 + n).slice(-7)}`;
+const seedSecondaryId = (co: SeedCtx, n: number) => `${co.secondaryId.numPrefix}${String(3000000 + n).slice(-7)}`;
 const seedAddr = (co: SeedCtx, n: number) =>
   `${(n % 60) + 1} ${co.streets[n % co.streets.length]}, ${co.cities[n % co.cities.length]}`;
 
@@ -260,8 +262,15 @@ function bulkRows(co: SeedCtx, employer: string, batchId: string, count: number,
   return out;
 }
 
+// Seeded desk cases start here (→ first id AO-YYYY-000101). Kept well clear of the
+// Ops console's curated 000001–000035 so those hand-written narratives always
+// survive the merge, and fixed so the ids are the same on every fresh browser —
+// which lets the Maestro embed link real, existing records deterministically.
+export const SEED_BASE = 100;
+
 function seed(s: MockOnboardingStore) {
   const co = getActiveCountry();
+  setApplicationSeq(SEED_BASE);   // park the demo cases in a high, deterministic band
   const emp1 = co.companies[0], emp2 = co.companies[1];
   // A named person built from the pool at a fixed index, so the demo narrative is
   // stable within a country but relocalises when the country changes.

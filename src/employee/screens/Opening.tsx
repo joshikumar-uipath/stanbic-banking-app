@@ -5,6 +5,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useMemo, useState } from 'react';
 import { stateMeta, fullName, ONBOARDING_STATES, type OnboardingCase, type OnboardingState } from '../../onboarding';
+import { useMaestroStates, MaestroCell } from '../maestroStatus';
+import type { LiveStateLite } from '../../onboarding/maestro';
 import AccountOpeningFlow from '../../customer/flow';
 import CaseDetail from './CaseDetail';
 import BulkUpload from './BulkUpload';
@@ -103,6 +105,9 @@ export default function Opening({ cases, flow, setFlow }: { cases: OnboardingCas
   const touched = cases.filter((c) => c.state === 'EXCEPTION' || c.validations.some((v) => v.status === 'failed' || v.status === 'timeout')).length;
   const stp = cases.length ? Math.round(((cases.length - touched) / cases.length) * 100) : 0;
 
+  // Live Maestro status for the list column (shared hook — two API calls per refresh).
+  const mstates = useMaestroStates(useMemo(() => cases.map((c) => c.id), [cases]));
+
   return (
     <div className={`dk-split${flow !== null ? ' busy' : ''}`}>
       <div className="p l">
@@ -149,7 +154,7 @@ export default function Opening({ cases, flow, setFlow }: { cases: OnboardingCas
             </div>
 
             {list.length ? (
-              <GroupedTable groups={groups} active={flow} onPick={setFlow} isOpen={isOpen} toggle={toggle} />
+              <GroupedTable groups={groups} active={flow} onPick={setFlow} isOpen={isOpen} toggle={toggle} mstates={mstates} />
             ) : (
               <div className="dk-empty"><b>Nothing here</b><span>No applications match this filter.</span></div>
             )}
@@ -194,7 +199,7 @@ function Blank({ onNew, onBulk }: { onNew: () => void; onBulk: () => void }) {
   );
 }
 
-const GRID = { gridTemplateColumns: 'minmax(0,1.2fr) minmax(0,1fr) 130px 84px 20px' };
+const GRID = { gridTemplateColumns: 'minmax(0,1.2fr) minmax(0,1fr) 148px 130px 84px 20px' };
 
 // ── Grouping: each bulk upload is a node; loose single captures share one. ──
 type Group = { key: string; kind: 'batch' | 'direct'; title: string; batchId?: string; createdAt: string; rows: OnboardingCase[] };
@@ -227,11 +232,21 @@ function buildGroups(list: OnboardingCase[]): Group[] {
   return groups;
 }
 
-function GroupedTable({ groups, active, onPick, isOpen, toggle }: {
+function GroupedTable({ groups, active, onPick, isOpen, toggle, mstates }: {
   groups: Group[]; active: string | null; onPick: (id: string) => void; isOpen: (g: Group) => boolean; toggle: (g: Group) => void;
+  mstates: Record<string, LiveStateLite>;
 }) {
   return (
     <div className="dk-groups">
+      {/* Two labelled status lanes: the real Maestro stage, and the business outcome. */}
+      <div className="dk-colhead" style={GRID}>
+        <span>Applicant</span>
+        <span />
+        <span>Maestro stage</span>
+        <span>Outcome</span>
+        <span />
+        <span />
+      </div>
       {groups.map((g) => {
         const open = isOpen(g);
         const s = summarize(g.rows);
@@ -253,7 +268,7 @@ function GroupedTable({ groups, active, onPick, isOpen, toggle }: {
             </button>
             {open && (
               <div className="dk-group-body">
-                {g.rows.map((c) => <Row key={c.id} c={c} active={active} onPick={onPick} />)}
+                {g.rows.map((c) => <Row key={c.id} c={c} active={active} onPick={onPick} maestro={mstates[c.id]} />)}
               </div>
             )}
           </div>
@@ -263,7 +278,7 @@ function GroupedTable({ groups, active, onPick, isOpen, toggle }: {
   );
 }
 
-function Row({ c, active, onPick }: { c: OnboardingCase; active: string | null; onPick: (id: string) => void }) {
+function Row({ c, active, onPick, maestro }: { c: OnboardingCase; active: string | null; onPick: (id: string) => void; maestro?: LiveStateLite }) {
   const m = stateMeta(c.state);
   const tone = TONE[m.tone] ?? 'idle';
   const step = ONBOARDING_STATES.findIndex((x) => x.state === c.state) + 1;
@@ -284,6 +299,7 @@ function Row({ c, active, onPick }: { c: OnboardingCase; active: string | null; 
       <span className="mu">
         {stage ?? <>Account <span className="num">{c.accountNumber}</span></>}
       </span>
+      <MaestroCell m={maestro} />
       <span><Tag tone={tone}>{m.label}</Tag></span>
       <span className="rf">{ago(c.createdAt)}</span>
       <span className="ch"><I n="chevron" s={15} /></span>

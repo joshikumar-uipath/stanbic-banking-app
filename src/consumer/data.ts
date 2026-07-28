@@ -22,6 +22,20 @@ export function money(amount: number, dp = 2): string {
   return `${CURRENCY} ${fmt(amount, dp)}`;
 }
 
+// ── Dates, computed relative to "now" so the demo never reads stale ───────────
+// Everything dated is expressed as an offset in days from today; the app is a
+// live demo so a card is never "past due" and the last login is always recent.
+const _MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const _shift = (days: number): Date => { const d = new Date(); d.setHours(0, 0, 0, 0); d.setDate(d.getDate() + days); return d; };
+/** "24 Jul 2026" — a date `days` from today (negative = past). */
+export const dmy = (days: number): string => { const d = _shift(days); return `${String(d.getDate()).padStart(2, '0')} ${_MON[d.getMonth()]} ${d.getFullYear()}`; };
+/** "24 JUL" — short upper-case day+month, for the insights rail. */
+export const dm = (days: number): string => { const d = _shift(days); return `${String(d.getDate()).padStart(2, '0')} ${_MON[d.getMonth()].toUpperCase()}`; };
+/** "Jun 2026" — the month `n` months before this one (0 = this month). */
+export const monthName = (n: number): string => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - n); return `${_MON[d.getMonth()]} ${d.getFullYear()}`; };
+/** The last `n` short month labels ending with this month, e.g. ['Feb','Mar',…,'Jul']. */
+const lastMonths = (n: number): string[] => Array.from({ length: n }, (_, i) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - (n - 1 - i)); return _MON[d.getMonth()]; });
+
 // Deterministic customer identity drawn from the active country's name pools.
 const custFirst = CO.firstNames[0];
 const custLast = CO.lastNames[0];
@@ -31,7 +45,7 @@ export const customer = {
   name: `${custFirst} ${custLast}`,
   firstName: custFirst,
   initials: `${custFirst[0]}${custLast[0]}`,
-  lastLogin: `11 Jun 2026, 04:15 PM (${CO.timezone})`,
+  lastLogin: `${dmy(0)}, 04:15 PM (${CO.timezone})`,
   phone: custPhone,
 };
 
@@ -83,8 +97,8 @@ export interface CardAccount {
   gradient: [string, string];
 }
 export const cards: CardAccount[] = [
-  { id: 'wmc', name: 'World Mastercard', scheme: 'Mastercard', last4: '7421', outstanding: 128540.0, limit: 400000, dueDate: '28 Jun 2026', gradient: ['#38302E', '#5A4D49'] },
-  { id: 'vg', name: 'Visa Gold', scheme: 'Visa', last4: '3092', outstanding: 14280.5, limit: 150000, dueDate: '28 Jun 2026', gradient: ['#1C4E63', '#39B3E5'] },
+  { id: 'wmc', name: 'World Mastercard', scheme: 'Mastercard', last4: '7421', outstanding: 128540.0, limit: 400000, dueDate: dmy(6), gradient: ['#38302E', '#5A4D49'] },
+  { id: 'vg', name: 'Visa Gold', scheme: 'Visa', last4: '3092', outstanding: 14280.5, limit: 150000, dueDate: dmy(6), gradient: ['#1C4E63', '#39B3E5'] },
 ];
 export const cardsOutstanding = cards.reduce((s, c) => s + c.outstanding, 0);
 
@@ -114,22 +128,22 @@ export const smartShortcuts = [
 // ── Insights (Home → Insights tab) ───────────────────────────────────────────
 export interface Insight { id: string; date: string; title: string; body: string; tone: 'info' | 'good' | 'warn'; }
 export const insights: Insight[] = [
-  { id: 'i1', date: '11 JUN', title: 'You received a large deposit', body: `${money(120000, 0)} landed in your Savings Account. Tap for a full view.`, tone: 'good' },
-  { id: 'i2', date: '09 JUN', title: 'Grow your idle cash', body: `You have ${money(312900, 0)} sitting in Savings. The Money Market Fund earns ~9.8% p.a.`, tone: 'info' },
-  { id: 'i3', date: '06 JUN', title: 'A late fee was charged', body: `A ${money(1500, 0)} late fee hit your World Mastercard. Set up auto-pay to avoid this.`, tone: 'warn' },
-  { id: 'i4', date: '02 JUN', title: 'Your spending is up 18%', body: `You spent ${money(64200, 0)} this month vs ${money(54300, 0)} last month. See the breakdown.`, tone: 'info' },
+  { id: 'i1', date: dm(0), title: 'You received a large deposit', body: `${money(120000, 0)} landed in your Savings Account. Tap for a full view.`, tone: 'good' },
+  { id: 'i2', date: dm(-2), title: 'Grow your idle cash', body: `You have ${money(312900, 0)} sitting in Savings. The Money Market Fund earns ~9.8% p.a.`, tone: 'info' },
+  { id: 'i3', date: dm(-5), title: 'A late fee was charged', body: `A ${money(1500, 0)} late fee hit your World Mastercard. Set up auto-pay to avoid this.`, tone: 'warn' },
+  { id: 'i4', date: dm(-9), title: 'Your spending is up 18%', body: `You spent ${money(64200, 0)} this month vs ${money(54300, 0)} last month. See the breakdown.`, tone: 'info' },
 ];
 
 // ── Transactions ─────────────────────────────────────────────────────────────
 export interface Txn { id: string; date: string; title: string; subtitle: string; amount: number; account: string; }
 export const transactions: Txn[] = [
-  { id: 't1', date: '11 Jun 2026', title: `Salary — ${employer}`, subtitle: 'Current Account', amount: 120000.0, account: 'Savings Account' },
-  { id: 't2', date: '10 Jun 2026', title: `${M.supermarket} Supermarket`, subtitle: 'Buy Goods 5483', amount: -4320.0, account: 'Current Account' },
-  { id: 't3', date: '10 Jun 2026', title: M.utility, subtitle: 'Pay Bill 888880', amount: -2000.0, account: 'Current Account' },
-  { id: 't4', date: '09 Jun 2026', title: `Send Money — ${peer(0)}`, subtitle: `Mobile Wallet ${maskPhone('6 321')}`, amount: -5000.0, account: 'Current Account' },
-  { id: 't5', date: '08 Jun 2026', title: M.cafe, subtitle: 'Card •••• 7421', amount: -1180.0, account: 'World Mastercard' },
-  { id: 't6', date: '07 Jun 2026', title: `NIP Transfer — ${M.otherBank}`, subtitle: 'To 0803••• 901', amount: -15000.0, account: 'Savings Account' },
-  { id: 't7', date: '05 Jun 2026', title: 'Airtime top-up', subtitle: M.telco, amount: -500.0, account: 'Mobile Wallet' },
+  { id: 't1', date: dmy(0), title: `Salary — ${employer}`, subtitle: 'Current Account', amount: 120000.0, account: 'Savings Account' },
+  { id: 't2', date: dmy(-1), title: `${M.supermarket} Supermarket`, subtitle: 'Buy Goods 5483', amount: -4320.0, account: 'Current Account' },
+  { id: 't3', date: dmy(-1), title: M.utility, subtitle: 'Pay Bill 888880', amount: -2000.0, account: 'Current Account' },
+  { id: 't4', date: dmy(-2), title: `Send Money — ${peer(0)}`, subtitle: `Mobile Wallet ${maskPhone('6 321')}`, amount: -5000.0, account: 'Current Account' },
+  { id: 't5', date: dmy(-3), title: M.cafe, subtitle: 'Card •••• 7421', amount: -1180.0, account: 'World Mastercard' },
+  { id: 't6', date: dmy(-4), title: `NIP Transfer — ${M.otherBank}`, subtitle: 'To 0803••• 901', amount: -15000.0, account: 'Savings Account' },
+  { id: 't7', date: dmy(-6), title: 'Airtime top-up', subtitle: M.telco, amount: -500.0, account: 'Mobile Wallet' },
 ];
 
 // ── Pay & Transfer ───────────────────────────────────────────────────────────
@@ -163,7 +177,7 @@ export const wealthProducts: WealthProduct[] = [
   { id: 'bond', name: 'Stanbic IBTC Bond Fund', desc: 'A basket of Nigerian government & corporate bonds.', oneYear: 12.6, risk: 2 },
   { id: 'dollar', name: 'Dollar Money Market Fund', desc: 'Hold and grow USD with a low-risk fund.', oneYear: 4.9, risk: 1 },
 ];
-export const investmentSummary = { total: 486120.55, change: 4210.0, changePct: 0.87, since: '31 May 2026' };
+export const investmentSummary = { total: 486120.55, change: 4210.0, changePct: 0.87, since: dmy(-30) };
 
 export interface CoverageNeed { id: string; name: string; cover: string; note: string; }
 export const coverageNeeds: CoverageNeed[] = [
@@ -184,22 +198,22 @@ export const cashflow = {
   netCashflow: -8420.0,
   moneyIn: 132040.0,
   moneyOut: 140460.0,
-  // [month, in, out]
-  months: [
-    ['Jan', 130000, 96000], ['Feb', 142000, 138000], ['Mar', 121000, 110000],
-    ['Apr', 128000, 119000], ['May', 132040, 140460], ['Jun', 120000, 64200],
-  ] as [string, number, number][],
+  // [month, in, out] — labels roll with today; this month is the last entry.
+  months: ([
+    [130000, 96000], [142000, 138000], [121000, 110000],
+    [128000, 119000], [132040, 140460], [120000, 64200],
+  ] as [number, number][]).map((v, i) => [lastMonths(6)[i], v[0], v[1]]) as [string, number, number][],
 };
 
 // ── Notifications ────────────────────────────────────────────────────────────
 export interface Notification { id: string; title: string; body: string; time: string; cat: 'banking' | 'deals'; unread?: boolean; }
 export const notifications: Notification[] = [
-  { id: 'n1', title: 'Your eStatement is ready', body: 'Your May 2026 statement is ready for viewing.', time: '11 Jun 2026 06:40', cat: 'banking', unread: true },
-  { id: 'n2', title: 'Salary received', body: `${money(120000)} credited to your Savings Account from ${employer}.`, time: '11 Jun 2026 09:02', cat: 'banking', unread: true },
-  { id: 'n3', title: 'Card payment due', body: `Your World Mastercard payment of ${money(128540, 0)} is due on 28 Jun 2026.`, time: '09 Jun 2026 14:35', cat: 'banking', unread: true },
-  { id: 'n4', title: 'Overdraft repaid', body: `${money(1200, 0)} Overdraft was auto-repaid from your incoming Mobile Wallet.`, time: '08 Jun 2026 19:37', cat: 'banking' },
-  { id: 'd1', title: 'Earn 9.8% on idle cash', body: 'Move to the Money Market Fund and earn daily interest.', time: '07 Jun 2026 10:00', cat: 'deals', unread: true },
-  { id: 'd2', title: '0% balance transfer', body: 'Transfer other card balances at 0% for 6 months.', time: '04 Jun 2026 08:15', cat: 'deals' },
+  { id: 'n1', title: 'Your eStatement is ready', body: `Your ${monthName(1)} statement is ready for viewing.`, time: `${dmy(0)} 06:40`, cat: 'banking', unread: true },
+  { id: 'n2', title: 'Salary received', body: `${money(120000)} credited to your Savings Account from ${employer}.`, time: `${dmy(0)} 09:02`, cat: 'banking', unread: true },
+  { id: 'n3', title: 'Card payment due', body: `Your World Mastercard payment of ${money(128540, 0)} is due on ${dmy(6)}.`, time: `${dmy(-2)} 14:35`, cat: 'banking', unread: true },
+  { id: 'n4', title: 'Overdraft repaid', body: `${money(1200, 0)} Overdraft was auto-repaid from your incoming Mobile Wallet.`, time: `${dmy(-3)} 19:37`, cat: 'banking' },
+  { id: 'd1', title: 'Earn 9.8% on idle cash', body: 'Move to the Money Market Fund and earn daily interest.', time: `${dmy(-4)} 10:00`, cat: 'deals', unread: true },
+  { id: 'd2', title: '0% balance transfer', body: 'Transfer other card balances at 0% for 6 months.', time: `${dmy(-7)} 08:15`, cat: 'deals' },
 ];
 
 // ── More tab menu groups ─────────────────────────────────────────────────────

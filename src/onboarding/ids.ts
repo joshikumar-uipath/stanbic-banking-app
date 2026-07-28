@@ -7,6 +7,13 @@
 
 const COUNTER_KEY = 'aof_app_seq';
 
+/** Force the running counter to `n`, so the NEXT id is AO-YYYY-{n+1 padded}.
+ *  Used by the seed to park demo cases in a high, deterministic band (000101+)
+ *  that never collides with the Ops console's curated 000001–000035 narratives. */
+export function setApplicationSeq(n: number): void {
+  try { localStorage.setItem(COUNTER_KEY, String(n)); } catch { /* ignore */ }
+}
+
 export function nextApplicationId(): string {
   const year = new Date().getFullYear();
   let seq = 0;

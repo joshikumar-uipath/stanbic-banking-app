@@ -11,6 +11,8 @@ import { stateMeta, fullName, type OnboardingCase } from '../../onboarding';
 import { approvals, money, type Approval } from '../../approvalsData';
 import { customers, type Customer } from '../../customersData';
 import { I, Tag, Dot, Stat, type Tone } from '../ui';
+import { useMaestroStates, MaestroCell } from '../maestroStatus';
+import type { LiveStateLite } from '../../onboarding/maestro';
 import { ago } from '../time';
 import type { Dest } from '../DeskShell';
 
@@ -23,6 +25,8 @@ type Item = {
   cta: string;          // what the attention-bar button should say
   what: string;
   when: string;
+  /** Onboarding record id — set for openings only, so the Maestro lane can resolve it. */
+  recordId?: string;
   tag?: { tone: Tone; text: string };
   /** Where the application came from — set for openings only, so a banker can
    *  tell a payroll row from a walk-in without opening it. */
@@ -53,6 +57,7 @@ function fromCases(cases: OnboardingCase[], open: (id: string) => void): Item[] 
       cta: c.id,
       what,
       when: ago(c.createdAt),
+      recordId: c.id,
       tag: { tone: STATE_TONE[m.tone] ?? 'idle', text: m.label },
       src: c.batchId
         ? { kind: 'bulk', label: c.employer || 'Bulk' }
@@ -122,6 +127,9 @@ export default function MyDesk({ cases, onNavigate, onOpenCase }: { cases: Onboa
 
   const top = now[0];
 
+  // Live Maestro status for every onboarding record on the desk (shared hook).
+  const mstates = useMaestroStates(useMemo(() => cases.map((c) => c.id), [cases]));
+
   return (
     <>
       {/* Attention bar — the single most urgent thing, or an all-clear. */}
@@ -168,12 +176,12 @@ export default function MyDesk({ cases, onNavigate, onOpenCase }: { cases: Onboa
           </div>
 
           <div className="dk-eyebrow">Needs you now <span className="n">{now.length}</span></div>
-          {now.length ? <Rows items={now} /> : (
+          {now.length ? <Rows items={now} mstates={mstates} /> : (
             <div className="dk-empty"><b>Nothing waiting on you</b><span>Every application is either moving or done.</span></div>
           )}
 
           <div className="dk-eyebrow">In flight <span className="n">nothing needed from you</span></div>
-          {flight.length ? <Rows items={flight} /> : (
+          {flight.length ? <Rows items={flight} mstates={mstates} /> : (
             <div className="dk-empty"><b>Nothing in flight</b><span>Start an application and it will track here.</span></div>
           )}
         </div>
@@ -182,13 +190,13 @@ export default function MyDesk({ cases, onNavigate, onOpenCase }: { cases: Onboa
   );
 }
 
-const GRID = { gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1.4fr) 120px 92px 20px' };
+const GRID = { gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1.3fr) 150px 118px 84px 20px' };
 
-function Rows({ items }: { items: Item[] }) {
+function Rows({ items, mstates }: { items: Item[]; mstates: Record<string, LiveStateLite> }) {
   return (
     <div className="dk-rows">
       <div className="dk-cols" style={GRID}>
-        <span>Who</span><span>What</span><span>Status</span><span>When</span><span />
+        <span>Who</span><span>What</span><span>Maestro stage</span><span>Status</span><span>When</span><span />
       </div>
       {items.map((i) => (
         <button key={i.key} className="dk-row" style={GRID} onClick={i.go}>
@@ -207,6 +215,7 @@ function Rows({ items }: { items: Item[] }) {
             </span>
           </span>
           <span className="mu">{i.what}</span>
+          {i.recordId ? <MaestroCell m={mstates[i.recordId]} /> : <span />}
           <span>{i.tag ? <Tag tone={i.tag.tone}>{i.tag.text}</Tag> : null}</span>
           <span className="rf">{i.when}</span>
           <span className="ch"><I n="chevron" s={15} /></span>

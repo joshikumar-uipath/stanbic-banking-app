@@ -142,8 +142,8 @@ function fieldsFor(first: string, last: string): BulkRow {
     firstName: first, lastName: last,
     phone: `${CO.phoneTrunk}${String(4000000 + (n % 900000)).slice(-7)}`,
     email: `${first.toLowerCase()}.${last.toLowerCase()}@docs.example`,
-    bvn: `${CO.primaryId.numPrefix}${String(50000000 + (n % 9000000)).slice(-8)}`,
-    nin: `${CO.secondaryId.numPrefix}${String(60000000 + (n % 9000000)).slice(-8)}`,
+    bvn: `${CO.primaryId.numPrefix}${String(5000000 + (n % 9000000)).slice(-7)}`,
+    nin: `${CO.secondaryId.numPrefix}${String(6000000 + (n % 9000000)).slice(-7)}`,
     address: `${(n % 80) + 1} ${CO.streets[n % CO.streets.length]}, ${CO.cities[n % CO.cities.length]}`,
   };
 }
@@ -227,8 +227,8 @@ function buildSampleCsv(): string {
     const l = co.lastNames[(i * 7 + 3) % co.lastNames.length];
     const phone = `${co.phoneTrunk}${String(3000001 + i).slice(-7)}`;
     const email = `${f.toLowerCase()}.${l.toLowerCase()}@payroll.example`;
-    const pid = `${co.primaryId.numPrefix}${String(10000001 + i).slice(-8)}`;
-    const sid = `${co.secondaryId.numPrefix}${String(20000001 + i).slice(-8)}`;
+    const pid = `${co.primaryId.numPrefix}${String(1000001 + i).slice(-7)}`;
+    const sid = `${co.secondaryId.numPrefix}${String(2000001 + i).slice(-7)}`;
     const addr = `${i + 1} ${co.streets[i % co.streets.length]}, ${co.cities[i % co.cities.length]}`;
     return `${f},${l},${phone},${email},${pid},${sid},${addr}`;
   });

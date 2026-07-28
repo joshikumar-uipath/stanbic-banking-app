@@ -1583,6 +1583,9 @@ function mSetLink(id, inst) { var m = mReadLinks(); m[id] = inst; localStorage.s
 function mInstanceUrl(inst) {
   return "https://staging.uipath.com/" + MAESTRO.org + "/" + MAESTRO.tenant + "/maestro_/cases/" + MAESTRO.releaseKey + "/instances/" + inst + "?folderKey=" + MAESTRO.folderKey;
 }
+function mActionCenterUrl(taskId) {
+  return "https://staging.uipath.com/" + MAESTRO.org + "/" + MAESTRO.tenant + "/actions_/tasks/" + taskId;
+}
 
 function mOrch(method, path, body) {
   return fetch(MAESTRO.base + path, {
@@ -1611,19 +1614,43 @@ function mStartCase(input) {
   });
 }
 
+// Persistent live stage from the Maestro case instance (pims_ service). Stages linger
+// "InProgress" in case management, so the active stage is the FURTHEST one reached.
+function mCaseStages(inst) {
+  var base = MAESTRO.base.replace("orchestrator_", "pims_");
+  return fetch(base + "/api/v1/element-executions/case-instances/" + inst, {
+    headers: { Authorization: "Bearer " + MAESTRO.token, Accept: "application/json", "x-uipath-folderkey": MAESTRO.folderKey },
+  }).then(function (r) { if (!r.ok) throw new Error("pims " + r.status); return r.json(); }).then(function (d) {
+    var reached = {};
+    (d.elementExecutions || []).forEach(function (e) {
+      if (e.elementType === "CaseStage" && e.status !== "NotStarted") reached[e.elementName] = 1;
+    });
+    var rl = M_STAGES.filter(function (s) { return reached[s]; });
+    var active = rl.length ? rl[rl.length - 1] : null;
+    var idx = active ? M_STAGES.indexOf(active) : -1;
+    return { active: active, completed: idx > 0 ? M_STAGES.slice(0, idx) : [] };
+  }).catch(function () { return null; });
+}
+
 function mGetState(inst) {
   return mOrch("GET", "/odata/Jobs?%24filter=Key%20eq%20" + inst + "&%24select=State").then(function (jr) {
     var jobState = (jr.value && jr.value[0] && jr.value[0].State) || "Unknown";
     var done = jobState === "Successful" || jobState === "Completed";
     if (done) return { jobState: jobState, done: true, activeStage: null, completedStages: M_STAGES.slice(), pendingTaskId: null, pendingTitle: null };
-    return mOrch("GET", "/odata/Tasks/UiPath.Server.Configuration.OData.GetTasksAcrossFolders?%24filter=Status%20ne%20'Completed'&%24orderby=CreationTime%20desc&%24top=40").then(function (tr) {
+    return Promise.all([
+      mCaseStages(inst),
+      mOrch("GET", "/odata/Tasks/UiPath.Server.Configuration.OData.GetTasksAcrossFolders?%24filter=Status%20ne%20'Completed'&%24orderby=CreationTime%20desc&%24top=40"),
+    ]).then(function (res) {
+      var stages = res[0], tr = res[1];
       // Scope strictly to THIS instance — CreatorJobKey is the case job that spawned the task.
       var pending = (tr.value || []).filter(function (t) {
         return t.OrganizationUnitId === MAESTRO.folderId && t.CreatorJobKey === inst && M_STAGE_BY_TASK[t.Title];
       })[0];
-      var active = pending ? M_STAGE_BY_TASK[pending.Title] : null;
-      var idx = active ? M_STAGES.indexOf(active) : -1;
-      var completed = idx > 0 ? M_STAGES.slice(0, idx) : [];
+      var pendingStage = pending ? M_STAGE_BY_TASK[pending.Title] : null;
+      var active = (stages && stages.active) || pendingStage;
+      var completed = (stages && stages.completed) || [];
+      if (!stages && pendingStage) { var i = M_STAGES.indexOf(pendingStage); completed = i > 0 ? M_STAGES.slice(0, i) : []; }
+      if (pendingStage) { active = pendingStage; completed = completed.filter(function (s) { return s !== pendingStage; }); }
       return { jobState: jobState, done: false, activeStage: active, completedStages: completed, pendingTaskId: pending ? pending.Id : null, pendingTitle: pending ? pending.Title : null };
     });
   });
@@ -1702,10 +1729,20 @@ function paintMaestro() {
     title = s.activeStage + " · awaiting approval";
     sub = "The real Maestro case is parked at " + s.activeStage + ". Approving here completes the stage and advances the case.";
     btn = '<button class="mz-approve" data-mapprove="' + s.pendingTaskId + '"' + (M_BUSY ? " disabled" : "") + ">" + (M_BUSY ? "Working…" : "Approve " + s.activeStage + " & advance") + "</button>";
+  } else if (s && s.activeStage) {
+    title = s.activeStage + " · in progress";
+    sub = "The real Maestro case is running the " + s.activeStage + " stage — automated checks are in flight. The next approval will surface here.";
   } else {
     title = "Case running in Maestro";
-    sub = "A real Maestro instance is running — its next decision will appear here.";
+    sub = "A real Maestro instance is starting — its live stage will appear here.";
   }
+
+  var actask = (!done && s && s.pendingTaskId)
+    ? '<div class="mz-actask"><span class="mz-actask-ic">▤</span>' +
+        '<div class="mz-actask-t"><b>' + esc(s.pendingTitle || "Human task") + '</b>' +
+        '<span>Action Center · app task · Unassigned</span></div>' +
+        '<a class="mz-actask-open" href="' + mActionCenterUrl(s.pendingTaskId) + '" target="_blank" rel="noopener">Open in Action Center ↗</a></div>'
+    : "";
 
   zone.innerHTML =
     '<div class="mz mz-live' + (done ? " done" : "") + '">' +
@@ -1716,7 +1753,7 @@ function paintMaestro() {
         '<div class="mz-act">' + btn +
           '<a class="mz-link" href="' + mInstanceUrl(inst) + '" target="_blank" rel="noopener">Open in Maestro ↗</a>' +
         "</div>" +
-      "</div>" +
+      "</div>" + actask +
     "</div>";
 }
 
@@ -1763,6 +1800,13 @@ setInterval(function () {
     ".mz-act{display:flex;align-items:center;gap:14px;margin-left:auto}" +
     ".mz-approve{background:var(--blue);border:1px solid var(--blue);color:#fff;border-radius:9px;padding:10px 18px;font-size:13.5px;font-weight:600;white-space:nowrap;cursor:pointer}" +
     ".mz-approve:hover:not(:disabled){background:var(--blue-hover)}.mz-approve:disabled{opacity:.6;cursor:default}" +
+    ".mz-actask{display:flex;align-items:center;gap:11px;margin-top:2px;padding:9px 12px;background:#fff;border:1px solid var(--line-2);border-radius:11px}" +
+    ".mz-actask-ic{width:28px;height:28px;flex:0 0 auto;border-radius:8px;display:grid;place-items:center;background:#e7effb;color:var(--blue);font-size:14px}" +
+    ".mz-actask-t{display:flex;flex-direction:column;min-width:0;flex:1}" +
+    ".mz-actask-t b{font-size:12.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}" +
+    ".mz-actask-t span{font-size:11px;color:var(--ink-4);margin-top:1px}" +
+    ".mz-actask-open{flex:0 0 auto;font-size:12px;font-weight:600;color:var(--blue);text-decoration:none;white-space:nowrap}" +
+    ".mz-actask-open:hover{text-decoration:underline}" +
     ".mz-link{font-size:12.5px;font-weight:600;color:var(--blue);text-decoration:none;white-space:nowrap}" +
     ".mz-link:hover{text-decoration:underline}";
   document.head.appendChild(st);
