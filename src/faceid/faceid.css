@@ -1300,7 +1300,10 @@ button.primary.cta {
 .ew-ot { font-size:13px; font-weight:600; }
 .ew-os { font-size:11.5px; color:var(--muted); margin-top:3px; line-height:1.4; }
 .ew-bioframe { border-radius:12px; border:1px solid var(--line); overflow:hidden; max-width:280px; }
-.ew-bioframe img { width:100%; height:auto; display:block; }
+/* Cap the preview height so the Biometric step stays within the viewport and the
+   Back/Continue footer is reachable without scrolling. A full passport spread is tall;
+   contain keeps it undistorted. */
+.ew-bioframe img { width:100%; height:auto; max-height:260px; object-fit:contain; background:var(--inset); display:block; }
 .ew-capframe { aspect-ratio:1/.7; border-radius:12px; border:1.5px dashed #CBD2DB; background:var(--inset); display:grid; place-items:center; text-align:center; color:var(--faint); font-size:12px; }
 .ew-capframe .ew-ic { width:30px; height:30px; color:var(--teal); margin:0 auto 8px; display:block; }
 .ew-qgrid { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-top:16px; }
