@@ -8,6 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react';
 import { ConfigProvider, useConfig, loadLocalConfig, stanbicConfig, applyFavicon } from '../config';
+import { store } from '../onboarding';
 import { Console } from './Console';
 import { LoginScreen } from './LoginScreen';
 import './faceid.css';
@@ -15,13 +16,20 @@ import './faceid.css';
 function FaceIdInner() {
   const { branding } = useConfig();
   const [authed, setAuthed] = useState(false);
-  // Remount the console when a kiosk scan lands in another tab, so the new
-  // verification shows up live (Console loads its data on mount).
+  // The Console loads its data on mount, so bump `rev` to remount it whenever the
+  // underlying data changes: a kiosk scan landing (its own key), OR any change to the
+  // shared onboarding store — a new application, a state change, an approval — from
+  // this tab or another. store.subscribe fires for same-tab writes AND for cross-tab
+  // ones (the store reloads on the `aof_cases` storage event and re-emits). Debounced
+  // so a burst (e.g. a bulk upload) coalesces into one refresh.
   const [rev, setRev] = useState(0);
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => { if (e.key === 'faceid_kiosk_vers') setRev((r) => r + 1); };
+    let t: number | undefined;
+    const bump = () => { window.clearTimeout(t); t = window.setTimeout(() => setRev((r) => r + 1), 250); };
+    const onStorage = (e: StorageEvent) => { if (e.key === 'faceid_kiosk_vers') bump(); };
     window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    const unsub = store.subscribe(bump);
+    return () => { window.clearTimeout(t); window.removeEventListener('storage', onStorage); unsub(); };
   }, []);
 
   // Drive the console's brand vars (the ported UiPath orange/teal/deep) + tab.
