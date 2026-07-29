@@ -5,7 +5,10 @@
    ───────────────────────────────────────────────────────────────────────────── */
 html[data-shell="web"],
 html[data-shell="web"] body {
-  overflow: auto;
+  /* overflow:visible (default document scroll), NOT auto. overflow:auto on BOTH html
+     and body at once silently breaks mouse-wheel / trackpad scrolling in Chrome —
+     the page is scrollable programmatically but the wheel does nothing. */
+  overflow: visible;
   height: auto;
   min-height: 100%;
   background: #eef2f7;
