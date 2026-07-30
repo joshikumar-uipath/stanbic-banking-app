@@ -31,7 +31,9 @@ export function TopBar({ system, sub }: { system: string; sub: string }) {
       </div>
       <span className="sys">{system}</span>
       <span className="live"><i />Live</span>
-      <a className="back" href="/">← Launcher</a>
+      {/* "./" resolves to the app root against the coded-app <base href> (and to "/" on
+          localhost), so this returns to the launcher whether or not we're under a base path. */}
+      <a className="back" href="./">← Launcher</a>
     </header>
   );
 }

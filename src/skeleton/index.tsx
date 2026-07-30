@@ -23,6 +23,13 @@ const SLATE = '#64748B';
 // getting a handle back to this window.
 const NEW_TAB = { target: '_blank', rel: 'noopener noreferrer' } as const;
 
+// When deployed as a UiPath coded app the whole thing sits under a base path
+// (the host injects <base href="/<app>/">), so an absolute "/employee-web" link would
+// escape the app entirely. Navigate by HASH instead: detectRoute already matches on
+// hash.includes(name), and a hash keeps the URL at the always-served app root. Works
+// identically on localhost. e.g. "/employee-web" -> "#employee-web".
+const hashHref = (p: string) => '#' + p.replace(/^\/+/, '');
+
 // ── Monoline icon set (Lucide-style) ─────────────────────────────────────────
 type IconName = 'phone' | 'monitor' | 'dashboard' | 'user' | 'link' | 'sliders' | 'activity' | 'landmark' | 'briefcase' | 'message';
 const PATHS: Record<IconName, string> = {
@@ -134,7 +141,7 @@ function Front() {
         <div className="ld-people">
           {PEOPLE.map((p) => (
             <div className="ld-person" key={p.key}>
-              <a className="ld-person-a" href={p.href} {...NEW_TAB}>
+              <a className="ld-person-a" href={hashHref(p.href)} {...NEW_TAB}>
                 <span className="ld-ic"><Icon name={p.icon} /></span>
                 <span className="ld-main">
                   <span className="ld-name">{p.name}</span>
@@ -145,7 +152,7 @@ function Front() {
               </a>
               {p.alts && (
                 <div className="ld-alts">
-                  {p.alts.map((a) => <a key={a.href} className="ld-alt" href={a.href} {...NEW_TAB}>{a.label}</a>)}
+                  {p.alts.map((a) => <a key={a.href} className="ld-alt" href={hashHref(a.href)} {...NEW_TAB}>{a.label}</a>)}
                 </div>
               )}
             </div>
@@ -155,7 +162,7 @@ function Front() {
         <div className="ld-group-h" style={{ marginTop: 34 }}><span className="l">Behind the scenes</span><span className="n">for the demo</span></div>
         <div className="ld-panel">
           {TOOLS.map((t) => (
-            <a className="ld-row" key={t.key} href={t.url} {...NEW_TAB} style={{ ['--a' as string]: t.accent } as CSSProperties}>
+            <a className="ld-row" key={t.key} href={hashHref(t.url)} {...NEW_TAB} style={{ ['--a' as string]: t.accent } as CSSProperties}>
               <span className="ld-ic sm"><Icon name={t.icon} size={19} /></span>
               <span className="ld-main">
                 <span className="ld-name">{t.name}</span>
@@ -230,7 +237,7 @@ function Shell({ route }: { route: RouteKey }) {
         <div className="ld-shell-role">{m.role}</div>
         <div className="ld-shell-chip"><span className="dot" />Not built yet · {m.phase}</div>
         <div className="ld-shell-url">{m.url}</div>
-        <a className="ld-shell-back" href="/"><span aria-hidden="true">←</span> Back to the front door</a>
+        <a className="ld-shell-back" href="./"><span aria-hidden="true">←</span> Back to the front door</a>
       </div>
     </div>
   );
