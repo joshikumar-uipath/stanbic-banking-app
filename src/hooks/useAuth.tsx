@@ -96,10 +96,18 @@ export const AuthProvider: React.FC<{ children: ReactNode; config: UiPathSDKConf
       setIsLoading(true);
       setError(null);
       try {
-        // Restore a persisted demo session first — rebuild the secret-auth SDK
-        // from the bundled token so a refresh keeps the user signed in.
+        // Auto-authenticate from the bundled demo token (secret-auth SDK). This is a
+        // demo build, so a fresh visit on ANY origin should land straight on the desk —
+        // the same as a persisted local session — instead of the welcome/sign-in screen.
+        // (Previously this only RESTORED an existing session, so a new origin like the
+        // deployed coded-app host showed the welcome screen.) Skipped only when a real
+        // OAuth callback is in flight (?code=…), so genuine SSO still completes.
         const demoToken = import.meta.env.VITE_UIPATH_DEMO_TOKEN as string | undefined;
-        if (!demoInitRef.current && localStorage.getItem(DEMO_SESSION_KEY) === '1' && demoToken) {
+        // Only treat this as an OAuth callback when the URL actually has a code.
+        // Without this guard, a stale sessionStorage context from a prior failed
+        // attempt causes completeOAuth() to throw "Authorization code missing".
+        const urlHasCode = new URLSearchParams(window.location.search).has('code');
+        if (!demoInitRef.current && demoToken && !urlHasCode) {
           demoInitRef.current = true;
           const secretSdk = new UiPath({
             baseUrl: config.baseUrl, orgName: config.orgName, tenantName: config.tenantName,
@@ -108,13 +116,10 @@ export const AuthProvider: React.FC<{ children: ReactNode; config: UiPathSDKConf
           setSdk(secretSdk);
           setIsDemoSession(true);
           setIsAuthenticated(true);
+          try { localStorage.setItem(DEMO_SESSION_KEY, '1'); } catch { /* ignore */ }
           fetchDemoProfile(config, demoToken).then((p) => { if (mounted) setProfile(p); });
           return; // skip the OAuth path entirely
         }
-        // Only treat this as an OAuth callback when the URL actually has a code.
-        // Without this guard, a stale sessionStorage context from a prior failed
-        // attempt causes completeOAuth() to throw "Authorization code missing".
-        const urlHasCode = new URLSearchParams(window.location.search).has('code');
         if (urlHasCode && sdk.isInOAuthCallback()) {
           // Deduplicate concurrent calls — StrictMode fires this effect twice before
           // the first completeOAuth() network request finishes, causing "code already used".
