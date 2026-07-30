@@ -81,11 +81,9 @@ const PEOPLE: Persona[] = [
       { label: 'KYC link', href: '/kyc/DEMO01' },
     ],
   },
-  {
-    key: 'admin', name: 'Administrator', sub: 'Branding & configuration', icon: 'sliders',
-    blurb: 'Make every surface wear another bank — logo, colours, copy — without touching code.',
-    href: '/admin',
-  },
+  // The Administrator (branding/config) card is intentionally NOT listed here — it's for
+  // the demo owner only, not people we share the URL with. The surface itself stays
+  // reachable directly at /admin (hash: #admin), just not advertised on the launcher.
 ];
 
 interface Tool { key: string; name: string; url: string; desc: string; icon: IconName; accent: string; soon?: boolean }
