@@ -7,6 +7,20 @@
 import type { TenantConfig } from './types';
 import { defaultConfig } from './default';
 
+// Resolve a bundled public asset (logo/favicon) against the APP BASE, so it loads both
+// on localhost (served at "/") and when deployed as a UiPath coded app (the host injects
+// <base href="/<app>/"> and the assets live under that path). Resolving against the base —
+// not the current route — also fixes deep routes like /kyc/:token, where a route-relative
+// path would ask the SPA for /kyc/logo.png and get index.html back. A leading-"/" absolute
+// path breaks the coded-app case (it escapes the app); this fixes both.
+export const asset = (name: string): string => {
+  try {
+    const base = (typeof document !== 'undefined' && document.querySelector('base')?.getAttribute('href')) || '/';
+    const origin = typeof location !== 'undefined' ? location.origin : 'http://localhost';
+    return new URL(name, new URL(base, origin)).pathname;
+  } catch { return '/' + name; }
+};
+
 export const DEFAULT_PRESET_ID = '__default__';
 export const ZARA_PRESET_ID = '__preset_zara__';
 export const STANBIC_PRESET_ID = '__preset_stanbic__';
@@ -44,18 +58,16 @@ export const stanbicConfig: TenantConfig = {
     // NB: the artwork is white on a solid blue plate — the blue is #0032A1,
     // i.e. primaryColor. Surfaces that place it on a dark background paint the
     // area primaryColor so the plate disappears rather than reading as a box.
-    // Root-absolute, NOT './': a relative path resolves against the current
-    // route, so on /kyc/:token it asked for /kyc/stanbic-logo.png — which the SPA
-    // server answers with index.html (200 text/html, not a 404), so the <img>
-    // silently got HTML and fell back to the wordmark.
-    logo: '/stanbic-logo.png',
+    // Resolved against the app base via asset() — works at "/" (localhost, any route
+    // incl. /kyc/:token) AND under the coded-app base path (/<app>/stanbic-logo.png).
+    logo: asset('stanbic-logo.png'),
     // Transparent-background variant for the navy nav rails (desk + ops), so the
     // logo blends in rather than showing its blue plate as a box. The plated
     // `logo` above still serves light surfaces (home launcher).
-    logoLight: '/stanbic-logo-light.png',
+    logoLight: asset('stanbic-logo-light.png'),
     // Square shield mark (cropped from the wordmark) for the browser tab and any
     // compact spot. Without this the tab falls back to an auto-generated initial.
-    favicon: '/stanbic-favicon.png',
+    favicon: asset('stanbic-favicon.png'),
     primaryColor: '#0033A1',
     secondaryColor: '#0091DA',
     accentColor: '#0091DA',
