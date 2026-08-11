@@ -3,7 +3,7 @@
 // The wizard itself is the same component the customer uses (mode='rm'), so the
 // two surfaces can never drift apart. Everything around it is desk-native.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { stateMeta, fullName, ONBOARDING_STATES, type OnboardingCase, type OnboardingState } from '../../onboarding';
 import { useMaestroStates, MaestroCell } from '../maestroStatus';
 import type { LiveStateLite } from '../../onboarding/maestro';
@@ -110,6 +110,17 @@ export default function Opening({ cases, flow, setFlow }: { cases: OnboardingCas
   // Live Maestro status for the list column (shared hook — two API calls per refresh).
   const mstates = useMaestroStates(useMemo(() => cases.map((c) => c.id), [cases]));
 
+  // The capture wizard opens as a centred overlay, not in the right pane: at
+  // pane width it's a 440px column, which is too narrow for the corporate
+  // two-column form and far too narrow for the side-by-side document read.
+  const composing = flow === '';
+  useEffect(() => {
+    if (!composing) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setFlow(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [composing, setFlow]);
+
   return (
     <div className={`dk-split${flow !== null ? ' busy' : ''}`}>
       <div className="p l">
@@ -170,13 +181,20 @@ export default function Opening({ cases, flow, setFlow }: { cases: OnboardingCas
           customer, so customer voice is correct there. An *existing* case gets
           the staff view: what to do about it, in the banker's voice. */}
       <div className="p r" style={{ position: 'relative' }}>
-        {flow === null && <Blank onNew={() => setFlow('')} onBulk={() => setFlow(BULK)} />}
-        {flow === '' && <div className="dk-flow"><AccountOpeningFlow mode="rm" onExit={() => setFlow(null)} /></div>}
+        {(flow === null || composing) && <Blank onNew={() => setFlow('')} onBulk={() => setFlow(BULK)} />}
         {flow === BULK && <BulkUpload onExit={() => setFlow(null)} />}
         {flow && flow !== BULK && flow !== '' && (picked
           ? <CaseDetail key={picked.id} c={picked} onClose={() => setFlow(null)} />
           : <Blank onNew={() => setFlow('')} onBulk={() => setFlow(BULK)} />)}
       </div>
+
+      {composing && (
+        <div className="dk-capture-scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) setFlow(null); }}>
+          <div className="dk-capture" role="dialog" aria-modal="true" aria-label="New application">
+            <AccountOpeningFlow mode="rm" onExit={() => setFlow(null)} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

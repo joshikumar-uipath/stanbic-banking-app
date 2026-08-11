@@ -359,6 +359,38 @@
 .dk-flow > * { width: 100%; max-width: 440px; height: 100%; max-height: 760px; border-radius: 0; overflow: hidden;
   border: 1px solid var(--d-line-2); background: #fff; box-shadow: 0 18px 44px -22px rgba(17,24,29,.3); }
 
+/* ── Capture wizard as a centred overlay ──
+   The right pane is a 440px column — fine for the phone-shaped consumer flow,
+   far too tight for the corporate two-column form and the document read that
+   sits beside it. On the desk the wizard therefore takes over the screen. */
+/* NB: `.dk-modal` is already taken further down by the small confirm dialog
+   (384px). These use their own names so the two never collide. */
+.dk-capture-scrim { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 28px;
+  background: rgba(17,24,29,.42); backdrop-filter: blur(2px); animation: dkFade .16s ease-out; }
+.dk-capture { width: 100%; max-width: 1020px; height: min(880px, 92vh); display: flex; flex-direction: column;
+  overflow: hidden; background: #fff; border: 1px solid var(--d-line-2);
+  box-shadow: 0 40px 90px -30px rgba(17,24,29,.5); animation: dkPop .2s cubic-bezier(.2,.7,.3,1); }
+.dk-capture > * { flex: 1; min-height: 0; }
+
+/* Scoped widening of the shared customer shell — customer.css stays phone-first
+   for the real consumer app; only the desk overlay gets the roomier treatment. */
+.dk-capture .cx-head { padding: 16px 28px 12px; }
+.dk-capture .cx-body { padding: 24px 28px; }
+.dk-capture .cx-foot { padding: 16px 28px 20px; }
+/* Keep prose readable at 1020px while letting the form grids use the width. */
+.dk-capture .cx-h1, .dk-capture .cx-p { max-width: 62ch; }
+.dk-capture .cx-row { grid-template-columns: 1fr 1fr; gap: 14px 20px; }
+/* One content width for every block, so paired rows and lone fields share a
+   left AND right edge instead of ending ragged. Wide enough for two columns,
+   short enough that a single input isn't a 960px slab. */
+.dk-capture .cx-body > * { max-width: 900px; }
+.dk-capture .cx-drop { padding: 20px 24px; }
+
+@media (max-width: 1080px) {
+  .dk-capture { max-width: none; height: 100%; }
+  .dk-capture-scrim { padding: 0; }
+}
+
 /* ── Bulk upload (right pane) ── */
 .dk-bulk { height: 100%; display: flex; flex-direction: column; background: #fff; min-height: 0; }
 .dk-bulk-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--d-line-2); flex: 0 0 auto; }
