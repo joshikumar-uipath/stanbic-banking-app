@@ -13,6 +13,8 @@ import { Button, Field, Note, Rail, KV, Brand } from './ui';
 import Icon from './icons';
 import type { ApplyMode } from './Apply';
 import { extractAof } from './ixp';
+import { corporateMaestroReady, startCorporateCase } from '../onboarding/maestro-corporate';
+import { linkInstance } from '../onboarding/maestro';
 
 const CO = getActiveCountry();
 const CUR = CO.currency.symbol;
@@ -148,6 +150,21 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
       bvn: digits(primary.bvn), nin: '', address: v.address.trim(),
       channel: 'single', source: 'rm',
     });
+    // Start the REAL corporate Maestro case and link it to this record, so the
+    // desk shows its live stage exactly like an individual one. Best-effort: a
+    // Maestro hiccup must not lose an application the RM just captured.
+    if (corporateMaestroReady()) {
+      try {
+        const instanceId = await startCorporateCase({
+          applicantId: c.id,
+          companyName: v.company.trim() || 'Unnamed business',
+          rcNumber: v.rc.trim(),
+          tin: v.tin.trim(),
+          directors: dirs.length,
+        });
+        linkInstance(c.id, instanceId);
+      } catch { /* case still captured; it just isn't live in Maestro */ }
+    }
     onDone(c);
   };
 
