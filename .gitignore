@@ -31,3 +31,4 @@ ios/App/build/
 .DS_Store
 **/.DS_Store
 *.log
+out/

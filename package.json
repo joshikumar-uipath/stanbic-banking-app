@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@aws-amplify/ui-react": "^6.5.5",
+    "@aws-amplify/ui-react-liveness": "^3.2.0",
     "@capacitor/app": "^8.1.0",
     "@capacitor/browser": "^8.0.3",
     "@capacitor/core": "^8.3.1",
@@ -18,15 +20,13 @@
     "@capacitor/status-bar": "^8.0.2",
     "@uipath/uipath-typescript": "^1.3.5",
     "autoprefixer": "^10.4.27",
+    "aws-amplify": "^6.6.6",
     "path-browserify": "^1.0.1",
     "postcss": "^8.5.8",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-markdown": "^10.1.0",
-    "tailwindcss": "^3.4.19",
-    "aws-amplify": "^6.6.6",
-    "@aws-amplify/ui-react": "^6.5.5",
-    "@aws-amplify/ui-react-liveness": "^3.2.0"
+    "tailwindcss": "^3.4.19"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.3.1",
@@ -35,6 +35,7 @@
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
+    "dmn-js": "^17.10.1",
     "eslint": "^9.39.4",
     "eslint-plugin-react-hooks": "^7.0.1",
     "eslint-plugin-react-refresh": "^0.5.2",

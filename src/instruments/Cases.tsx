@@ -88,17 +88,84 @@ const STAGES: StageDef[] = [
   },
 ];
 
-// Which stage a case's state currently sits in.
-const STATE_STAGE: Record<OnboardingState, number> = {
-  PRE_REGISTERED: 0,
-  VALIDATION_IN_PROGRESS: 1,
-  PENDING_DOCUMENTS: 1,
-  PENDING_LIVENESS: 1,
-  EXCEPTION: 1,
-  VALIDATED: 2,
-  ACCOUNT_CREATED: 3,
-  FULLY_ACTIVATED: 4,
+// ── Secondary / exception-lane stages ────────────────────────────────────────
+// These branch off the main spine and (mostly) loop back to their origin —
+// mirroring the deployed Maestro case topology (Verification → Compliance
+// escalations ↺, Decision → EDD ↺ / Pending customer ↺ / Declined ■).
+interface SecStageDef extends StageDef {
+  from: 'verification' | 'decision';   // spine stage this lane branches off
+  loops: boolean;                       // true = rework returns to origin; false = terminal
+}
+const SECONDARY: SecStageDef[] = [
+  {
+    key: 'escalations', name: 'Compliance escalations', blurb: 'Screening hit', duration: '2d',
+    from: 'verification', loops: true,
+    tasks: [
+      { name: 'Sanctions true-match review', kind: 'human', trigger: 'sequential', human: true },
+      { name: 'Adverse media & PEP review', kind: 'agent', trigger: 'event' },
+      { name: 'Source-of-funds check', kind: 'robot', trigger: 'event' },
+    ],
+  },
+  {
+    key: 'edd', name: 'EDD review', blurb: 'Enhanced due diligence', duration: '3d',
+    from: 'decision', loops: true,
+    tasks: [
+      { name: 'Enhanced due diligence', kind: 'human', trigger: 'sequential', human: true },
+      { name: 'Beneficial owner & risk deep-dive', kind: 'agent', trigger: 'event' },
+      { name: 'EDD decision', kind: 'human', trigger: 'event', human: true },
+    ],
+  },
+  {
+    key: 'pending', name: 'Pending customer', blurb: 'Info requested (RFI)', duration: '14d',
+    from: 'decision', loops: true,
+    tasks: [
+      { name: 'Request additional info (RFI)', kind: 'agent', trigger: 'sequential' },
+      { name: 'Await customer response', kind: 'gateway', trigger: 'event', gateway: true },
+      { name: 'Resume on response', kind: 'robot', trigger: 'event' },
+    ],
+  },
+  {
+    key: 'declined', name: 'Declined / withdrawn', blurb: 'Terminal', duration: '—',
+    from: 'decision', loops: false,
+    tasks: [
+      { name: 'Record decline rationale', kind: 'human', trigger: 'sequential', human: true },
+      { name: 'Notify customer', kind: 'robot', trigger: 'event' },
+      { name: 'Close & archive case', kind: 'robot', trigger: 'event' },
+    ],
+  },
+];
+
+// Which stage (spine key OR secondary key) a case's state currently sits in.
+const STATE_STAGE: Record<OnboardingState, string> = {
+  PRE_REGISTERED: 'intake',
+  VALIDATION_IN_PROGRESS: 'verification',
+  PENDING_DOCUMENTS: 'verification',
+  PENDING_LIVENESS: 'verification',
+  EXCEPTION: 'verification',
+  VALIDATED: 'decision',
+  ACCOUNT_CREATED: 'activation',
+  FULLY_ACTIVATED: 'closure',
+  COMPLIANCE_HOLD: 'escalations',
+  EDD_REVIEW: 'edd',
+  PENDING_CUSTOMER: 'pending',
+  DECLINED: 'declined',
 };
+
+const SPINE_KEYS = STAGES.map((s) => s.key);
+const secFrom = (key: string): 'verification' | 'decision' | null => SECONDARY.find((x) => x.key === key)?.from ?? null;
+// Spine stages that fan out to secondary lanes → the lane names, for the divert chip.
+const DIVERTS: Record<string, string[]> = SECONDARY.reduce((m, s) => {
+  (m[s.from] ??= []).push(s.name);
+  return m;
+}, {} as Record<string, string[]>);
+
+// A secondary lane's tasks light up only while the case actually sits in that lane.
+function secTaskState(t: TaskDef, isActive: boolean): TaskState {
+  if (!isActive) return 'pending';
+  if (t.gateway) return 'waiting';
+  if (t.human) return 'attention';
+  return 'active';
+}
 
 // ── Icons ────────────────────────────────────────────────────────────────────
 const KIND_PATH: Record<TaskKind, string> = {
@@ -188,7 +255,13 @@ function CasesInner() {
     return live.find((c) => c.state !== 'FULLY_ACTIVATED') ?? live[0];
   }, [cases, sel]);
 
-  const activeIdx = current ? STATE_STAGE[current.state] : -1;
+  // Stage the case sits in — a spine key, or a secondary-lane key. When it's in a
+  // lane, the spine highlights the lane's origin (the case is "at" Verification/
+  // Decision, diverted) and the lane card lights up.
+  const activeStageKey = current ? STATE_STAGE[current.state] : null;
+  const activeSecKey = activeStageKey && !SPINE_KEYS.includes(activeStageKey) ? activeStageKey : null;
+  const activeSpineKey = activeSecKey ? secFrom(activeSecKey) : activeStageKey;
+  const activeIdx = activeSpineKey ? SPINE_KEYS.indexOf(activeSpineKey) : -1;
 
   // Precompute each stage's task states + header state for the selected case.
   const computed = useMemo(() => STAGES.map((stg, i) => {
@@ -299,6 +372,13 @@ function CasesInner() {
                     <span>{head === 'pending' ? 'Not started' : `Duration: ${stg.duration}`}</span>
                   </div>
 
+                  {DIVERTS[stg.key] && (
+                    <div className={`cm-divert ${isActive && activeSecKey ? 'on' : ''}`}>
+                      <span className="cm-divert-gw">◇</span>
+                      <span>may route to {DIVERTS[stg.key].join(' · ')}</span>
+                    </div>
+                  )}
+
                   {seq.length > 0 && (
                     <div className="cm-group">
                       <span className="cm-group-l">Sequential tasks</span>
@@ -322,6 +402,41 @@ function CasesInner() {
           })}
         </div>
 
+        {/* Secondary / exception-lane stages — branch off the spine, loop back */}
+        <div className="cm-branches">
+          <div className="cm-branch-head">
+            <span className="cm-branch-eyebrow">Secondary &amp; exception stages</span>
+            <span className="cm-branch-sub">Routed from Verification / Decision · rework loops back to origin, declined is terminal</span>
+          </div>
+          <div className="cm-branch-row">
+            {SECONDARY.map((sec) => {
+              const active = activeSecKey === sec.key;
+              const head: TaskState = active ? (sec.loops ? 'active' : 'attention') : 'pending';
+              return (
+                <div className={`cm-stage sec ${head}`} key={sec.key}>
+                  <div className="cm-stage-head">
+                    <div className="cm-stage-title">
+                      <b>{sec.name}</b>
+                      <span>{sec.blurb}</span>
+                    </div>
+                    <Status s={head} />
+                  </div>
+                  <div className="cm-branch-route">
+                    <span className="cm-route-from">◇ from {sec.from === 'verification' ? 'Verification' : 'Decision'}</span>
+                    <span className={`cm-route-loop ${sec.loops ? 'loop' : 'term'}`}>{sec.loops ? '↺ returns to origin' : '■ terminal — case closed'}</span>
+                  </div>
+                  <div className="cm-group">
+                    <span className="cm-group-l">Tasks</span>
+                    <div className="cm-tasks">
+                      {sec.tasks.map((t) => <TaskRow key={t.name} t={t} s={secTaskState(t, active)} />)}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
         {/* The orchestrating agent, watching over the case */}
         <div className="cm-agent">
           <span className="cm-agent-mark"><KIcon k="agent" s={16} /></span>
@@ -330,8 +445,11 @@ function CasesInner() {
       </div>
 
       <p className="cm-note">
-        First pass · structure only. Tasks are placeholders; the flow is live off the shared store —
-        the selected case's state lights the stages, and Verification mirrors its real validation results.
+        Mirrors the deployed UiPath Maestro case: the main spine (Intake → Verification → Decision →
+        Activation → Closure) branches to secondary lanes — Compliance escalations, EDD review and
+        Pending customer all loop back to their origin, Declined is terminal. The flow is live off the
+        shared store — the selected case's state lights its stage (spine or lane), and Verification
+        mirrors its real validation results.
       </p>
     </div>
   );

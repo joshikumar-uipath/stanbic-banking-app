@@ -110,6 +110,36 @@
 .cx-note.good { background: var(--good-bg); color: #0d5c30; }
 .cx-note svg { flex: 0 0 auto; margin-top: 1px; }
 
+/* Upload a completed form → Document Understanding pre-fill */
+.cx-drop { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 13px 15px; margin-bottom: 16px; background: var(--wash); border: 1px dashed var(--line); border-radius: var(--r-tile); cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.cx-drop:hover { border-color: var(--blue); background: #fff; }
+.cx-drop.reading { cursor: default; border-style: solid; }
+.cx-drop-ic { flex: 0 0 auto; width: 34px; height: 34px; border-radius: var(--r-sm); background: color-mix(in srgb, var(--blue) 10%, #fff); color: var(--blue); display: grid; place-items: center; }
+.cx-drop-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.cx-drop-t b { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+.cx-drop-t em { font-style: normal; font-size: 12px; color: var(--soft); overflow: hidden; text-overflow: ellipsis; }
+.cx-spin { flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--blue); animation: cxSpin .7s linear infinite; }
+@keyframes cxSpin { to { transform: rotate(360deg); } }
+.cx-clearbtn { margin-left: 8px; background: none; border: none; padding: 0; font: inherit; font-weight: 600; color: #0d5c30; text-decoration: underline; cursor: pointer; }
+
+/* Account-type toggle (Individual | Corporate) */
+.cx-seg { display: inline-flex; padding: 3px; margin-bottom: 16px; background: var(--wash); border: 1px solid var(--line-2); border-radius: var(--r-sm); }
+.cx-seg button { padding: 6px 16px; border: none; background: transparent; border-radius: calc(var(--r-sm) - 3px); font: inherit; font-size: 13px; font-weight: 600; color: var(--soft); cursor: pointer; }
+.cx-seg button[aria-selected="true"] { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(17,24,29,.08); }
+
+/* Native <select> styled like cx-input */
+.cx-select { appearance: none; -webkit-appearance: none; cursor: pointer; padding-right: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2311181d' stroke-opacity='.5' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; }
+
+/* Directors / signatories list */
+.cx-dir { border: 1px solid var(--line); border-radius: var(--r-tile); padding: 14px; margin-bottom: 12px; background: var(--card); }
+.cx-dir-hd { display: flex; align-items: center; gap: 9px; margin-bottom: 10px; }
+.cx-dir-n { width: 22px; height: 22px; border-radius: 7px; background: color-mix(in srgb, var(--blue) 10%, #fff); color: var(--blue); font-size: 12px; font-weight: 700; display: grid; place-items: center; flex: 0 0 auto; }
+.cx-dir-hd b { font-size: 13.5px; font-weight: 600; color: var(--ink); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.cx-dir-x { width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--line); background: #fff; color: var(--soft); display: grid; place-items: center; cursor: pointer; flex: 0 0 auto; }
+.cx-dir-x:hover { color: var(--crit); border-color: var(--crit); }
+
 /* ── Welcome ── */
 .cx-hero { position: relative; overflow: hidden; border-radius: 26px; padding: 26px 22px 24px;
   background: linear-gradient(150deg, var(--blue) 0%, var(--navy) 100%); color: #fff; }

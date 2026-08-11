@@ -17,6 +17,19 @@ type Vals = { firstName: string; lastName: string; phone: string; email: string;
 const EMPTY: Vals = { firstName: '', lastName: '', phone: '', email: '', bvn: '', nin: '', address: '' };
 const STEPS = ['About you', 'Identity', 'Address', 'Review'];
 
+// What a UiPath Document Understanding extract of the uploaded account-opening
+// form yields. A corporate AOF carries its directors; the account opens under the
+// signing director, so we map the primary signatory into the individual capture.
+// (Demo stand-in for a live DU/IXP call — swap onUpload's body for the real one.)
+const EXTRACTED: Vals = {
+  firstName: 'Efe', lastName: 'Emore',
+  phone: '08027317889', email: 'eemore@gmail.com',
+  bvn: '22143511463', nin: '',
+  address: '62 Ire Akari Street, Isolo, Lagos',
+};
+const EXTRACTED_ORG = 'George Emore Technical Enterprises Ltd';
+const EXTRACTED_COUNT = Object.values(EXTRACTED).filter(Boolean).length;
+
 const digits = (s: string) => s.replace(/\D/g, '');
 
 // NOTE: field validation is deliberately OFF for now — every step advances freely
@@ -28,7 +41,7 @@ const digits = (s: string) => s.replace(/\D/g, '');
  *  capturing on someone's behalf — same wizard, staff-facing copy. */
 export type ApplyMode = 'self' | 'rm';
 
-export default function Apply({ onBack, onDone, mode = 'self' }: { onBack: () => void; onDone: (c: OnboardingCase) => void; mode?: ApplyMode }) {
+export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBack: () => void; onDone: (c: OnboardingCase) => void; mode?: ApplyMode; onKind?: (k: 'individual' | 'corporate') => void }) {
   const appName = useConfig().branding.appName;
   const rm = mode === 'rm';
   const [step, setStep] = useState(0);
@@ -36,10 +49,27 @@ export default function Apply({ onBack, onDone, mode = 'self' }: { onBack: () =>
   const [dup, setDup] = useState<DuplicateOutcome | null>(null);
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Scanned-form upload → Document Understanding → pre-fill.
+  const [doc, setDoc] = useState<{ name: string; phase: 'reading' | 'done' } | null>(null);
 
   const set = (k: keyof Vals) => (ev: React.ChangeEvent<HTMLInputElement>) => {
     setV((p) => ({ ...p, [k]: ev.target.value }));
   };
+
+  const onUpload = (ev: React.ChangeEvent<HTMLInputElement>) => {
+    const f = ev.target.files?.[0];
+    ev.target.value = '';                 // let the same file be re-picked
+    if (!f) return;
+    setDoc({ name: f.name, phase: 'reading' });
+    // Stand-in for a UiPath Document Understanding / IXP extract: read the scan
+    // and return the fields. Swap this timeout for the real DU call when wired.
+    window.setTimeout(() => {
+      setV((p) => ({ ...p, ...EXTRACTED }));
+      setDoc({ name: f.name, phase: 'done' });
+    }, 1700);
+  };
+
+  const clearUpload = () => { setV(EMPTY); setDoc(null); };
 
   const next = async () => {
     if (step === 1 && (v.bvn || v.nin || v.phone)) {
@@ -76,8 +106,39 @@ export default function Apply({ onBack, onDone, mode = 'self' }: { onBack: () =>
       <div className="cx-body">
         {step === 0 && (
           <>
+            {onKind && rm && (
+              <div className="cx-seg" role="tablist" aria-label="Account type">
+                <button role="tab" aria-selected={true}>Individual</button>
+                <button role="tab" aria-selected={false} onClick={() => onKind('corporate')}>Corporate</button>
+              </div>
+            )}
             <h1 className="cx-h1">{rm ? 'Customer details' : 'Let’s start with you'}</h1>
-            <p className="cx-p" style={{ marginBottom: 18 }}>{rm ? `Enter their name exactly as it appears on their ${Sc.label}.` : `Use your name exactly as it appears on your ${Sc.label}.`}</p>
+            <p className="cx-p" style={{ marginBottom: 16 }}>{rm ? `Enter their name exactly as it appears on their ${Sc.label}.` : `Use your name exactly as it appears on your ${Sc.label}.`}</p>
+
+            {/* Upload a completed form → Document Understanding reads it and pre-fills. */}
+            {!doc && (
+              <label className="cx-drop">
+                <input type="file" accept="application/pdf,image/*" onChange={onUpload} hidden />
+                <span className="cx-drop-ic"><Icon name="upload" size={18} /></span>
+                <span className="cx-drop-t">
+                  <b>{rm ? 'Have a completed form? Upload it' : 'Have a completed form? Upload it'}</b>
+                  <em>Scan or photo of the account opening form — we’ll read it and fill this in.</em>
+                </span>
+              </label>
+            )}
+            {doc?.phase === 'reading' && (
+              <div className="cx-drop reading">
+                <span className="cx-spin" aria-hidden />
+                <span className="cx-drop-t"><b>Reading {doc.name}…</b><em>Document Understanding is extracting the fields.</em></span>
+              </div>
+            )}
+            {doc?.phase === 'done' && (
+              <Note tone="good" icon="checkCircle">
+                <b>{EXTRACTED_COUNT} fields read from the form.</b> From {EXTRACTED_ORG} — signing director. Please check each one before you continue.
+                <button type="button" className="cx-clearbtn" onClick={clearUpload}>Clear</button>
+              </Note>
+            )}
+
             <div className="cx-row">
               <Field label="First name" name="firstName" value={v.firstName} onChange={set('firstName')} autoComplete="given-name" />
               <Field label="Last name" name="lastName" value={v.lastName} onChange={set('lastName')} autoComplete="family-name" />

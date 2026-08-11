@@ -40,7 +40,7 @@ export interface OnboardingStore {
 const CASES_KEY = 'aof_cases';
 const EVENTS_KEY = 'aof_events';
 const SEED_VERSION_KEY = 'aof_seed_v';
-const SEED_VERSION = '8';   // bump to force a reseed when the demo data changes
+const SEED_VERSION = '9';   // bump to force a reseed when the demo data changes
 const SEED_AT_KEY = 'aof_seed_at';   // wall-clock of the last seed, for staleness
 const SEED_COUNTRY_KEY = 'aof_seed_country';   // market the current seed was localised to
 // Seeded cases freeze their createdAt at seed time, so "opened 2h ago" drifts to
@@ -147,6 +147,7 @@ class MockOnboardingStore implements OnboardingStore {
     const c: OnboardingCase = {
       id: nextApplicationId(),
       firstName: input.firstName, lastName: input.lastName,
+      entity: input.entity,
       phone: input.phone, email: input.email, bvn: input.bvn, nin: input.nin,
       address: input.address, employer: input.employer,
       channel: input.channel ?? 'single',
@@ -301,6 +302,14 @@ function seed(s: MockOnboardingStore) {
     // batches out to a believable size — batch 1 → 10, batch 2 → 20.
     ...bulkRows(co, emp1, 'BATCH-001', 9, 100, 1800),
     ...bulkRows(co, emp2, 'BATCH-002', 19, 200, 120),
+    // ── Secondary / branch-stage cases ──────────────────────────────────────
+    // Store-only demo cases parked in the Maestro case's exception lanes, so the
+    // case view shows cases sitting across EVERY stage (not just the main spine).
+    // Appended last on purpose — keeps every existing id + SEED_LINKS stable.
+    named(9,  { source: 'branch',         state: 'COMPLIANCE_HOLD',  vals: { PEP: 'failed', AML: 'passed', BVN: 'passed', NIN: 'passed', FRAUD: 'passed', LIVENESS: 'passed' }, agoMin: 260 }),
+    named(10, { source: 'rm',             state: 'EDD_REVIEW',       vals: { PEP: 'passed', AML: 'passed', BVN: 'passed', NIN: 'passed', FRAUD: 'passed', LIVENESS: 'passed' }, agoMin: 610 }),
+    named(11, { source: 'contact-centre', state: 'PENDING_CUSTOMER', vals: { BVN: 'passed', NIN: 'passed', AML: 'passed', PEP: 'passed', FRAUD: 'passed', LIVENESS: 'passed' }, agoMin: 1560 }),
+    named(12, { source: 'rm',             state: 'DECLINED',         vals: { FRAUD: 'failed', BVN: 'passed', NIN: 'passed', AML: 'passed', PEP: 'passed', LIVENESS: 'passed' }, agoMin: 4380 }),
   ];
   rows.forEach((r) => { void seedCase(s, r); });
 }
@@ -337,6 +346,11 @@ async function seedCase(s: MockOnboardingStore, r: SeedRow) {
   if (BEYOND_VALIDATION.includes(r.state)) await s.publish(c.id, 'account-creation-requested', `Account creation requested in Finacle for ${nm}`);
   if (r.account) await s.publish(c.id, 'account-created', `Finacle account ${patch.accountNumber} created for ${nm}`);
   if (r.state === 'PENDING_LIVENESS' || r.state === 'PENDING_DOCUMENTS') await s.publish(c.id, 'customer-notification', `KYC link sent by SMS to ${nm}`);
+  // Secondary / branch-stage narrative — show how the case diverted (and will loop back).
+  if (r.state === 'COMPLIANCE_HOLD') await s.publish(c.id, 'exception-queue', `Sanctions/PEP screening hit — routed from Verification to Compliance escalations for ${nm}`);
+  if (r.state === 'EDD_REVIEW') await s.publish(c.id, 'customer-notification', `Risk-based enhanced due diligence opened from Decision for ${nm} — returns to Decision when cleared`);
+  if (r.state === 'PENDING_CUSTOMER') await s.publish(c.id, 'customer-notification', `Additional information requested from ${nm} (RFI) — paused pending customer response`);
+  if (r.state === 'DECLINED') await s.publish(c.id, 'customer-notification', `Application declined at Decision for ${nm} — case closed`);
 }
 
 // Shared singleton — import this everywhere.

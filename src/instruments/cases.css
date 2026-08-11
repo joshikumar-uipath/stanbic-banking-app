@@ -10,7 +10,7 @@
   --cm-att: #dc4a3d; --cm-att-bg: #fdf3f2; --cm-att-line: #f3ccc7;
   --cm-pend: #9aa6b2; --cm-pend-line: #e3e7ec;
   display: flex; flex-direction: column; min-height: 100vh;
-  background: #f4f6f9; color: var(--i-ink); font-family: var(--i-num);
+  background: #ffffff; color: var(--i-ink); font-family: var(--i-num);
 }
 
 /* ── Control row ── */
@@ -19,9 +19,9 @@
 .cm-ctrl-l { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .cm-eyebrow { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--i-ink-3); }
 .cm-pick { font: inherit; font-size: 13px; font-weight: 500; color: var(--i-ink); background: #fff;
-  border: 1px solid var(--i-line-2); border-radius: 9px; padding: 8px 11px; min-width: 320px; max-width: 60vw; outline: none; cursor: pointer; }
+  border: 1px solid var(--i-line-2); border-radius: 0; padding: 8px 11px; min-width: 320px; max-width: 60vw; outline: none; cursor: pointer; }
 .cm-pick:focus { border-color: var(--i-brand); }
-.cm-badge { font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
+.cm-badge { font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 0; border: 1px solid transparent; white-space: nowrap; }
 .cm-badge.progress { background: var(--cm-active-bg); color: var(--cm-active); border-color: var(--cm-active-line); }
 .cm-badge.good { background: var(--cm-done-bg); color: var(--cm-done-ink, #15803d); border-color: var(--cm-done-line); }
 .cm-badge.pending { background: #fbf6ea; color: var(--i-warn-ink); border-color: #f0e2c2; }
@@ -31,7 +31,7 @@
 .cm-leg { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--i-ink-2); }
 
 /* ── Task-kind icon chips ── */
-.cm-ti { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; flex: 0 0 auto; }
+.cm-ti { width: 22px; height: 22px; border-radius: 0; display: grid; place-items: center; flex: 0 0 auto; }
 .cm-ti.agent  { background: #eef0ff; color: #4c53c9; }
 .cm-ti.robot  { background: #eaf4fb; color: #2f7fb8; }
 .cm-ti.human  { background: #fdeef4; color: #c0468a; }
@@ -59,7 +59,7 @@
 
 /* ── Stage card ── */
 .cm-stage { width: 264px; flex: 0 0 auto; background: #fff; border: 2px solid var(--cm-pend-line);
-  border-radius: 16px; padding: 15px 15px 8px; box-shadow: 0 4px 20px -12px rgba(20,40,70,.3); }
+  border-radius: 0; padding: 15px 15px 8px; box-shadow: 0 4px 20px -12px rgba(20,40,70,.3); }
 .cm-stage.done   { border-color: var(--cm-done-line); }
 .cm-stage.active { border-color: var(--cm-active-line); box-shadow: 0 6px 24px -10px rgba(47,107,214,.4); }
 .cm-stage.attention { border-color: var(--cm-att-line); }
@@ -76,7 +76,7 @@
 .cm-tasks { display: flex; flex-direction: column; gap: 7px; }
 
 /* ── Task row ── */
-.cm-task { display: flex; align-items: center; gap: 9px; padding: 8px 9px; border-radius: 9px;
+.cm-task { display: flex; align-items: center; gap: 9px; padding: 8px 9px; border-radius: 0;
   border: 1px solid var(--i-line-2); background: #fff; }
 .cm-task.done { border-color: var(--cm-done-line); background: linear-gradient(0deg, var(--cm-done-bg), var(--cm-done-bg)); }
 .cm-task.active { border-color: var(--cm-active-line); background: var(--cm-active-bg); }
@@ -96,11 +96,31 @@
 .cm-spin { width: 13px; height: 13px; border-radius: 50%; border: 2px solid var(--cm-active-line); border-top-color: var(--cm-active); animation: cmspin .7s linear infinite; }
 @keyframes cmspin { to { transform: rotate(360deg); } }
 
+/* ── Divert chip on spine stages that fan out to secondary lanes ── */
+.cm-divert { display: flex; align-items: center; gap: 7px; margin: 0 0 12px; padding: 6px 9px; border-radius: 0;
+  background: #f6f2fc; border: 1px dashed #dcccf4; font-size: 11px; font-weight: 500; color: #6b4bb0; line-height: 1.3; }
+.cm-divert-gw { font-weight: 800; font-size: 13px; flex: 0 0 auto; }
+.cm-divert.on { background: #efe7fb; border-color: #c9b3ee; color: #59309e; }
+
+/* ── Secondary / exception-lane stages ── */
+.cm-branches { margin-top: 30px; padding-top: 22px; border-top: 1px dashed var(--i-line-2); min-width: min-content; }
+.cm-branch-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; padding: 0 2px; }
+.cm-branch-eyebrow { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--i-ink-3); }
+.cm-branch-sub { font-size: 12px; color: var(--i-ink-3); }
+.cm-branch-row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.cm-stage.sec { width: 236px; border-style: dashed; }
+.cm-stage.sec.active, .cm-stage.sec.attention { border-style: solid; }
+.cm-branch-route { display: flex; flex-direction: column; gap: 4px; margin: 8px 0 4px; }
+.cm-route-from { font-size: 11px; font-weight: 600; color: #7a52c4; }
+.cm-route-loop { font-size: 11px; font-weight: 600; }
+.cm-route-loop.loop { color: var(--cm-active); }
+.cm-route-loop.term { color: var(--cm-att); }
+
 /* ── Orchestrating agent ── */
 .cm-agent { position: sticky; left: 22px; display: inline-flex; align-items: center; gap: 10px; margin: 18px 0 4px;
-  background: #fff; border: 1px solid var(--i-line-2); border-radius: 12px; padding: 9px 14px 9px 10px;
+  background: #fff; border: 1px solid var(--i-line-2); border-radius: 0; padding: 9px 14px 9px 10px;
   box-shadow: 0 6px 22px -12px rgba(20,40,70,.4); width: max-content; }
-.cm-agent-mark { width: 30px; height: 30px; border-radius: 8px; background: #eef0ff; color: #4c53c9; display: grid; place-items: center; }
+.cm-agent-mark { width: 30px; height: 30px; border-radius: 0; background: #eef0ff; color: #4c53c9; display: grid; place-items: center; }
 .cm-agent-t b { display: block; font-size: 13px; font-weight: 700; color: var(--i-ink); }
 .cm-agent-t em { display: block; font-style: normal; font-size: 11px; color: var(--i-ink-3); }
 
@@ -108,7 +128,7 @@
 
 /* ── Live bridge to the real Maestro case ── */
 .cm-run { font: inherit; font-size: 12.5px; font-weight: 600; color: #fff; background: var(--i-brand);
-  border: 1px solid var(--i-brand); border-radius: 9px; padding: 7px 13px; cursor: pointer; white-space: nowrap; }
+  border: 1px solid var(--i-brand); border-radius: 0; padding: 7px 13px; cursor: pointer; white-space: nowrap; }
 .cm-run:hover:not(:disabled) { filter: brightness(1.06); }
 .cm-run:disabled { opacity: .6; cursor: default; }
 
@@ -123,10 +143,10 @@
 @keyframes cmpulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
 .cm-live-id { font-family: var(--i-mono); font-size: 11px; color: var(--i-ink-3); }
 .cm-live-state { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--cm-active);
-  background: var(--cm-active-bg); border: 1px solid var(--cm-active-line); border-radius: 999px; padding: 2px 9px; }
+  background: var(--cm-active-bg); border: 1px solid var(--cm-active-line); border-radius: 0; padding: 2px 9px; }
 .cm-live-state.ok { color: var(--cm-done); background: var(--cm-done-bg); border-color: var(--cm-done-line); }
 .cm-live-stages { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.cm-live-stage { font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--cm-pend-line); color: var(--i-ink-3); background: #fff; white-space: nowrap; }
+.cm-live-stage { font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 0; border: 1px solid var(--cm-pend-line); color: var(--i-ink-3); background: #fff; white-space: nowrap; }
 .cm-live-stage.done { color: var(--cm-done); border-color: var(--cm-done-line); background: var(--cm-done-bg); }
 .cm-live-stage.active { color: var(--cm-active); border-color: var(--cm-active-line); background: var(--cm-active-bg); box-shadow: 0 0 0 2px color-mix(in srgb, var(--cm-active) 14%, transparent); }
 .cm-live-actions { margin-left: auto; display: flex; align-items: center; gap: 12px; }

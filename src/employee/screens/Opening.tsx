@@ -43,9 +43,10 @@ export default function Opening({ cases, flow, setFlow }: { cases: OnboardingCas
   const [openMap, setOpenMap] = useState<Record<string, boolean>>({});
 
   // A case can be opened from outside this screen (My desk, global search). Reveal
-  // it in context: expand the batch it belongs to — collapsing the other batches to
-  // keep the accordion — so the row is visible and highlighted, not buried in a
-  // folded group. Render-phase adjustment: it reacts to `flow` changing, not a click.
+  // it in context: collapse EVERY group — the other batches and the walk-in/direct
+  // lane — and open only the one the case lives in, so the row is visible and
+  // highlighted, never sharing the view with an unrelated expanded group.
+  // Render-phase adjustment: it reacts to `flow` changing, not a click.
   const [revealed, setRevealed] = useState<string | null>(null);
   if (flow !== revealed) {
     setRevealed(flow);
@@ -53,7 +54,8 @@ export default function Opening({ cases, flow, setFlow }: { cases: OnboardingCas
     if (target) {
       setOpenMap((m) => {
         const next = { ...m };
-        if (target.batchId) for (const c of cases) if (c.batchId) next[c.batchId] = false;
+        for (const c of cases) if (c.batchId) next[c.batchId] = false;
+        next['__direct__'] = false;
         next[target.batchId ?? '__direct__'] = true;
         return next;
       });
@@ -111,6 +113,7 @@ export default function Opening({ cases, flow, setFlow }: { cases: OnboardingCas
   return (
     <div className={`dk-split${flow !== null ? ' busy' : ''}`}>
       <div className="p l">
+        <div className="dk-scroll">
         {/* Three stats, not four: this pane is half-width, and straight-through
             is a desk-level number that already leads My desk. */}
         <div className="dk-health">
@@ -159,6 +162,7 @@ export default function Opening({ cases, flow, setFlow }: { cases: OnboardingCas
               <div className="dk-empty"><b>Nothing here</b><span>No applications match this filter.</span></div>
             )}
           </div>
+        </div>
         </div>
       </div>
 
@@ -220,15 +224,18 @@ function buildGroups(list: OnboardingCase[]): Group[] {
     if (c.batchId) { const a = batches.get(c.batchId) ?? []; a.push(c); batches.set(c.batchId, a); }
     else direct.push(c);
   }
-  const groups: Group[] = [];
+  const batchGroups: Group[] = [];
   for (const [batchId, rows] of batches) {
     const sorted = [...rows].sort((a, b) => a.id.localeCompare(b.id));
     const employer = sorted.find((c) => c.employer)?.employer;
     const createdAt = sorted.reduce((min, c) => (c.createdAt < min ? c.createdAt : min), sorted[0].createdAt);
-    groups.push({ key: batchId, kind: 'batch', title: employer || 'Bulk batch', batchId, createdAt, rows: sorted });
+    batchGroups.push({ key: batchId, kind: 'batch', title: employer || 'Bulk batch', batchId, createdAt, rows: sorted });
   }
-  groups.sort((a, b) => b.createdAt.localeCompare(a.createdAt)); // newest batch first
+  batchGroups.sort((a, b) => b.createdAt.localeCompare(a.createdAt)); // newest batch first
+  // Walk-in / direct always leads the list; bulk uploads follow (newest first).
+  const groups: Group[] = [];
   if (direct.length) groups.push({ key: '__direct__', kind: 'direct', title: 'Walk-in / direct', createdAt: '', rows: direct });
+  groups.push(...batchGroups);
   return groups;
 }
 

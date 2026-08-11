@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dmn:definitions xmlns:dmn="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="AOF_OnboardingAutomation" name="Account Opening — Automation Rules" exporter="UiPath (https://bpmn.uipath.com)" exporterVersion="a0f9348b">
+  <dmn:decision id="d_OnboardingAutomation" label="OnboardingAutomation" name="OnboardingAutomation">
+    <dmn:informationRequirement id="InformationRequirement_check">
+      <dmn:requiredInput href="#InputData_check" />
+    </dmn:informationRequirement>
+    <dmn:informationRequirement id="InformationRequirement_condition">
+      <dmn:requiredInput href="#InputData_condition" />
+    </dmn:informationRequirement>
+    <dmn:decisionTable id="dt_OnboardingAutomation" hitPolicy="FIRST">
+      <dmn:input id="ti_check" label="Check">
+        <dmn:inputExpression id="ie_expr_check" typeRef="string">
+          <dmn:text>check</dmn:text>
+        </dmn:inputExpression>
+      </dmn:input>
+      <dmn:input id="ti_condition" label="Condition">
+        <dmn:inputExpression id="ie_expr_condition" typeRef="string">
+          <dmn:text>condition</dmn:text>
+        </dmn:inputExpression>
+      </dmn:input>
+      <dmn:output id="to_action" label="Automated Action" name="action" typeRef="string" />
+      <dmn:output id="to_automated" label="Automated" name="automated" typeRef="boolean" />
+      <dmn:rule id="r_BR_AUT_001">
+        <dmn:description>BR-AUT-001: Accept NIMC name when the match is strong and date of birth agrees</dmn:description>
+        <dmn:inputEntry id="ie_001_check">
+          <dmn:text>"nin"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_001_cond">
+          <dmn:text>nin.nameMatch &gt;= 0.95 AND applicant.dob == nimc.dob</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_001_action">
+          <dmn:text>"Accept nimc.name"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_001_auto">
+          <dmn:text>true</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+      <dmn:rule id="r_BR_AUT_002">
+        <dmn:description>BR-AUT-002: Retry the NIN check automatically on a NIMC gateway 5xx</dmn:description>
+        <dmn:inputEntry id="ie_002_check">
+          <dmn:text>"nin"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_002_cond">
+          <dmn:text>nin.error.status &gt;= 500</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_002_action">
+          <dmn:text>"Retry NIN check up to 3 times, 60s apart"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_002_auto">
+          <dmn:text>true</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+      <dmn:rule id="r_BR_AUT_003">
+        <dmn:description>BR-AUT-003: Retry the BVN check automatically on a NIBSS gateway 5xx</dmn:description>
+        <dmn:inputEntry id="ie_003_check">
+          <dmn:text>"bvn"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_003_cond">
+          <dmn:text>bvn.error.status &gt;= 500</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_003_action">
+          <dmn:text>"Retry BVN check up to 3 times, 60s apart"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_003_auto">
+          <dmn:text>true</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+      <dmn:rule id="r_BR_AUT_004">
+        <dmn:description>BR-AUT-004: Accept BVN name when the match is strong and date of birth agrees</dmn:description>
+        <dmn:inputEntry id="ie_004_check">
+          <dmn:text>"bvn"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_004_cond">
+          <dmn:text>bvn.nameMatch &gt;= 0.97 AND applicant.dob == bvn.dob</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_004_action">
+          <dmn:text>"Accept bvn.name"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_004_auto">
+          <dmn:text>true</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+      <dmn:rule id="r_BR_AUT_005">
+        <dmn:description>BR-AUT-005: Clear AML and PEP screening when there are no watchlist hits</dmn:description>
+        <dmn:inputEntry id="ie_005_check">
+          <dmn:text>"screening"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_005_cond">
+          <dmn:text>aml.hits == 0 AND pep.hits == 0 AND sanctions.hits == 0</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_005_action">
+          <dmn:text>"Clear AML and PEP screening"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_005_auto">
+          <dmn:text>true</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+      <dmn:rule id="r_BR_AUT_006">
+        <dmn:description>BR-AUT-006: Request a new selfie when liveness is below threshold and captured after hours</dmn:description>
+        <dmn:inputEntry id="ie_006_check">
+          <dmn:text>"liveness"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_006_cond">
+          <dmn:text>liveness.score &lt; 0.60 AND capture.hour &gt;= 19</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_006_action">
+          <dmn:text>"Request a new selfie and notify the applicant"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_006_auto">
+          <dmn:text>true</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+      <dmn:rule id="r_BR_AUT_007">
+        <dmn:description>BR-AUT-007: Re-queue bulk rows stalled behind a recovered NIMC window</dmn:description>
+        <dmn:inputEntry id="ie_007_check">
+          <dmn:text>"bulk"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_007_cond">
+          <dmn:text>batch.stalledReason == "nimc_timeout" AND nimc.status == "recovered"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_007_action">
+          <dmn:text>"Re-queue the stalled rows"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_007_auto">
+          <dmn:text>true</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+      <dmn:rule id="r_BR_AUT_000_default">
+        <dmn:description>Default — anything an automation rule does not cover routes to a reviewer</dmn:description>
+        <dmn:inputEntry id="ie_000_check">
+          <dmn:text>-</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_000_cond">
+          <dmn:text>-</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_000_action">
+          <dmn:text>"Route to a reviewer"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_000_auto">
+          <dmn:text>false</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+    </dmn:decisionTable>
+  </dmn:decision>
+  <dmn:inputData id="InputData_check" label="check" name="check" />
+  <dmn:inputData id="InputData_condition" label="condition" name="condition" />
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="DMNDiagram_aof_automation">
+      <dmndi:DMNShape id="DMNShape_d_OnboardingAutomation" dmnElementRef="d_OnboardingAutomation">
+        <dc:Bounds height="80" width="180" x="430" y="160" />
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="DMNShape_InputData_check" dmnElementRef="InputData_check">
+        <dc:Bounds height="45" width="125" x="178" y="80" />
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="DMNShape_InputData_condition" dmnElementRef="InputData_condition">
+        <dc:Bounds height="45" width="125" x="178" y="280" />
+      </dmndi:DMNShape>
+      <dmndi:DMNEdge id="DMNEdge_InformationRequirement_check" dmnElementRef="InformationRequirement_check">
+        <di:waypoint x="240" y="125" />
+        <di:waypoint x="240" y="150" />
+        <di:waypoint x="520" y="150" />
+        <di:waypoint x="520" y="160" />
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="DMNEdge_InformationRequirement_condition" dmnElementRef="InformationRequirement_condition">
+        <di:waypoint x="240" y="280" />
+        <di:waypoint x="240" y="250" />
+        <di:waypoint x="520" y="250" />
+        <di:waypoint x="520" y="240" />
+      </dmndi:DMNEdge>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</dmn:definitions>

@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { store, mockCif, mockAccountNumber, type OnboardingCase, type ValidationKind, type ValidationStatus } from '../onboarding';
 import { getActiveCountry, kycLabel } from '../config/countries';
 import Apply, { type ApplyMode } from './Apply';
+import ApplyCorporate from './ApplyCorporate';
 import Status, { useCase } from './Status';
 import Kyc from './Kyc';
 import { rememberMyApp } from './mine';
@@ -43,16 +44,21 @@ type Screen = 'apply' | 'received' | 'status' | 'kyc';
 export default function AccountOpeningFlow({ onExit, startCaseId, mode = 'self' }: { onExit: () => void; startCaseId?: string; mode?: ApplyMode }) {
   const [screen, setScreen] = useState<Screen>(startCaseId ? 'status' : 'apply');
   const [id, setId] = useState<string | null>(startCaseId ?? null);
+  // Individual vs corporate (business) opening. Staff can switch at step 1.
+  const [kind, setKind] = useState<'individual' | 'corporate'>('individual');
   const c = useCase(id);
+
+  const onCreated = (created: OnboardingCase) => {
+    // Only the customer's own device keeps a "mine" list — staff see the branch pipeline.
+    if (mode === 'self') rememberMyApp(created.id);
+    setId(created.id); setScreen('received'); simulate(created.id);
+  };
 
   return (
     <div className="cx">
-      {screen === 'apply' && (
-        <Apply mode={mode} onBack={onExit} onDone={(created: OnboardingCase) => {
-          // Only the customer's own device keeps a "mine" list — staff see the branch pipeline.
-          if (mode === 'self') rememberMyApp(created.id);
-          setId(created.id); setScreen('received'); simulate(created.id);
-        }} />
+      {screen === 'apply' && (kind === 'corporate'
+        ? <ApplyCorporate mode={mode} onBack={onExit} onKind={setKind} onDone={onCreated} />
+        : <Apply mode={mode} onBack={onExit} onKind={setKind} onDone={onCreated} />
       )}
       {screen === 'received' && c && <Received c={c} mode={mode} onTrack={() => setScreen('status')} onKyc={() => setScreen('kyc')} />}
       {screen === 'status' && c && <Status c={c} onBack={onExit} onKyc={() => setScreen('kyc')} />}

@@ -35,7 +35,7 @@ export default function Clients() {
   if (open) return <div className="dk-hold"><Customer360 customer={open} onBack={() => setOpen(null)} /></div>;
 
   return (
-    <>
+    <div className="dk-scroll">
       <div className="dk-health">
         <Stat k="Relationships" v={p.relationships} />
         <Stat k="At-risk" v={p.atRisk} tone={p.atRisk ? '#d97706' : undefined} />
@@ -87,7 +87,7 @@ export default function Clients() {
           ) : <div className="dk-empty"><b>Nothing here</b><span>No clients match this filter.</span></div>}
         </div>
       </div>
-    </>
+    </div>
   );
 }
 

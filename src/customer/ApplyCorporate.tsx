@@ -1,0 +1,229 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// ApplyCorporate — the business/entity opening wizard.
+// Business details → Directors & signatories → Review → submit.
+// A corporate account opens under its signing director, so the case carries the
+// primary signatory's identity (for validations/pipeline) plus the full entity
+// metadata (see EntityInfo). Same shared OnboardingStore as the individual flow.
+// ─────────────────────────────────────────────────────────────────────────────
+import { useState } from 'react';
+import { store, type OnboardingCase } from '../onboarding';
+import { getActiveCountry } from '../config/countries';
+import { useConfig } from '../config';
+import { Button, Field, Note, Rail, KV, Brand } from './ui';
+import Icon from './icons';
+import type { ApplyMode } from './Apply';
+
+const CO = getActiveCountry();
+const CUR = CO.currency.symbol;
+const digits = (s: string) => s.replace(/\D/g, '');
+
+type Dir = { name: string; bvn: string; idType: string; idNumber: string; phone: string; email: string; role: string };
+type Corp = { company: string; rc: string; bizType: string; sector: string; tin: string; turnover: string; address: string; email: string; phone: string };
+
+const BIZ_TYPES = ['Limited Liability Company', 'Partnership', 'Sole Proprietor', 'Schools', 'Other'];
+const ROLES = ['Director', 'Shareholder', 'Signatory'];
+const TURNOVERS = [`Less than ${CUR}400m`, `${CUR}400m – ${CUR}1bn`, `${CUR}1bn – ${CUR}4bn`, `Greater than ${CUR}4bn`];
+
+const EMPTY_DIR: Dir = { name: '', bvn: '', idType: 'International Passport', idNumber: '', phone: '', email: '', role: 'Director' };
+const EMPTY_CORP: Corp = { company: '', rc: '', bizType: BIZ_TYPES[0], sector: '', tin: '', turnover: TURNOVERS[0], address: '', email: '', phone: '' };
+
+// Demo Document Understanding result for the corporate AOF — company + directors.
+const EXTRACTED_CORP: Corp = {
+  company: 'George Emore Technical Enterprises Ltd', rc: '961813',
+  bizType: 'Limited Liability Company', sector: 'Information Technology',
+  tin: '26224878833179', turnover: TURNOVERS[0],
+  address: '45 Ajose Street, Mende, Maryland', email: 'eemore@gmail.com', phone: '08027317889',
+};
+const EXTRACTED_DIRS: Dir[] = [
+  { name: 'Efe George Emore', bvn: '22143511463', idType: 'International Passport', idNumber: 'B03199156', phone: '08027317889', email: 'eemore@gmail.com', role: 'Director' },
+  { name: 'Kehinde Omotayo Akerele', bvn: '22148013170', idType: 'International Passport', idNumber: 'B00597328', phone: '08066526627', email: 'meetsweetkenny@yahoo.com', role: 'Director' },
+];
+
+const STEPS = ['Business', 'Directors', 'Review'];
+
+function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
+  return (
+    <div className="cx-field">
+      <label>{label}</label>
+      <select className="cx-input cx-select" value={value} onChange={(e) => onChange(e.target.value)}>
+        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  );
+}
+
+export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: {
+  onBack: () => void; onDone: (c: OnboardingCase) => void; mode?: ApplyMode; onKind?: (k: 'individual' | 'corporate') => void;
+}) {
+  const appName = useConfig().branding.appName;
+  const rm = mode === 'rm';
+  const [step, setStep] = useState(0);
+  const [v, setV] = useState<Corp>(EMPTY_CORP);
+  const [dirs, setDirs] = useState<Dir[]>([{ ...EMPTY_DIR }]);
+  const [consent, setConsent] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [doc, setDoc] = useState<{ name: string; phase: 'reading' | 'done' } | null>(null);
+
+  const set = (k: keyof Corp) => (e: React.ChangeEvent<HTMLInputElement>) => setV((p) => ({ ...p, [k]: e.target.value }));
+  const setDir = (i: number, k: keyof Dir, val: string) => setDirs((ds) => ds.map((d, j) => (j === i ? { ...d, [k]: val } : d)));
+  const addDir = () => setDirs((ds) => [...ds, { ...EMPTY_DIR }]);
+  const removeDir = (i: number) => setDirs((ds) => (ds.length > 1 ? ds.filter((_, j) => j !== i) : ds));
+
+  const onUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    setDoc({ name: f.name, phase: 'reading' });
+    // Stand-in for a UiPath Document Understanding / IXP extract of the AOF.
+    window.setTimeout(() => {
+      setV(EXTRACTED_CORP);
+      setDirs(EXTRACTED_DIRS.map((d) => ({ ...d })));
+      setDoc({ name: f.name, phase: 'done' });
+    }, 1700);
+  };
+  const clearUpload = () => { setV(EMPTY_CORP); setDirs([{ ...EMPTY_DIR }]); setDoc(null); };
+
+  const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
+  const back = () => (step === 0 ? onBack() : setStep((s) => s - 1));
+
+  const submit = async () => {
+    setBusy(true);
+    const primary = dirs[0] ?? EMPTY_DIR;
+    const c = await store.create({
+      firstName: v.company.trim() || 'Unnamed business', lastName: '',
+      entity: {
+        companyName: v.company.trim(), rcNumber: v.rc.trim(), businessType: v.bizType, sector: v.sector.trim(),
+        tin: v.tin.trim(), turnover: v.turnover, address: v.address.trim(), email: v.email.trim(), phone: digits(v.phone),
+        directors: dirs.map((d) => ({ name: d.name.trim(), bvn: digits(d.bvn), idType: d.idType, idNumber: d.idNumber.trim(), phone: digits(d.phone), email: d.email.trim(), role: d.role })),
+      },
+      phone: digits(v.phone || primary.phone), email: (v.email || primary.email).trim(),
+      bvn: digits(primary.bvn), nin: '', address: v.address.trim(),
+      channel: 'single', source: 'rm',
+    });
+    onDone(c);
+  };
+
+  return (
+    <>
+      <div className="cx-head">
+        <div className="cx-topline">
+          <button className="cx-back" onClick={back} aria-label="Back"><Icon name="arrowLeft" /></button>
+          <Brand sub={STEPS[step]} />
+        </div>
+        <Rail step={step} total={STEPS.length} />
+      </div>
+
+      <div className="cx-body">
+        {step === 0 && (
+          <>
+            {onKind && rm && (
+              <div className="cx-seg" role="tablist" aria-label="Account type">
+                <button role="tab" aria-selected={false} onClick={() => onKind('individual')}>Individual</button>
+                <button role="tab" aria-selected={true}>Corporate</button>
+              </div>
+            )}
+            <h1 className="cx-h1">Business details</h1>
+            <p className="cx-p" style={{ marginBottom: 16 }}>The registered company, exactly as it appears on the certificate of incorporation.</p>
+
+            {!doc && (
+              <label className="cx-drop">
+                <input type="file" accept="application/pdf,image/*" onChange={onUpload} hidden />
+                <span className="cx-drop-ic"><Icon name="upload" size={18} /></span>
+                <span className="cx-drop-t"><b>Have a completed form? Upload it</b><em>Scan or photo of the account opening form — we’ll read the company and directors.</em></span>
+              </label>
+            )}
+            {doc?.phase === 'reading' && (
+              <div className="cx-drop reading"><span className="cx-spin" aria-hidden /><span className="cx-drop-t"><b>Reading {doc.name}…</b><em>Document Understanding is extracting the form.</em></span></div>
+            )}
+            {doc?.phase === 'done' && (
+              <Note tone="good" icon="checkCircle">
+                <b>Company and {EXTRACTED_DIRS.length} directors read from the form.</b> Please check each field before you continue.
+                <button type="button" className="cx-clearbtn" onClick={clearUpload}>Clear</button>
+              </Note>
+            )}
+
+            <Field label="Company / business name" name="company" value={v.company} onChange={set('company')} placeholder="ACME Trading Ltd" />
+            <div className="cx-row">
+              <Field label="RC / registration number" name="rc" value={v.rc} onChange={set('rc')} placeholder="1234567" />
+              <Field label="Tax ID (TIN)" name="tin" value={v.tin} onChange={set('tin')} placeholder="01234567-0001" />
+            </div>
+            <div className="cx-row">
+              <Select label="Category of business" value={v.bizType} onChange={(x) => setV((p) => ({ ...p, bizType: x }))} options={BIZ_TYPES} />
+              <Field label="Sector / industry" name="sector" value={v.sector} onChange={set('sector')} placeholder="Information Technology" />
+            </div>
+            <Select label="Annual turnover" value={v.turnover} onChange={(x) => setV((p) => ({ ...p, turnover: x }))} options={TURNOVERS} />
+            <Field label="Operating business address" name="address" value={v.address} onChange={set('address')} placeholder={`45 ${CO.streets[0]}, ${CO.cities[0]}`} />
+            <div className="cx-row">
+              <Field label="Business email" name="email" value={v.email} onChange={set('email')} inputMode="email" placeholder="accounts@company.com" />
+              <Field label="Business phone" name="phone" value={v.phone} onChange={set('phone')} inputMode="numeric" placeholder="0803 000 0000" />
+            </div>
+          </>
+        )}
+
+        {step === 1 && (
+          <>
+            <h1 className="cx-h1">Directors &amp; signatories</h1>
+            <p className="cx-p" style={{ marginBottom: 16 }}>Everyone who signs on the account. Each is verified with {CO.primaryId.authority} in the background.</p>
+            {dirs.map((d, i) => (
+              <div className="cx-dir" key={i}>
+                <div className="cx-dir-hd">
+                  <span className="cx-dir-n">{i + 1}</span>
+                  <b>{d.name.trim() || `Director ${i + 1}`}</b>
+                  {dirs.length > 1 && <button type="button" className="cx-dir-x" onClick={() => removeDir(i)} aria-label="Remove"><Icon name="x" size={14} /></button>}
+                </div>
+                <Field label="Full name" name={`d-name-${i}`} value={d.name} onChange={(e) => setDir(i, 'name', e.target.value)} placeholder="Surname First Other" />
+                <div className="cx-row">
+                  <Field label={CO.primaryId.label} name={`d-bvn-${i}`} value={d.bvn} onChange={(e) => setDir(i, 'bvn', e.target.value)} inputMode="numeric" placeholder={`${CO.primaryId.numPrefix}12345678`} />
+                  <Field label="ID number" name={`d-id-${i}`} value={d.idNumber} onChange={(e) => setDir(i, 'idNumber', e.target.value)} placeholder="Passport / ID no." />
+                </div>
+                <div className="cx-row">
+                  <Field label="Phone" name={`d-ph-${i}`} value={d.phone} onChange={(e) => setDir(i, 'phone', e.target.value)} inputMode="numeric" placeholder="0803 000 0000" />
+                  <Select label="Role" value={d.role} onChange={(x) => setDir(i, 'role', x)} options={ROLES} />
+                </div>
+                <Field label="Email" name={`d-em-${i}`} value={d.email} onChange={(e) => setDir(i, 'email', e.target.value)} inputMode="email" placeholder="name@company.com" />
+              </div>
+            ))}
+            <Button variant="ghost" onClick={addDir}><Icon name="user" size={15} />Add another director</Button>
+          </>
+        )}
+
+        {step === 2 && (
+          <>
+            <h1 className="cx-h1">Check the details</h1>
+            <p className="cx-p" style={{ marginBottom: 16 }}>Confirm this matches the form before you submit.</p>
+            <div className="cx-card">
+              <KV k="Company" v={v.company} />
+              <KV k="RC number" v={v.rc} />
+              <KV k="Category" v={v.bizType} />
+              <KV k="Sector" v={v.sector} />
+              <KV k="TIN" v={v.tin} />
+              <KV k="Turnover" v={v.turnover} />
+              <KV k="Address" v={v.address} />
+              <KV k="Contact" v={`${v.email}${v.email && v.phone ? ' · ' : ''}${digits(v.phone)}`} />
+            </div>
+            <div className="cx-label" style={{ margin: '14px 0 8px' }}>{dirs.length} director{dirs.length === 1 ? '' : 's'} / signatories</div>
+            <div className="cx-card">
+              {dirs.map((d, i) => (
+                <KV key={i} k={d.name.trim() || `Director ${i + 1}`} v={`${d.role} · ${CO.primaryId.label} ${digits(d.bvn) || '—'}`} />
+              ))}
+            </div>
+            <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 16, cursor: 'pointer' }}>
+              <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: 2, width: 18, height: 18, accentColor: 'var(--blue)' }} />
+              <span style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--soft)' }}>
+                The signatories confirm these details are correct and consent to {appName} verifying the company and each director with {CO.primaryId.authority}, {CO.secondaryId.authority} and screening partners.
+              </span>
+            </label>
+          </>
+        )}
+      </div>
+
+      <div className="cx-foot">
+        {step < 2 ? (
+          <Button onClick={next}>Continue<Icon name="arrowRight" size={17} /></Button>
+        ) : (
+          <Button onClick={submit} disabled={busy}>{busy ? 'Submitting…' : 'Submit application'}</Button>
+        )}
+      </div>
+    </>
+  );
+}

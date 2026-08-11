@@ -58,6 +58,15 @@ async function fetchWithTimeout(url: string, init: RequestInit): Promise<Respons
  *  not just the version it managed to read. Best-effort: [] if the read fails. */
 async function fetchRawRecordsForKey(creds: AdminTenantCredentials, key: string): Promise<AuraConfigChunkRecord[]> {
   try {
+    // Prefer the paged query so we see EVERY chunk for this Key (old versions and
+    // orphans included) — the capped /read misses anything past row 100, which is
+    // exactly how orphans accumulated in the first place (the save below deletes
+    // whatever this returns).
+    const entityId = await resolveEntityId(creds);
+    if (entityId) {
+      const { status, records } = await queryByFilter(creds, entityId, { fieldName: 'Key', operator: '=', value: key });
+      if (status >= 200 && status < 300) return records.filter((r) => r.Key === key);
+    }
     const url = `${entityServiceUrl(creds, 'read')}?$top=${MAX_CHUNKS}`;
     const res = await fetchWithTimeout(url, { headers: authHeader(creds) });
     if (!res.ok) return [];
@@ -118,6 +127,52 @@ function authHeader(creds: AdminTenantCredentials): HeadersInit {
   return { Authorization: `Bearer ${creds.pat}` };
 }
 
+// ─── Paged-query reader (works around the 100-record cap on /read) ────────
+// The simplified `EntityService/{Name}/read` endpoint returns at most 100
+// records and ignores $top/$skip/$filter — so once this table holds >100 chunk
+// rows, a config whose chunks fall past the cutoff reads back incomplete and
+// looks "corrupt". The entity-id `.../entity/{id}/query` endpoint honours a
+// single-field filter in its POST body, so we fetch each config's chunks in
+// isolation (well under 100) and enumerate configs via a ChunkIndex=0 filter.
+// Falls back to the legacy read whenever the entity id can't be resolved, so
+// the app still works if this endpoint or the /api/Entity lookup is unavailable.
+let entityIdCache: { base: string; id: string } | null = null;
+
+interface EntityListItem { Name?: string; name?: string; Id?: string; id?: string }
+
+async function resolveEntityId(creds: AdminTenantCredentials): Promise<string | null> {
+  const base = apiBaseFor(creds, 'dataservice_');
+  if (entityIdCache && entityIdCache.base === base) return entityIdCache.id;
+  try {
+    const res = await fetchWithTimeout(`${base}/api/Entity`, { headers: authHeader(creds) });
+    if (!res.ok) return null;
+    const data = (await res.json()) as EntityListItem[] | { value?: EntityListItem[]; Data?: { Items?: EntityListItem[] } };
+    const arr: EntityListItem[] = Array.isArray(data) ? data : (data.value ?? data.Data?.Items ?? []);
+    const ent = arr.find((e) => (e?.Name ?? e?.name) === ENTITY_NAME);
+    const id = ent?.Id ?? ent?.id;
+    if (id) { entityIdCache = { base, id }; return id; }
+    return null;
+  } catch { return null; }
+}
+
+interface SingleFilter { fieldName: string; operator: '='; value: string | number }
+
+/** Query the entity by a SINGLE equality filter (multi-condition filters are
+ *  silently ignored by this endpoint). Returns the HTTP status so callers can
+ *  map 401/403/404 to their own result kinds. */
+async function queryByFilter(
+  creds: AdminTenantCredentials, entityId: string, filter: SingleFilter,
+): Promise<{ status: number; records: AuraConfigChunkRecord[] }> {
+  const url = `${apiBaseFor(creds, 'dataservice_')}/api/EntityService/entity/${entityId}/query`;
+  const body = JSON.stringify({ filterGroup: { logicalOperator: 0, queryFilters: [filter], filterGroups: [] } });
+  const res = await fetchWithTimeout(url, {
+    method: 'POST', headers: { ...authHeader(creds), 'Content-Type': 'application/json' }, body,
+  });
+  if (!res.ok) return { status: res.status, records: [] };
+  const data = (await res.json()) as { value?: AuraConfigChunkRecord[] };
+  return { status: res.status, records: data.value ?? [] };
+}
+
 /**
  * Fetches all chunks for a given Key and reconstitutes the TenantConfig.
  * Each named configuration lives under its own Key (the config's display name);
@@ -126,16 +181,29 @@ function authHeader(creds: AdminTenantCredentials): HeadersInit {
  */
 export async function fetchAuraConfig(creds: AdminTenantCredentials, key: string = SINGLETON_KEY): Promise<FetchResult> {
   try {
-    const url = `${entityServiceUrl(creds, 'read')}?$top=${MAX_CHUNKS}`;
-    const res = await fetch(url, { headers: authHeader(creds) });
-    if (res.status === 401 || res.status === 403) return { kind: 'unauthorized' };
-    if (res.status === 404) return { kind: 'entity-missing' };
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      return { kind: 'error', message: `HTTP ${res.status}: ${text.slice(0, 240)}` };
+    // Prefer the paged query (per-Key filter) so a config never reads back
+    // truncated once the table grows past 100 rows. Fall back to the capped
+    // whole-table read if the entity id can't be resolved.
+    let recs: AuraConfigChunkRecord[] | null = null;
+    const entityId = await resolveEntityId(creds);
+    if (entityId) {
+      const { status, records } = await queryByFilter(creds, entityId, { fieldName: 'Key', operator: '=', value: key });
+      if (status === 401 || status === 403) return { kind: 'unauthorized' };
+      if (status === 404) return { kind: 'entity-missing' };
+      if (status >= 200 && status < 300) recs = records.filter((r) => r.Key === key);
     }
-    const data = (await res.json()) as { totalRecordCount?: number; value?: AuraConfigChunkRecord[] };
-    const recs = (data.value ?? []).filter((r) => r.Key === key);
+    if (recs === null) {
+      const url = `${entityServiceUrl(creds, 'read')}?$top=${MAX_CHUNKS}`;
+      const res = await fetch(url, { headers: authHeader(creds) });
+      if (res.status === 401 || res.status === 403) return { kind: 'unauthorized' };
+      if (res.status === 404) return { kind: 'entity-missing' };
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        return { kind: 'error', message: `HTTP ${res.status}: ${text.slice(0, 240)}` };
+      }
+      const data = (await res.json()) as { totalRecordCount?: number; value?: AuraConfigChunkRecord[] };
+      recs = (data.value ?? []).filter((r) => r.Key === key);
+    }
     if (recs.length === 0) return { kind: 'not-found' };
     const best = reassembleLatestValid(recs);
     if (!best) return { kind: 'error', message: 'Stored ConfigJson chunks did not concatenate into valid JSON.' };
@@ -181,6 +249,41 @@ export type ListResult =
  */
 export async function listDataFabricConfigs(creds: AdminTenantCredentials): Promise<ListResult> {
   try {
+    // Preferred path: enumerate configs via their head chunks (ChunkIndex = 0 —
+    // one row per config-version), then fetch each config's chunks in isolation
+    // with a per-Key filter. No single request can hit the 100-row cap, so a
+    // config never reads back truncated (which is what made FirstBank look
+    // "corrupt" once the table grew past 100 rows).
+    const entityId = await resolveEntityId(creds);
+    if (entityId) {
+      const heads = await queryByFilter(creds, entityId, { fieldName: 'ChunkIndex', operator: '=', value: 0 });
+      if (heads.status === 401 || heads.status === 403) return { kind: 'unauthorized' };
+      if (heads.status === 404) return { kind: 'entity-missing' };
+      if (heads.status >= 200 && heads.status < 300) {
+        const keys = [...new Set(heads.records.map((r) => r.Key).filter((k): k is string => !!k))];
+        const entries: DataFabricConfigEntry[] = [];
+        const corruptKeys: string[] = [];
+        for (const key of keys) {
+          const { records } = await queryByFilter(creds, entityId, { fieldName: 'Key', operator: '=', value: key });
+          const best = reassembleLatestValid(records.filter((r) => r.Key === key));
+          if (!best) { corruptKeys.push(key); continue; }
+          const head = best.chunks[0];
+          const config = migrate(best.parsed);
+          entries.push({
+            key,
+            name: config.branding.appName || key,
+            config,
+            meta: { Version: head.Version, LastSavedAt: head.LastSavedAt, LastSavedBy: head.LastSavedBy, ChunkCount: best.chunks.length, chunks: best.chunks },
+          });
+        }
+        entries.sort((a, b) => a.name.localeCompare(b.name));
+        return { kind: 'ok', entries, corruptKeys };
+      }
+      // Non-2xx from the query endpoint (other than the auth/404 handled above):
+      // fall through to the legacy read below.
+    }
+
+    // Legacy fallback: single whole-table read (capped at 100 records).
     const url = `${entityServiceUrl(creds, 'read')}?$top=${MAX_CHUNKS}`;
     const res = await fetch(url, { headers: authHeader(creds) });
     if (res.status === 401 || res.status === 403) return { kind: 'unauthorized' };
@@ -199,8 +302,6 @@ export async function listDataFabricConfigs(creds: AdminTenantCredentials): Prom
     const entries: DataFabricConfigEntry[] = [];
     const corruptKeys: string[] = [];
     for (const [key, recs] of byKey) {
-      // Reassemble the newest version that parses — so leftover chunks from an
-      // interrupted publish don't make an otherwise-good config read as corrupt.
       const best = reassembleLatestValid(recs);
       if (!best) { corruptKeys.push(key); continue; }
       const head = best.chunks[0];

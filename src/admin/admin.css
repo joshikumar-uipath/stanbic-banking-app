@@ -7,28 +7,28 @@
   src: url('/fonts/Inter.woff2') format('woff2');
 }
 @font-face {
-  font-family: 'Poppins';
+  font-family: 'IBM Plex Sans', 'Poppins';
   font-style: normal;
   font-weight: 400;
   font-display: swap;
   src: url('/fonts/Poppins-400.woff2') format('woff2');
 }
 @font-face {
-  font-family: 'Poppins';
+  font-family: 'IBM Plex Sans', 'Poppins';
   font-style: normal;
   font-weight: 500;
   font-display: swap;
   src: url('/fonts/Poppins-500.woff2') format('woff2');
 }
 @font-face {
-  font-family: 'Poppins';
+  font-family: 'IBM Plex Sans', 'Poppins';
   font-style: normal;
   font-weight: 600;
   font-display: swap;
   src: url('/fonts/Poppins-600.woff2') format('woff2');
 }
 @font-face {
-  font-family: 'Poppins';
+  font-family: 'IBM Plex Sans', 'Poppins';
   font-style: normal;
   font-weight: 700;
   font-display: swap;
@@ -42,7 +42,7 @@
 body, html {
   margin: 0;
   padding: 0;
-  font-family: 'Inter', Arial, sans-serif;
+  font-family: 'IBM Plex Sans', 'Inter', Arial, sans-serif;
   background: #e8ebed;
   color: #182126;
 }

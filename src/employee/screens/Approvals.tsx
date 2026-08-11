@@ -37,7 +37,7 @@ export default function Approvals() {
   if (open) return <div className="dk-hold"><ApprovalDetail approval={open} onBack={() => setOpen(null)} onResolved={() => setOpen(null)} /></div>;
 
   return (
-    <>
+    <div className="dk-scroll">
       <div className="dk-health">
         <Stat k="Pending you" v={p.pending} />
         <Stat k="Value awaiting" v={money(p.value)} />
@@ -93,7 +93,7 @@ export default function Approvals() {
           ) : <div className="dk-empty"><b>Nothing here</b><span>No approvals match this filter.</span></div>}
         </div>
       </div>
-    </>
+    </div>
   );
 }
 

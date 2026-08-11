@@ -6,7 +6,7 @@
 // list — "needs you now" above "in flight, nothing needed from you". That split
 // IS the Progress-First story: most of the pipeline is moving without them.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { stateMeta, fullName, type OnboardingCase } from '../../onboarding';
 import { approvals, money, type Approval } from '../../approvalsData';
 import { customers, type Customer } from '../../customersData';
@@ -24,6 +24,7 @@ type Item = {
   ref: string;
   cta: string;          // what the attention-bar button should say
   what: string;
+  why: string;          // a fuller, one-sentence reason — drives the "next move" hero
   when: string;
   /** Onboarding record id — set for openings only, so the Maestro lane can resolve it. */
   recordId?: string;
@@ -49,6 +50,13 @@ function fromCases(cases: OnboardingCase[], open: (id: string) => void): Item[] 
       : pend
         ? (c.state === 'PENDING_LIVENESS' ? 'Account open — selfie outstanding' : 'Account open — documents outstanding')
         : m.label;
+    const why = exc
+      ? `${failed.length ? failed.join(' & ') + ' validation ' : 'A check '}needs a person before this application can continue — clear it to send the case back into straight-through processing.`
+      : pend
+        ? (c.state === 'PENDING_LIVENESS'
+          ? 'The account is open but the customer’s selfie is still outstanding — nudge them to finish liveness.'
+          : 'The account is open but required documents are still outstanding from the customer.')
+        : m.desc;
     return {
       key: `c-${c.id}`,
       dot: STATE_TONE[m.tone] ?? 'idle',
@@ -56,6 +64,7 @@ function fromCases(cases: OnboardingCase[], open: (id: string) => void): Item[] 
       ref: c.id,
       cta: c.id,
       what,
+      why,
       when: ago(c.createdAt),
       recordId: c.id,
       tag: { tone: STATE_TONE[m.tone] ?? 'idle', text: m.label },
@@ -76,6 +85,7 @@ function fromApprovals(list: Approval[], go: () => void): Item[] {
     ref: `Raised by ${a.maker}`,   // the demo ids ('a3') mean nothing to a banker
     cta: a.customer,
     what: `${a.typeLabel}${a.amount ? ` · ${money(a.amount)}` : ''}`,
+    why: `${a.typeLabel}${a.amount ? ` for ${money(a.amount)}` : ''} — ${a.slaBreaching ? 'past its SLA and needs your sign-off now.' : !a.withinAuthority ? 'above your limit, so it needs dual approval.' : 'awaiting your approval.'}`,
     when: a.ago,
     tag: a.slaBreaching ? { tone: 'crit', text: 'SLA breach' } : !a.withinAuthority ? { tone: 'warn', text: 'Dual approval' } : undefined,
     rank: a.slaBreaching ? 1 : 3,
@@ -93,6 +103,7 @@ function fromClients(list: Customer[], go: () => void): Item[] {
       ref: c.maskedId,
       cta: c.name,
       what: c.kyc !== 'Verified' ? `KYC ${c.kyc.toLowerCase()}` : c.headline,
+      why: c.kyc !== 'Verified' ? `KYC is ${c.kyc.toLowerCase()} — refresh due diligence to keep this relationship compliant.` : c.headline,
       when: '',
       tag: c.kyc !== 'Verified' ? { tone: 'warn', text: 'KYC due' } : undefined,
       rank: 4,
@@ -125,25 +136,33 @@ export default function MyDesk({ cases, onNavigate, onOpenCase }: { cases: Onboa
     };
   }, [cases, onNavigate, onOpenCase]);
 
-  const top = now[0];
+  // Focus Flow — the desk leads with ONE next best action; "Skip for now" walks
+  // the queue instead of dropping the banker into a wall of 40 rows.
+  const [focusIdx, setFocusIdx] = useState(0);
+  const cur = now.length ? now[Math.min(focusIdx, now.length - 1)] : undefined;
 
   // Live Maestro status for every onboarding record on the desk (shared hook).
   const mstates = useMaestroStates(useMemo(() => cases.map((c) => c.id), [cases]));
 
   return (
-    <>
-      {/* Attention bar — the single most urgent thing, or an all-clear. */}
-      {top ? (
-        <div className="dk-triage red">
-          <div className="dk-tin">
-            <div className="lft">
-              <span className="pip"><I n="alert" s={16} w={2.2} /></span>
-              <div>
-                <div className="hl">{health.items} {health.items === 1 ? 'thing needs' : 'things need'} you</div>
-                <div className="sb">Most urgent: {top.who} — {top.what}</div>
-              </div>
+    <div className="dk-scroll">
+      {/* Next move — the single most urgent thing, guided; or an all-clear. */}
+      {cur ? (
+        <div className="dk-hero">
+          <div className="ey"><I n="alert" s={13} w={2.2} />Your next move · {Math.min(focusIdx, now.length - 1) + 1} of {now.length}</div>
+          <div className="cust">
+            <span className="av">{initials(cur.who)}</span>
+            <div style={{ minWidth: 0 }}>
+              <div className="nm">{cur.who}</div>
+              <div className="sub">{cur.ref}{cur.src ? ` · ${cur.src.label}` : ''}{cur.when ? ` · ${cur.when}` : ''}</div>
             </div>
-            <button className="go" onClick={top.go}>Open {top.cta}</button>
+            {cur.tag && <span className={`dk-tag ${cur.tag.tone === 'crit' ? 'red' : cur.tag.tone === 'warn' ? 'amber' : cur.tag.tone === 'good' ? 'green' : 'info'}`}>{cur.tag.text}</span>}
+          </div>
+          <p className="what">{cur.why}</p>
+          <div className="acts">
+            <button className="dk-btn pri lg" onClick={cur.go}>Open {cur.cta}</button>
+            {now.length > 1 && <button className="skip" onClick={() => setFocusIdx((i) => (i + 1) % now.length)}>Skip for now →</button>}
+            <span className="q">{health.items} {health.items === 1 ? 'thing needs' : 'things need'} you</span>
           </div>
         </div>
       ) : (
@@ -175,19 +194,25 @@ export default function MyDesk({ cases, onNavigate, onOpenCase }: { cases: Onboa
             <button className="dk-btn pri lg" onClick={() => onNavigate('open-account')}><I n="plus" s={15} w={2.4} />New application</button>
           </div>
 
-          <div className="dk-eyebrow">Needs you now <span className="n">{now.length}</span></div>
+          <div className="dk-eyebrow"><i className="no">01</i>Needs you now<span className="ln" /><span className="n">{now.length}</span></div>
           {now.length ? <Rows items={now} mstates={mstates} /> : (
             <div className="dk-empty"><b>Nothing waiting on you</b><span>Every application is either moving or done.</span></div>
           )}
 
-          <div className="dk-eyebrow">In flight <span className="n">nothing needed from you</span></div>
+          <div className="dk-eyebrow"><i className="no">02</i>In flight<span className="ln" /><span className="n">nothing needed from you</span></div>
           {flight.length ? <Rows items={flight} mstates={mstates} /> : (
             <div className="dk-empty"><b>Nothing in flight</b><span>Start an application and it will track here.</span></div>
           )}
         </div>
       </div>
-    </>
+    </div>
   );
+}
+
+/** First letters of the first two words — the hero avatar mark. */
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || '—';
 }
 
 const GRID = { gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1.3fr) 150px 118px 84px 20px' };
@@ -199,7 +224,7 @@ function Rows({ items, mstates }: { items: Item[]; mstates: Record<string, LiveS
         <span>Who</span><span>What</span><span>Maestro stage</span><span>Status</span><span>When</span><span />
       </div>
       {items.map((i) => (
-        <button key={i.key} className="dk-row" style={GRID} onClick={i.go}>
+        <button key={i.key} className={`dk-row ${i.dot === 'crit' ? 'sev-crit' : i.dot === 'warn' ? 'sev-warn' : ''}`} style={GRID} onClick={i.go}>
           <span className="who">
             <Dot tone={i.dot} live={i.dot === 'info'} />
             <span style={{ minWidth: 0 }}>

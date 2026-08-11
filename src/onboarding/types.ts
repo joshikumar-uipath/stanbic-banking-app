@@ -17,7 +17,12 @@ export type OnboardingState =
   | 'PENDING_DOCUMENTS'       // required documents outstanding
   | 'PENDING_LIVENESS'        // liveness verification outstanding
   | 'FULLY_ACTIVATED'         // all onboarding requirements complete
-  | 'EXCEPTION';              // manual intervention required
+  | 'EXCEPTION'              // manual intervention required
+  // ── Secondary / branch stages (mirror the Maestro case's exception lanes) ──
+  | 'COMPLIANCE_HOLD'        // screening hit → routed to Compliance escalations (loops back to Verification)
+  | 'EDD_REVIEW'             // enhanced due diligence required (loops back to Decision)
+  | 'PENDING_CUSTOMER'       // info requested from customer / RFI (loops back to Decision)
+  | 'DECLINED';              // application declined or withdrawn (terminal)
 
 export interface StateMeta { state: OnboardingState; label: string; desc: string; tone: 'progress' | 'good' | 'pending' | 'exception'; }
 
@@ -30,6 +35,10 @@ export const ONBOARDING_STATES: StateMeta[] = [
   { state: 'PENDING_LIVENESS',       label: 'Pending liveness',    desc: 'Liveness verification outstanding.',             tone: 'pending' },
   { state: 'FULLY_ACTIVATED',        label: 'Fully activated',     desc: 'All onboarding requirements complete.',          tone: 'good' },
   { state: 'EXCEPTION',              label: 'Exception',           desc: 'Manual intervention required in Operations.',    tone: 'exception' },
+  { state: 'COMPLIANCE_HOLD',        label: 'Compliance hold',     desc: 'Screening hit — with Compliance escalations.',   tone: 'exception' },
+  { state: 'EDD_REVIEW',             label: 'EDD review',          desc: 'Enhanced due diligence in progress.',            tone: 'progress' },
+  { state: 'PENDING_CUSTOMER',       label: 'Pending customer',    desc: 'Awaiting information requested from customer.',   tone: 'pending' },
+  { state: 'DECLINED',               label: 'Declined',            desc: 'Application declined or withdrawn.',             tone: 'exception' },
 ];
 
 export const stateMeta = (s: OnboardingState): StateMeta =>
@@ -84,10 +93,38 @@ export interface CaseEvent {
 }
 
 // ── The onboarding case (system-of-record record) ────────────────────────────
+/** A director / signatory on a corporate account. */
+export interface EntityDirector {
+  name: string;
+  bvn?: string;
+  idType?: string;
+  idNumber?: string;
+  phone?: string;
+  email?: string;
+  role?: string;              // Director / Shareholder / Signatory
+}
+
+/** Corporate/entity details, present only on business account openings. The case
+ *  still carries the individual fields (set from the primary signatory) so the
+ *  pipeline, validations and lists work unchanged. */
+export interface EntityInfo {
+  companyName: string;
+  rcNumber?: string;
+  businessType?: string;      // Limited Liability Company, Partnership, …
+  sector?: string;
+  tin?: string;
+  turnover?: string;
+  address?: string;
+  email?: string;
+  phone?: string;
+  directors: EntityDirector[];
+}
+
 export interface OnboardingCase {
   id: string;                 // AO-YYYY-NNNNNN
   firstName: string;
   lastName: string;
+  entity?: EntityInfo;        // set on corporate openings; absent for individuals
   phone: string;
   email: string;
   bvn: string;
@@ -115,6 +152,7 @@ export const fullName = (c: Pick<OnboardingCase, 'firstName' | 'lastName'>) =>
 export interface NewCaseInput {
   firstName: string;
   lastName: string;
+  entity?: EntityInfo;
   phone: string;
   email: string;
   bvn: string;

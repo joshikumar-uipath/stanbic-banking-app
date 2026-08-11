@@ -15,6 +15,15 @@ import { getCountry } from '../config/countries';
 import { maestroConfig } from '../onboarding/maestro';
 import './ops.css';
 
+/** "#003B65" → "0, 59, 101" for the console's --brand-primary-rgb (used in the
+ *  few rgba() overlays that can't take a hex). Null on a malformed value. */
+function hexToRgbTriplet(hex: string): string | null {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec((hex || '').trim());
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
+}
+
 function OpsInner() {
   const { branding } = useConfig();
   const frame = useRef<HTMLIFrameElement>(null);
@@ -37,7 +46,15 @@ function OpsInner() {
   const pushBrand = useCallback(() => {
     const w = frame.current?.contentWindow;
     if (!w) return;
-    w.postMessage({ type: 'aof-brand', logo, appName }, window.location.origin);
+    // Hand the console the tenant's brand colours too — its navy/blue palette
+    // derives from --brand-primary/--brand-secondary (same color-mix scheme as
+    // the desk), so an admin theme change re-paints /ops, not just its logo.
+    w.postMessage({
+      type: 'aof-brand', logo, appName,
+      primaryColor: branding.primaryColor,
+      secondaryColor: branding.secondaryColor || branding.primaryColor,
+      primaryRgb: hexToRgbTriplet(branding.primaryColor),
+    }, window.location.origin);
     w.postMessage({
       type: 'aof-country', code: country.code,
       pLabel: country.primaryId.label, pAuth: country.primaryId.authority,
@@ -46,7 +63,7 @@ function OpsInner() {
     // Hand the console the Maestro bridge config so it can start/drive the real
     // onboarding case per record — the token stays in the app bundle, not the HTML.
     w.postMessage({ type: 'aof-maestro', ...maestroConfig() }, window.location.origin);
-  }, [logo, appName, country]);
+  }, [logo, appName, country, branding.primaryColor, branding.secondaryColor]);
   useEffect(() => { pushBrand(); }, [pushBrand]);
 
   return (
