@@ -23,10 +23,19 @@ const PIMS_BASE = import.meta.env.DEV
   ? `/${ORG}/${TENANT}/pims_`
   : `https://staging.uipath.com/${ORG}/${TENANT}/pims_`;
 
-// The deployed OnboardingCase, folder Shared/OnboardingCase, mea/DefaultTenant.
-const FOLDER_KEY = '22cd8fb2-18a5-4779-b2c7-2b779445da4c';
-const FOLDER_ID = 3269939;
-const RELEASE_KEY = '540fa5d1-37dd-43e5-9f2c-58af03d59a05';
+// The deployed OnboardingCase, folder Banking/Account Opening/OnboardingCase,
+// mea/DefaultTenant (solution OnboardingCaseSolution v1.0.29, migrated from
+// Shared/OnboardingCase 2026-08-11 via a clean uninstall + fresh install).
+//
+// Migration gotcha worth remembering: the approval AppTask kept spawning back in
+// Shared because `caseplan.json.bpmn` — the artifact Maestro actually EXECUTES —
+// carried its own hardcoded app bindings and was stale. Editing caseplan.json
+// alone is NOT enough; the .bpmn `<uipath:binding>` defaults + resourceKeys (and
+// the copies inside its CDATA) must be repointed too, or every redeploy silently
+// keeps routing approvals to the old folder's app.
+const FOLDER_KEY = '34480da8-1d41-479f-bf3f-40689043c59a';
+const FOLDER_ID = 3352699;
+const RELEASE_KEY = '381f59ef-2dd1-4c00-8395-4b3d055fe430';
 
 export const STAGES = ['Intake', 'Verification', 'Decision', 'Activation', 'Closure'] as const;
 
@@ -53,7 +62,7 @@ const LINK_KEY = 'aof_maestro_links';
 // Bump when SEED_LINKS changes to a new set of instances — forces every browser to
 // drop its cached links (which may point at old/faulted instances) and reseed fresh.
 const LINK_SEED_KEY = 'aof_maestro_links_v';
-const LINK_SEED = '2026-08-02';
+const LINK_SEED = '2026-08-11-ao';
 /** Fired on `window` after the Data Fabric hydrate merges shared links in, so open
  *  screens re-read their link and flip to the live embed without a manual refresh. */
 export const LINKS_EVENT = 'aof-maestro-links';
@@ -78,11 +87,11 @@ const DS_BASE = import.meta.env.DEV
 // (e.g. "Fully activated" while the live case sits at Verification). Only in-flight
 // records carry a live embed; completed records (e.g. 000101 Fully activated) do not.
 const SEED_LINKS: Record<string, string> = {
-  'AO-2026-000106': '40bbabf5-bec4-4729-921e-aa7c5a2092eb', // VALIDATION_IN_PROGRESS → Intake
-  'AO-2026-000107': 'f7f38600-b358-4323-8f95-d9675ebe52e8', // EXCEPTION            → Verification
-  'AO-2026-000103': 'e9422456-e487-4010-b18f-427db779387f', // VALIDATED            → Decision
-  'AO-2026-000104': 'd3dd9f41-94af-4f7b-8ef5-dd2922a9347f', // PENDING_LIVENESS      → Activation
-  'AO-2026-000102': '8a6cf3d6-e60b-4a0a-8003-e5de5bfb3404', // ACCOUNT_CREATED       → Activation
+  'AO-2026-000106': '4ba82a0a-6bc5-46c1-8e9d-4ef9eb62176b', // VALIDATION_IN_PROGRESS → Intake
+  'AO-2026-000107': 'c9a5f2a1-0811-4288-b03f-e0a4d3c5cadf', // EXCEPTION            → Verification
+  'AO-2026-000103': '48b2e1b3-4f6d-423b-b5e6-92bdfa75cafd', // VALIDATED            → Decision
+  'AO-2026-000104': 'f7f5a929-f846-4812-8f11-f3544d296836', // PENDING_LIVENESS      → Activation
+  'AO-2026-000102': 'f3cb6f70-50e9-4131-8bb8-2a9ad10235d3', // ACCOUNT_CREATED       → Activation
 };
 
 function readLinks(): Record<string, string> {

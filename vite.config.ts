@@ -51,6 +51,21 @@ export default defineConfig(({ mode }) => {
           target: uipathBaseUrl,
           changeOrigin: true,
         },
+        // IXP / Document Understanding (corporate AOF extraction) lives on du_.
+        // du_ rejects the bundled `rt_` PAT (it requires a JWT carrying Du.* scopes),
+        // so in dev we swap in VITE_UIPATH_DU_TOKEN here — the browser never sees it.
+        // In production the app's own token must carry the Du.* scopes instead.
+        '^/[^/]+/[^/]+/du_': {
+          target: uipathBaseUrl,
+          changeOrigin: true,
+          configure: (proxy) => {
+            const duToken = env.VITE_UIPATH_DU_TOKEN;
+            if (!duToken) return;
+            proxy.on('proxyReq', (proxyReq) => {
+              proxyReq.setHeader('Authorization', `Bearer ${duToken}`);
+            });
+          },
+        },
       },
     },
     build: {
