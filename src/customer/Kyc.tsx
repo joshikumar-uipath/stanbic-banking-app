@@ -49,10 +49,28 @@ export default function Kyc({ c, onExit }: { c: OnboardingCase; onExit: () => vo
     setStage('done');
   };
 
+  // Every other screen in the flow has a back arrow; this one didn't, so once
+  // you were in KYC the only way out was to finish it. Step back through the
+  // stages, and leave the flow from the first one. Not offered on 'done' —
+  // the case is already activated by then, so there's nothing to go back to.
+  const STAGE_ORDER: Stage[] = ['intro', 'docs', 'liveness', 'signature'];
+  const back = () => {
+    const i = STAGE_ORDER.indexOf(stage);
+    if (i <= 0) return onExit();
+    setStage(STAGE_ORDER[i - 1]);
+  };
+
   return (
     <>
       <div className="cx-head">
-        <div className="cx-topline"><Brand sub="Finish your account" /></div>
+        <div className="cx-topline">
+          {stage !== 'done' && (
+            <button className="cx-back" onClick={back} aria-label={stage === 'intro' ? 'Close' : 'Back'}>
+              <Icon name="arrowLeft" />
+            </button>
+          )}
+          <Brand sub="Finish your account" />
+        </div>
       </div>
 
       {/* `fill` only on the liveness step: FaceID is the tallest thing in the
