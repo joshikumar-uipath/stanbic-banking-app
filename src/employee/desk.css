@@ -382,8 +382,9 @@
 .dk-capture .cx-row { grid-template-columns: 1fr 1fr; gap: 14px 20px; }
 /* One content width for every block, so paired rows and lone fields share a
    left AND right edge instead of ending ragged. Wide enough for two columns,
-   short enough that a single input isn't a 960px slab. */
-.dk-capture .cx-body > * { max-width: 900px; }
+   short enough that a single input isn't a 960px slab. Centred, so the cap
+   leaves even gutters rather than parking everything against the left. */
+.dk-capture .cx-body > * { max-width: 900px; margin-inline: auto; }
 .dk-capture .cx-drop { padding: 20px 24px; }
 
 /* The liveness mock keeps its full size in the overlay — it's the thing the
@@ -396,6 +397,20 @@
 /* Centre the column too, so the caption sits under the phone rather than under
    the 900px content box the other steps align to. */
 .dk-capture .cx-body:has(.cx-faceid) { justify-content: center; align-items: center; }
+
+/* Status screens — intro, received, "you're all set" — carry a short block of
+   content with no form fields. Left at the top of an 880px overlay they strand,
+   with half a screen of empty space above the button. Centre them.
+   `safe` matters: if the content ever does outgrow the body it reverts to
+   top-aligned rather than centring and clipping the top out of scroll reach. */
+.dk-capture .cx-body:not(:has(.cx-field)):not(:has(.cx-row)):not(:has(.cx-faceid)) {
+  display: flex; flex-direction: column; justify-content: safe center;
+}
+/* Those screens centre their own text, but the 62ch cap above parks the block
+   at the left edge — so the paragraph reads as offset from its heading.
+   Descendant, not child: these screens wrap their content in an unnamed div. */
+.dk-capture .cx-body:not(:has(.cx-field)):not(:has(.cx-row)) .cx-h1,
+.dk-capture .cx-body:not(:has(.cx-field)):not(:has(.cx-row)) .cx-p { margin-inline: auto; }
 
 @media (max-width: 1080px) {
   .dk-capture { max-width: none; height: 100%; }
