@@ -72,6 +72,10 @@ export default function DeskShell({ userName, userEmail, unreadAlerts = 0, onLog
     if (d === 'alerts') onAlertsSeen?.();
   };
   const openCase = (id: string) => { setDest('open-account'); setFlow(id); };
+  // "New application" from anywhere should land on the capture form itself —
+  // switching tabs and making the banker press the same button again is a
+  // dead-end click. `flow === ''` is the new-capture state Opening renders.
+  const newApplication = () => { setDest('open-account'); setFlow(''); };
 
   const initial = (userName || branding.appName || '?').trim().charAt(0).toUpperCase();
   // The compact square brand mark (favicon or auto-initial), used in this narrow
@@ -121,7 +125,7 @@ export default function DeskShell({ userName, userEmail, unreadAlerts = 0, onLog
           <span className="dk-live"><i />Live</span>
         </div>
 
-        {dest === 'desk' && <MyDesk cases={cases} onNavigate={go} onOpenCase={openCase} />}
+        {dest === 'desk' && <MyDesk cases={cases} onNavigate={go} onOpenCase={openCase} onNewApplication={newApplication} />}
         {dest === 'open-account' && <Opening cases={cases} flow={flow} setFlow={setFlow} />}
         {dest === 'approvals' && <Approvals />}
         {dest === 'customers' && <Clients />}

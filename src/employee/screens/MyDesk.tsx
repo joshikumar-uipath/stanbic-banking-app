@@ -111,7 +111,7 @@ function fromClients(list: Customer[], go: () => void): Item[] {
     }));
 }
 
-export default function MyDesk({ cases, onNavigate, onOpenCase }: { cases: OnboardingCase[]; onNavigate: (d: Dest) => void; onOpenCase: (id: string) => void }) {
+export default function MyDesk({ cases, onNavigate, onOpenCase, onNewApplication }: { cases: OnboardingCase[]; onNavigate: (d: Dest) => void; onOpenCase: (id: string) => void; onNewApplication: () => void }) {
   const { now, flight, health } = useMemo(() => {
     const all = [
       ...fromCases(cases, onOpenCase),
@@ -191,7 +191,7 @@ export default function MyDesk({ cases, onNavigate, onOpenCase }: { cases: Onboa
         <div className="dk-col">
           <div className="dk-qhead">
             <h1>My desk<span className="n">{now.length + flight.length} items</span></h1>
-            <button className="dk-btn pri lg" onClick={() => onNavigate('open-account')}><I n="plus" s={15} w={2.4} />New application</button>
+            <button className="dk-btn pri lg" onClick={onNewApplication}><I n="plus" s={15} w={2.4} />New application</button>
           </div>
 
           <div className="dk-eyebrow"><i className="no">01</i>Needs you now<span className="ln" /><span className="n">{now.length}</span></div>
