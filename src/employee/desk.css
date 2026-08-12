@@ -406,6 +406,16 @@
 .dk-capture .cx-body:not(:has(.cx-field)):not(:has(.cx-row)):not(:has(.cx-faceid)) {
   display: flex; flex-direction: column; justify-content: safe center;
 }
+/* `width: 100%` is load-bearing. These children inherit `margin-inline: auto`
+   from the cap above, and auto side-margins on a FLEX item override
+   align-self:stretch and collapse it to max-content — which shrank the status
+   cards to ~225px and mashed "Fraud screening" into "Verified". A definite
+   width restores the box; the auto margins then just centre it.
+   620px rather than the forms' 900: a progress list stretched over 900px reads
+   as a sparse table rather than a tracking card. */
+.dk-capture .cx-body:not(:has(.cx-field)):not(:has(.cx-row)):not(:has(.cx-faceid)) > * {
+  width: 100%; max-width: 620px;
+}
 /* Those screens centre their own text, but the 62ch cap above parks the block
    at the left edge — so the paragraph reads as offset from its heading.
    Descendant, not child: these screens wrap their content in an unnamed div. */
