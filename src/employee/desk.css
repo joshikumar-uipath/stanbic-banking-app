@@ -386,6 +386,15 @@
 .dk-capture .cx-body > * { max-width: 900px; }
 .dk-capture .cx-drop { padding: 20px 24px; }
 
+/* The liveness step embeds a phone mock that is `flex: 1` so it fills a 440px
+   pane nicely. In the overlay that stretches it into a ~460x660 slab reading as
+   neither phone nor desktop. Pin it to a handset aspect and centre it instead. */
+.dk-capture .cx-faceid { flex: 1 1 auto; width: auto; aspect-ratio: 9 / 19.5;
+  min-height: 380px; max-height: 620px; max-width: 100%; margin: 0 auto 10px; border-radius: 22px; }
+/* Centre the column too, so the caption sits under the phone rather than under
+   the 900px content box the other steps align to. */
+.dk-capture .cx-body:has(.cx-faceid) { justify-content: center; align-items: center; }
+
 @media (max-width: 1080px) {
   .dk-capture { max-width: none; height: 100%; }
   .dk-capture-scrim { padding: 0; }

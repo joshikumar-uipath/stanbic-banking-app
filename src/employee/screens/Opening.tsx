@@ -34,7 +34,7 @@ const SOURCES: { id: Src; label: string }[] = [
 
 const needsAttention = (s: OnboardingState) => s === 'EXCEPTION' || s === 'PENDING_LIVENESS' || s === 'PENDING_DOCUMENTS';
 
-export default function Opening({ cases, flow, setFlow }: { cases: OnboardingCase[]; flow: string | null; setFlow: (v: string | null) => void }) {
+export default function Opening({ cases, flow, setFlow, onNewApplication, captureSeq }: { cases: OnboardingCase[]; flow: string | null; setFlow: (v: string | null) => void; onNewApplication: () => void; captureSeq: number }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [source, setSource] = useState<Src>('all');
   const [q, setQ] = useState('');
@@ -143,7 +143,7 @@ export default function Opening({ cases, flow, setFlow }: { cases: OnboardingCas
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
                 <button className="dk-btn lg" onClick={() => setFlow(BULK)}><I n="layers" s={15} />Bulk upload</button>
-                <button className="dk-btn pri lg" onClick={() => setFlow('')}><I n="plus" s={15} w={2.4} />New application</button>
+                <button className="dk-btn pri lg" onClick={onNewApplication}><I n="plus" s={15} w={2.4} />New application</button>
               </div>
             </div>
 
@@ -181,17 +181,17 @@ export default function Opening({ cases, flow, setFlow }: { cases: OnboardingCas
           customer, so customer voice is correct there. An *existing* case gets
           the staff view: what to do about it, in the banker's voice. */}
       <div className="p r" style={{ position: 'relative' }}>
-        {(flow === null || composing) && <Blank onNew={() => setFlow('')} onBulk={() => setFlow(BULK)} />}
+        {(flow === null || composing) && <Blank onNew={onNewApplication} onBulk={() => setFlow(BULK)} />}
         {flow === BULK && <BulkUpload onExit={() => setFlow(null)} />}
         {flow && flow !== BULK && flow !== '' && (picked
           ? <CaseDetail key={picked.id} c={picked} onClose={() => setFlow(null)} />
-          : <Blank onNew={() => setFlow('')} onBulk={() => setFlow(BULK)} />)}
+          : <Blank onNew={onNewApplication} onBulk={() => setFlow(BULK)} />)}
       </div>
 
       {composing && (
         <div className="dk-capture-scrim" onMouseDown={(e) => { if (e.target === e.currentTarget) setFlow(null); }}>
           <div className="dk-capture" role="dialog" aria-modal="true" aria-label="New application">
-            <AccountOpeningFlow mode="rm" onExit={() => setFlow(null)} />
+            <AccountOpeningFlow key={captureSeq} mode="rm" onExit={() => setFlow(null)} />
           </div>
         </div>
       )}

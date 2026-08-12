@@ -75,7 +75,13 @@ export default function DeskShell({ userName, userEmail, unreadAlerts = 0, onLog
   // "New application" from anywhere should land on the capture form itself —
   // switching tabs and making the banker press the same button again is a
   // dead-end click. `flow === ''` is the new-capture state Opening renders.
-  const newApplication = () => { setDest('open-account'); setFlow(''); };
+  //
+  // The counter is the wizard's React key. Without it, pressing "New
+  // application" while the wizard is already open is a no-op (flow is already
+  // '') and the next customer inherits the previous one's screen — we landed on
+  // someone else's liveness check that way.
+  const [captureSeq, setCaptureSeq] = useState(0);
+  const newApplication = () => { setDest('open-account'); setFlow(''); setCaptureSeq((n) => n + 1); };
 
   const initial = (userName || branding.appName || '?').trim().charAt(0).toUpperCase();
   // The compact square brand mark (favicon or auto-initial), used in this narrow
@@ -126,7 +132,7 @@ export default function DeskShell({ userName, userEmail, unreadAlerts = 0, onLog
         </div>
 
         {dest === 'desk' && <MyDesk cases={cases} onNavigate={go} onOpenCase={openCase} onNewApplication={newApplication} />}
-        {dest === 'open-account' && <Opening cases={cases} flow={flow} setFlow={setFlow} />}
+        {dest === 'open-account' && <Opening cases={cases} flow={flow} setFlow={setFlow} onNewApplication={newApplication} captureSeq={captureSeq} />}
         {dest === 'approvals' && <Approvals />}
         {dest === 'customers' && <Clients />}
         {dest === 'chat' && <div className="dk-hold">{agentSurfaces.chat}</div>}
