@@ -53,6 +53,46 @@ async function orch<T>(method: string, path: string, body?: unknown): Promise<T>
   return (await res.json()) as T;
 }
 
+/** A Maestro `file` variable holds a JobAttachment record — not a path, not bytes.
+ *  Shape and the `ID`-is-required rule come from the case schema's FILE_TYPE_JSON_SCHEMA
+ *  (`x-uipath-resource-kind: "JobAttachment"`). The caseplan's IXP task reads its
+ *  `fileRef` input from a case argument of exactly this shape. */
+export interface JobAttachmentRef {
+  ID: string;
+  FullName: string;
+  MimeType: string;
+  Metadata: Record<string, string>;
+}
+
+interface AttachmentCreated {
+  Id: string;
+  Name: string;
+  BlobFileAccess: { Uri: string; Verb: string; RequiresAuth: boolean; Headers: { Keys: string[]; Values: string[] } };
+}
+
+/** Upload a document as an Orchestrator attachment and return the record the case
+ *  needs. Two steps: create the attachment to get a pre-signed blob URI, then PUT
+ *  the bytes straight to it. The blob PUT is deliberately unauthenticated —
+ *  Orchestrator returns `RequiresAuth: false` and the SAS token in the URI is the
+ *  credential, so the bearer token must NOT be sent there. */
+export async function uploadCaseAttachment(file: File): Promise<JobAttachmentRef> {
+  const att = await orch<AttachmentCreated>('POST', '/odata/Attachments', { Name: file.name });
+
+  const { Uri, Verb, Headers: h } = att.BlobFileAccess;
+  const headers: Record<string, string> = {};
+  h.Keys.forEach((k, i) => { headers[k] = h.Values[i]; });
+
+  const put = await fetch(Uri, { method: Verb || 'PUT', headers, body: file });
+  if (!put.ok) throw new Error(`attachment upload → ${put.status}`);
+
+  return {
+    ID: att.Id,
+    FullName: att.Name,
+    MimeType: file.type || 'application/octet-stream',
+    Metadata: {},
+  };
+}
+
 export interface CorporateCaseInput {
   applicantId: string;
   companyName: string;
@@ -60,6 +100,9 @@ export interface CorporateCaseInput {
   tin?: string;
   directors?: number;
   channel?: string;
+  /** The uploaded AOF, as an attachment record. Feeds the caseplan's `aofDocument`
+   *  argument, which the Intake stage's IXP extraction task reads as its File input. */
+  document?: JobAttachmentRef;
 }
 
 /** Start a live CorporateOnboardingCase instance. Returns its instance id. */
@@ -80,6 +123,9 @@ export async function startCorporateCase(input: CorporateCaseInput): Promise<str
         directors: input.directors ?? 0,
         channel: input.channel ?? 'corporate',
         approved: true,
+        // The scanned form. Only sent when an upload actually happened — the case
+        // argument is optional, and a null would fail the IXP task's required File.
+        ...(input.document ? { aofDocument: input.document } : {}),
       }),
     },
   });

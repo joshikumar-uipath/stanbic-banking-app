@@ -13,7 +13,7 @@ import { Button, Field, Note, Rail, KV, Brand } from './ui';
 import Icon from './icons';
 import type { ApplyMode } from './Apply';
 import { extractAof } from './ixp';
-import { corporateMaestroReady, startCorporateCase } from '../onboarding/maestro-corporate';
+import { corporateMaestroReady, startCorporateCase, uploadCaseAttachment, type JobAttachmentRef } from '../onboarding/maestro-corporate';
 import { linkInstance } from '../onboarding/maestro';
 
 const CO = getActiveCountry();
@@ -89,6 +89,10 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
   const [doc, setDoc] = useState<
     { name: string; phase: 'reading'; note?: string } | { name: string; phase: 'done'; source: 'ixp' | 'sample' } | null
   >(null);
+  // The uploaded form, parked as an Orchestrator attachment so the case can read it.
+  // The screen fills itself from IXP for immediate review; the case re-reads the same
+  // document server-side in its Intake stage.
+  const [attachment, setAttachment] = useState<JobAttachmentRef | null>(null);
 
   const set = (k: keyof Corp) => (e: React.ChangeEvent<HTMLInputElement>) => setV((p) => ({ ...p, [k]: e.target.value }));
   const setDir = (i: number, k: keyof Dir, val: string) => setDirs((ds) => ds.map((d, j) => (j === i ? { ...d, [k]: val } : d)));
@@ -100,6 +104,13 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
     e.target.value = '';
     if (!f) return;
     setDoc({ name: f.name, phase: 'reading', note: 'Uploading the form…' });
+    setAttachment(null);
+    // Park the document in Orchestrator first so the case has something to extract
+    // from. Best-effort: if this fails the screen still fills itself from IXP below,
+    // and the case simply starts without a document.
+    if (corporateMaestroReady()) {
+      try { setAttachment(await uploadCaseAttachment(f)); } catch { /* case starts without it */ }
+    }
     try {
       // Real UiPath IXP (Document Understanding) read of the scanned AOF.
       const x = await extractAof(f, (note) => setDoc({ name: f.name, phase: 'reading', note }));
@@ -131,7 +142,7 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
       setDoc({ name: f.name, phase: 'done', source: 'sample' });
     }
   };
-  const clearUpload = () => { setV(EMPTY_CORP); setDirs([{ ...EMPTY_DIR }]); setDoc(null); };
+  const clearUpload = () => { setV(EMPTY_CORP); setDirs([{ ...EMPTY_DIR }]); setDoc(null); setAttachment(null); };
 
   const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
   const back = () => (step === 0 ? onBack() : setStep((s) => s - 1));
@@ -161,6 +172,7 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
           rcNumber: v.rc.trim(),
           tin: v.tin.trim(),
           directors: dirs.length,
+          document: attachment ?? undefined,
         });
         linkInstance(c.id, instanceId);
       } catch { /* case still captured; it just isn't live in Maestro */ }
