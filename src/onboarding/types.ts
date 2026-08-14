@@ -10,6 +10,7 @@
 
 // ── Lifecycle state machine ──────────────────────────────────────────────────
 export type OnboardingState =
+  | 'AWAITING_EXTRACTION'     // corporate: form uploaded, case running, review not yet confirmed
   | 'PRE_REGISTERED'          // customer info captured, case created
   | 'VALIDATION_IN_PROGRESS'  // async validations running
   | 'VALIDATED'               // all mandatory validations passed
@@ -27,6 +28,7 @@ export type OnboardingState =
 export interface StateMeta { state: OnboardingState; label: string; desc: string; tone: 'progress' | 'good' | 'pending' | 'exception'; }
 
 export const ONBOARDING_STATES: StateMeta[] = [
+  { state: 'AWAITING_EXTRACTION',    label: 'Awaiting review',     desc: 'Form uploaded and read — waiting on the extraction review.', tone: 'pending' },
   { state: 'PRE_REGISTERED',         label: 'Pre-registered',      desc: 'Customer information captured, case created.',   tone: 'progress' },
   { state: 'VALIDATION_IN_PROGRESS', label: 'Validating',          desc: 'Async validation activities are running.',       tone: 'progress' },
   { state: 'VALIDATED',              label: 'Validated',           desc: 'All mandatory validations completed.',           tone: 'progress' },
@@ -162,4 +164,7 @@ export interface NewCaseInput {
   channel?: Channel;
   source?: Source;
   batchId?: string;
+  /** Defaults to PRE_REGISTERED. The corporate upload path opens a record at
+   *  AWAITING_EXTRACTION so the running case shows on the desk before capture ends. */
+  state?: OnboardingState;
 }

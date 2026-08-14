@@ -152,7 +152,9 @@ class MockOnboardingStore implements OnboardingStore {
       address: input.address, employer: input.employer,
       channel: input.channel ?? 'single',
       source: input.source ?? 'rm',
-      state: 'PRE_REGISTERED',
+      // A corporate upload creates the record before the wizard is finished, so the
+      // running case is visible on the desk rather than invisible until submit.
+      state: input.state ?? 'PRE_REGISTERED',
       duplicate,
       validations: emptyValidations(),
       batchId: input.batchId,

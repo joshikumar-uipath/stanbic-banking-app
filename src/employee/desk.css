@@ -646,3 +646,65 @@
 .dk-hold button[style*="gradient"], .dk-hold a[style*="gradient"], .dk-hold [role="button"][style*="gradient"] { background: var(--d-brand) !important; }
 /* Explore agents: fill the desktop with a 3-up card grid instead of the phone's 2-up. */
 .dk-hold [class*="grid-cols-2"] { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+
+/* ── Application details popup ─────────────────────────────────────────────── */
+/* The pane beside the pipeline stays operational — where the case is and what it
+   needs. This carries the captured record itself, which is read in one pass. */
+.ad-scrim { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 24px;
+  background: rgba(13,27,48,.5); backdrop-filter: blur(3px); animation: adFade .16s ease; }
+@keyframes adFade { from { opacity: 0; } to { opacity: 1; } }
+.ad { width: min(760px, 100%); max-height: 86vh; display: flex; flex-direction: column;
+  background: var(--dk-card, #fff); border-radius: 16px; overflow: hidden;
+  box-shadow: 0 30px 70px -22px rgba(10,25,60,.55); animation: adPop .2s cubic-bezier(.2,.7,.3,1); }
+@keyframes adPop { from { opacity: 0; transform: translateY(8px) scale(.99); } to { opacity: 1; transform: none; } }
+
+.ad-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--dk-line, #e7eaf1); }
+.ad-eyebrow { font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--dk-sky, #0091da); }
+.ad-head h2 { margin: 4px 0 0; font-size: 19px; letter-spacing: -.02em; }
+.ad-sub { display: flex; align-items: center; gap: 9px; margin-top: 6px; }
+.ad-sub code { font-size: 11.5px; color: var(--dk-ink-3, #8a94a8); font-variant-numeric: tabular-nums; }
+.ad-pill { font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 999px; }
+.ad-pill.progress { background: #eef3fb; color: #0033a1; }
+.ad-pill.pending  { background: #fdf5e6; color: #b7791f; }
+.ad-pill.good     { background: #e8f6ef; color: #12805c; }
+.ad-pill.exception{ background: #fdecea; color: #c0392b; }
+.ad-x { margin-left: auto; background: none; border: 0; cursor: pointer; color: var(--dk-ink-3, #8a94a8);
+  padding: 7px; border-radius: 9px; display: grid; place-items: center; }
+.ad-x:hover { background: var(--dk-bg, #f4f6fb); color: var(--dk-ink, #16202e); }
+
+.ad-body { padding: 6px 20px 4px; overflow-y: auto; }
+.ad-sec { padding: 14px 0; border-bottom: 1px solid var(--dk-line-2, #f0f2f7); }
+.ad-sec:last-child { border-bottom: 0; }
+.ad-sec h3 { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--dk-ink-3, #8a94a8); margin-bottom: 10px; }
+.ad-sec h3 em { font-style: normal; color: var(--dk-ink-2, #55627a); }
+
+.ad-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 22px; }
+@media (max-width: 620px) { .ad-grid { grid-template-columns: 1fr; } }
+.ad-row { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.ad-row dt { flex: 0 0 42%; font-size: 12px; color: var(--dk-ink-3, #8a94a8); }
+.ad-row dd { flex: 1; font-size: 13px; font-weight: 500; word-break: break-word; }
+.ad-row dd.empty { color: var(--dk-ink-3, #8a94a8); font-weight: 400; font-style: italic; }
+
+.ad-people { display: flex; flex-direction: column; gap: 10px; }
+.ad-person { display: flex; gap: 11px; padding: 11px 12px; border: 1px solid var(--dk-line, #e7eaf1);
+  border-radius: 11px; background: #fbfcfe; }
+.ad-person b { display: block; font-size: 13.5px; }
+.ad-person span { display: block; font-size: 11.5px; color: var(--dk-ink-2, #55627a); }
+.ad-ava { width: 34px; height: 34px; flex: none; border-radius: 10px; display: grid; place-items: center;
+  font-size: 12px; font-weight: 700; color: #fff; background: linear-gradient(135deg, #0033a1, #0091da); }
+
+.ad-foot { display: flex; align-items: center; gap: 12px; padding: 13px 20px;
+  border-top: 1px solid var(--dk-line, #e7eaf1); background: #fbfcfe; }
+.ad-note { flex: 1; font-size: 12px; color: var(--dk-ink-2, #55627a); }
+.ad-btn { font: inherit; font-size: 13.5px; font-weight: 600; padding: 9px 18px; border-radius: 10px;
+  border: 1px solid var(--dk-line, #e7eaf1); background: #fff; cursor: pointer; }
+.ad-btn:hover { background: var(--dk-bg, #f4f6fb); }
+@media (prefers-reduced-motion: reduce) { .ad, .ad-scrim { animation: none; } }
+
+/* Opens the captured record. Sits with the status tag, not the close button —
+   it is a way further in, not a way out. */
+.dk-case-details { font: inherit; font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 8px;
+  border: 1px solid var(--dk-line, #e7eaf1); background: #fff; color: var(--dk-ink-2, #55627a); cursor: pointer; }
+.dk-case-details:hover { background: var(--dk-bg, #f4f6fb); color: var(--dk-ink, #16202e); }

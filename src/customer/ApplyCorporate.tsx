@@ -126,6 +126,8 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
   // A review parked with "Finish later" survives closing the wizard entirely, so
   // offer it back rather than stranding a case that is already running.
   const [resume, setResume] = useState(() => loadPendingExtraction());
+  // The record opened at upload. Submit fills it in rather than creating a second one.
+  const [draftId, setDraftId] = useState<string | null>(null);
 
   const set = (k: keyof Corp) => (e: React.ChangeEvent<HTMLInputElement>) => setV((p) => ({ ...p, [k]: e.target.value }));
   const setDir = (i: number, k: keyof Dir, val: string) => setDirs((ds) => ds.map((d, j) => (j === i ? { ...d, [k]: val } : d)));
@@ -152,6 +154,15 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
             document: att, documentUri: uri,
           });
           setExtractionInstance(id);
+          // Open the record now so the running case is visible on the desk. It carries
+          // the file name until the review confirms a company name.
+          const draft = await store.create({
+            firstName: f.name, lastName: '',
+            phone: '', email: '', bvn: '', nin: '', address: '',
+            channel: 'single', source: 'rm', state: 'AWAITING_EXTRACTION',
+          });
+          setDraftId(draft.id);
+          linkInstance(draft.id, id);
           savePendingExtraction({ instanceId: id, attachmentId: att.ID, documentName: att.FullName });
         } catch { /* review falls back to the local read */ }
       } catch { /* case starts without it */ }
@@ -236,7 +247,7 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
   const submit = async () => {
     setBusy(true);
     const primary = dirs[0] ?? EMPTY_DIR;
-    const c = await store.create({
+    const fields = {
       firstName: v.company.trim() || 'Unnamed business', lastName: '',
       entity: {
         companyName: v.company.trim(), rcNumber: v.rc.trim(), businessType: v.bizType, sector: v.sector.trim(),
@@ -245,8 +256,13 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
       },
       phone: digits(v.phone || primary.phone), email: (v.email || primary.email).trim(),
       bvn: digits(primary.bvn), nin: '', address: v.address.trim(),
-      channel: 'single', source: 'rm',
-    });
+      channel: 'single' as const, source: 'rm' as const,
+    };
+    // An upload already opened a draft record — fill that one in rather than
+    // leaving it orphaned beside a second, near-identical row.
+    const c = draftId
+      ? await store.update(draftId, { ...fields, state: 'PRE_REGISTERED' })
+      : await store.create(fields);
     // Start the REAL corporate Maestro case and link it to this record, so the
     // desk shows its live stage exactly like an individual one. Best-effort: a
     // Maestro hiccup must not lose an application the RM just captured.
@@ -254,7 +270,8 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
     // was still capturing — reuse it rather than starting a second one. Only the
     // fill-the-form path starts a case here.
     if (extractionInstance) {
-      linkInstance(c.id, extractionInstance);
+      linkInstance(c.id, extractionInstance);   // no-op when the draft already linked it
+      clearPendingExtraction();
     } else if (corporateMaestroReady()) {
       try {
         const instanceId = await startCorporateCase({

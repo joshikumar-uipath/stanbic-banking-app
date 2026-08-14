@@ -10,6 +10,7 @@
 // the screen is turned toward the customer, which is exactly who they're for.)
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react';
+import ApplicationDetails from './ApplicationDetails';
 import { store, stateMeta, fullName, commsFor, CHANNEL_META, MSG_CHANNELS, VALIDATION_KINDS, type OnboardingCase, type ValidationKind, type MsgChannel } from '../../onboarding';
 import { maestroReady, startCase, getState, getCachedState, approve, instanceUrl, actionCenterUrl, getLinkedInstance, linkInstance, LINKS_EVENT, STAGES as MAESTRO_STAGES, type LiveState } from '../../onboarding/maestro';
 import { ChannelIcon } from '../../onboarding/ChannelIcon';
@@ -51,6 +52,8 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
   const [busy, setBusy] = useState<string | null>(null);
   const [tab, setTab] = useState<CaseTab>('overview');
   const [picker, setPicker] = useState(false);
+  // The captured record itself opens as a popup; the pane stays the operational view.
+  const [details, setDetails] = useState(false);
   // Live link to the real Maestro case for this record.
   const [linked, setLinked] = useState<string | null>(() => getLinkedInstance(c.id));
   // Seed from the per-instance cache so a reopened case shows its last-known stage at once.
@@ -145,8 +148,11 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
           <div className="nm">{name}</div>
           <div className="rf num">{c.id} · opened {ago(c.createdAt)}</div>
         </div>
+        <button className="dk-case-details" onClick={() => setDetails(true)}
+          title="Everything captured on this application">Details</button>
         <Tag tone={TONE[m.tone] ?? 'idle'}>{m.label}</Tag>
       </div>
+      {details && <ApplicationDetails c={c} onClose={() => setDetails(false)} />}
 
       <div className="dk-case-body">
         {/* The point of the pane: what to do, and why — always in view, above the tabs.
