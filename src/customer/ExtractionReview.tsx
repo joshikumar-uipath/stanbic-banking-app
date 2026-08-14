@@ -203,11 +203,20 @@ export default function ExtractionReview({ instanceId, attachmentId, documentNam
       <div className="xv-split">
         <div className="xv-fields">
           {!done && (
-            <div className="xv-wait">
-              <div className="xv-spin" />
-              <b>{note}</b>
-              <span>The case is running the extraction. You can close this and come back — it keeps going.</span>
-            </div>
+            <>
+              <div className="xv-wait">
+                <div className="xv-spin" />
+                <b>{note}</b>
+                <span>The case is running the extraction. You can close this and come back — it keeps going.</span>
+              </div>
+              {/* Shape for the column while the read runs, so the fields do not
+                  appear out of an empty page. */}
+              {['l', 'm', 's'].map((w, i) => (
+                <div className="xv-skel" key={i}>
+                  <div className={`sk ${w}`} /><div className="sk l" /><div className="sk m" /><div className="sk s" />
+                </div>
+              ))}
+            </>
           )}
 
           {done && attention.length > 0 && (
@@ -239,7 +248,8 @@ export default function ExtractionReview({ instanceId, attachmentId, documentNam
           </div>
           <div className="xv-doc-body">
             {docUrl
-              ? <iframe className="xv-frame" src={docUrl} title="Uploaded form" />
+              ? <iframe className="xv-frame" title="Uploaded form"
+                  src={`${docUrl}#view=FitH&toolbar=1&navpanes=0`} />
               : <div className="xv-doc-none">The uploaded pages will appear here.</div>}
             {!done && <div className="xv-scan" />}
           </div>

@@ -708,3 +708,7 @@
 .dk-case-details { font: inherit; font-size: 12px; font-weight: 600; padding: 5px 11px; border-radius: 8px;
   border: 1px solid var(--dk-line, #e7eaf1); background: #fff; color: var(--dk-ink-2, #55627a); cursor: pointer; }
 .dk-case-details:hover { background: var(--dk-bg, #f4f6fb); color: var(--dk-ink, #16202e); }
+
+/* The extraction review needs the document at a readable size, so the capture
+   overlay widens for that screen only — the capture wizard stays at 1020px. */
+.dk-capture:has(.xv) { max-width: 1440px; }
