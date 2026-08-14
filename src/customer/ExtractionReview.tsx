@@ -129,7 +129,10 @@ export default function ExtractionReview({ instanceId, attachmentId, documentNam
       } catch { /* keep polling */ }
       tries += 1;
       setNote(tries < 3 ? 'Reading the form…' : `Still reading — ${tries * 4}s`);
-      if (tries > 30) { setRows(fallback); setSource('sample'); return; }
+      // A resumed review whose task was already completed elsewhere (Action Center,
+      // another tab) has nothing to wait for — give up early rather than spending
+      // two minutes polling for a gate that is already open.
+      if (tries > 12) { setRows(fallback); setSource('sample'); return; }
       timer.current = window.setTimeout(tick, 4000);
     };
     tick();

@@ -5,7 +5,7 @@
 // primary signatory's identity (for validations/pipeline) plus the full entity
 // metadata (see EntityInfo). Same shared OnboardingStore as the individual flow.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { store, type OnboardingCase } from '../onboarding';
 import { getActiveCountry } from '../config/countries';
 import { useConfig } from '../config';
@@ -13,7 +13,7 @@ import { Button, Field, Note, Rail, KV, Brand } from './ui';
 import Icon from './icons';
 import type { ApplyMode } from './Apply';
 import { extractAof } from './ixp';
-import { attachmentReadUrl, corporateMaestroReady, startCorporateCase, uploadCaseAttachment, type JobAttachmentRef } from '../onboarding/maestro-corporate';
+import { attachmentReadUrl, clearPendingExtraction, corporateMaestroReady, loadPendingExtraction, savePendingExtraction, startCorporateCase, uploadCaseAttachment, type JobAttachmentRef } from '../onboarding/maestro-corporate';
 import ExtractionReview, { type ReviewField } from './ExtractionReview';
 import { linkInstance } from '../onboarding/maestro';
 
@@ -120,6 +120,12 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
   // desk and Action Center are two doors onto the same task.
   const [extractionInstance, setExtractionInstance] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState(false);
+  // Whether the reviewer has actually confirmed. "Finish later" leaves this false,
+  // so the banner keeps saying the gate is open and the way back stays visible.
+  const [reviewDone, setReviewDone] = useState(false);
+  // A review parked with "Finish later" survives closing the wizard entirely, so
+  // offer it back rather than stranding a case that is already running.
+  const [resume, setResume] = useState(() => loadPendingExtraction());
 
   const set = (k: keyof Corp) => (e: React.ChangeEvent<HTMLInputElement>) => setV((p) => ({ ...p, [k]: e.target.value }));
   const setDir = (i: number, k: keyof Dir, val: string) => setDirs((ds) => ds.map((d, j) => (j === i ? { ...d, [k]: val } : d)));
@@ -146,6 +152,7 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
             document: att, documentUri: uri,
           });
           setExtractionInstance(id);
+          savePendingExtraction({ instanceId: id, attachmentId: att.ID, documentName: att.FullName });
         } catch { /* review falls back to the local read */ }
       } catch { /* case starts without it */ }
     }
@@ -212,9 +219,16 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
         };
       }));
     }
+    setReviewDone(true);
     setReviewing(false);
+    clearPendingExtraction();
+    setResume(null);
   };
-  const clearUpload = () => { setV(EMPTY_CORP); setDirs([{ ...EMPTY_DIR }]); setDoc(null); setAttachment(null); };
+  const clearUpload = () => {
+    setV(EMPTY_CORP); setDirs([{ ...EMPTY_DIR }]); setDoc(null); setAttachment(null);
+    setExtractionInstance(null); setReviewDone(false);
+    clearPendingExtraction(); setResume(null);
+  };
 
   const next = () => setStep((s) => Math.min(s + 1, STEPS.length - 1));
   const back = () => (step === 0 ? onBack() : setStep((s) => s - 1));
@@ -292,6 +306,19 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
             <h1 className="cx-h1">Business details</h1>
             <p className="cx-p" style={{ marginBottom: 16 }}>The registered company, exactly as it appears on the certificate of incorporation.</p>
 
+            {!doc && resume && (
+              <Note tone="warn" icon="clock">
+                <b>An extraction is waiting for your review.</b>{' '}
+                {resume.documentName} — started {new Date(resume.startedAt).toLocaleTimeString()}.
+                <button type="button" className="cx-clearbtn" onClick={() => {
+                  setExtractionInstance(resume.instanceId);
+                  setAttachment({ ID: resume.attachmentId, FullName: resume.documentName, MimeType: 'application/pdf', Metadata: {} });
+                  setDoc({ name: resume.documentName, phase: 'done', source: 'sample' });
+                  setReviewing(true);
+                }}>Resume review</button>
+                <button type="button" className="cx-clearbtn" onClick={() => { clearPendingExtraction(); setResume(null); }}>Discard</button>
+              </Note>
+            )}
             {!doc && (
               <label className="cx-drop">
                 <input type="file" accept="application/pdf,image/*" onChange={onUpload} hidden />
@@ -306,7 +333,16 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
               <Note tone="good" icon="checkCircle">
                 <b>Company and {dirs.length} {dirs.length === 1 ? 'director' : 'directors'} read from the form.</b>{' '}
                 {doc.source === 'sample' && <>(Sample read — live extraction unavailable.) </>}
-                Please check each field before you continue.
+                {reviewDone
+                  ? 'Please check each field before you continue.'
+                  : 'The extraction is still waiting on your review.'}
+                {/* The review is a gate on the case, so it has to be reachable again
+                    after "Finish later" — otherwise the case sits parked with no way in. */}
+                {extractionInstance && (
+                  <button type="button" className="cx-clearbtn" onClick={() => setReviewing(true)}>
+                    {reviewDone ? 'Reopen extraction' : 'Review extraction'}
+                  </button>
+                )}
                 <button type="button" className="cx-clearbtn" onClick={clearUpload}>Clear</button>
               </Note>
             )}

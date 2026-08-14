@@ -102,6 +102,47 @@ export async function attachmentReadUrl(attachmentId: string): Promise<string> {
   return att?.BlobFileAccess?.Uri ?? '';
 }
 
+// ── Pending extraction ───────────────────────────────────────────────────────
+// An upload starts the case before the application record exists, so there is
+// nothing to hang the instance off yet — `linkInstance` is keyed by record id.
+// Park it here instead so "Finish later" is genuinely resumable: close the
+// wizard, come back, and the review is still reachable.
+
+const PENDING_KEY = 'aof_corp_pending_extraction';
+
+export interface PendingExtraction {
+  instanceId: string;
+  attachmentId: string;
+  documentName: string;
+  startedAt: string;
+}
+
+export function savePendingExtraction(p: Omit<PendingExtraction, 'startedAt'>): void {
+  try {
+    localStorage.setItem(PENDING_KEY, JSON.stringify({ ...p, startedAt: new Date().toISOString() }));
+  } catch { /* quota/disabled — resume just won't survive a reload */ }
+}
+
+/** The parked extraction, if one is still worth resuming. Anything older than a
+ *  day is stale: the document's read link is long gone and the case has moved on. */
+export function loadPendingExtraction(): PendingExtraction | null {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as PendingExtraction;
+    if (!p?.instanceId) return null;
+    if (Date.now() - new Date(p.startedAt).getTime() > 24 * 60 * 60 * 1000) {
+      clearPendingExtraction();
+      return null;
+    }
+    return p;
+  } catch { return null; }
+}
+
+export function clearPendingExtraction(): void {
+  try { localStorage.removeItem(PENDING_KEY); } catch { /* ignore */ }
+}
+
 /** The extraction review task the case parks after IXP finishes. */
 export interface ExtractionTask {
   taskId: number;
