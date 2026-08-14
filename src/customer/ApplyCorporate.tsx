@@ -13,7 +13,8 @@ import { Button, Field, Note, Rail, KV, Brand } from './ui';
 import Icon from './icons';
 import type { ApplyMode } from './Apply';
 import { extractAof } from './ixp';
-import { corporateMaestroReady, startCorporateCase, uploadCaseAttachment, type JobAttachmentRef } from '../onboarding/maestro-corporate';
+import { attachmentReadUrl, corporateMaestroReady, startCorporateCase, uploadCaseAttachment, type JobAttachmentRef } from '../onboarding/maestro-corporate';
+import ExtractionReview, { type ReviewField } from './ExtractionReview';
 import { linkInstance } from '../onboarding/maestro';
 
 const CO = getActiveCountry();
@@ -63,6 +64,27 @@ const EXTRACTED_DIRS: Dir[] = [
   { name: 'Kehinde Omotayo Akerele', bvn: '22148013170', idType: 'International Passport', idNumber: 'B00597328', phone: '08066526627', email: 'meetsweetkenny@yahoo.com', role: 'Director' },
 ];
 
+/** The sample read as review rows, used when the case payload can't be reached.
+ *  Confidences mirror what the model actually returned on this form — the two
+ *  BVNs really do read poorly, which is the point of having a review step. */
+const SAMPLE_ROWS: ReviewField[] = [
+  { id: 's-company', name: 'Registered Company Name', value: EXTRACTED_CORP.company, confidence: 98, missing: false, group: 'Company details' },
+  { id: 's-rc', name: 'RC/Registration Number', value: EXTRACTED_CORP.rc, confidence: 82, missing: false, group: 'Company details' },
+  { id: 's-tin', name: 'TIN', value: EXTRACTED_CORP.tin, confidence: 87, missing: false, group: 'Company details' },
+  { id: 's-biz', name: 'Business Type', value: 'Consultancy in Infotech', confidence: 86, missing: false, group: 'Company details' },
+  { id: 's-sector', name: 'Industry/Nature of Business', value: EXTRACTED_CORP.sector, confidence: 95, missing: false, group: 'Company details' },
+  { id: 's-addr', name: 'Registered Address', value: EXTRACTED_CORP.address, confidence: 92, missing: false, group: 'Company details' },
+  { id: 's-email', name: 'Email', value: EXTRACTED_CORP.email, confidence: 96, missing: false, group: 'Company details' },
+  { id: 's-phone', name: 'Phone', value: EXTRACTED_CORP.phone, confidence: 96, missing: false, group: 'Company details' },
+  { id: 's-scuml', name: 'SCUML registration number', value: '', confidence: 0, missing: true, group: 'Company details' },
+  ...EXTRACTED_DIRS.flatMap((d, i) => [
+    { id: `s-d${i}-name`, name: 'Full Name', value: d.name, confidence: 96, missing: false, group: `Directors / signatories ${i + 1}` },
+    { id: `s-d${i}-bvn`, name: 'BVN', value: d.bvn, confidence: i === 0 ? 58 : 62, missing: false, group: `Directors / signatories ${i + 1}` },
+    { id: `s-d${i}-id`, name: 'ID/Means-of-Identification Number', value: d.idNumber, confidence: 94, missing: false, group: `Directors / signatories ${i + 1}` },
+    { id: `s-d${i}-role`, name: 'Designation/Role', value: d.role, confidence: 88, missing: false, group: `Directors / signatories ${i + 1}` },
+  ]),
+];
+
 const STEPS = ['Business', 'Directors', 'Review'];
 
 function Select({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: string[] }) {
@@ -93,6 +115,11 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
   // The screen fills itself from IXP for immediate review; the case re-reads the same
   // document server-side in its Intake stage.
   const [attachment, setAttachment] = useState<JobAttachmentRef | null>(null);
+  // The case instance started at upload time. The review screen polls it for the
+  // parked "Confirm extracted details" task and completes it on accept, so the
+  // desk and Action Center are two doors onto the same task.
+  const [extractionInstance, setExtractionInstance] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState(false);
 
   const set = (k: keyof Corp) => (e: React.ChangeEvent<HTMLInputElement>) => setV((p) => ({ ...p, [k]: e.target.value }));
   const setDir = (i: number, k: keyof Dir, val: string) => setDirs((ds) => ds.map((d, j) => (j === i ? { ...d, [k]: val } : d)));
@@ -105,11 +132,22 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
     if (!f) return;
     setDoc({ name: f.name, phase: 'reading', note: 'Uploading the form…' });
     setAttachment(null);
-    // Park the document in Orchestrator first so the case has something to extract
-    // from. Best-effort: if this fails the screen still fills itself from IXP below,
-    // and the case simply starts without a document.
+    // Park the document in Orchestrator first, then start the case immediately so
+    // the server-side extraction is already running while the RM is still on this
+    // screen. The review step opens against that same instance.
     if (corporateMaestroReady()) {
-      try { setAttachment(await uploadCaseAttachment(f)); } catch { /* case starts without it */ }
+      try {
+        const att = await uploadCaseAttachment(f);
+        setAttachment(att);
+        try {
+          const uri = await attachmentReadUrl(att.ID);
+          const id = await startCorporateCase({
+            applicantId: 'pending', companyName: 'Corporate applicant',
+            document: att, documentUri: uri,
+          });
+          setExtractionInstance(id);
+        } catch { /* review falls back to the local read */ }
+      } catch { /* case starts without it */ }
     }
     try {
       // Real UiPath IXP (Document Understanding) read of the scanned AOF.
@@ -141,6 +179,40 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
       setDirs(EXTRACTED_DIRS.map((d) => ({ ...d })));
       setDoc({ name: f.name, phase: 'done', source: 'sample' });
     }
+    // The RM confirms what was read before the case moves on. Opening this is what
+    // makes the review a step rather than a screen they might never look at.
+    setReviewing(true);
+  };
+
+  /** Fold confirmed values back into the form so the rest of the wizard starts
+   *  from what the reviewer accepted, not from the raw read. */
+  const applyConfirmed = (rows: ReviewField[]) => {
+    const pick = (re: RegExp) => rows.find((r) => re.test(r.name))?.value?.trim() ?? '';
+    setV((p) => ({
+      ...p,
+      company: pick(/company name/i) || p.company,
+      rc: pick(/^rc|registration number/i) || p.rc,
+      tin: pick(/^tin$/i) || p.tin,
+      sector: pick(/industry|nature of business/i) || p.sector,
+      address: pick(/address/i) || p.address,
+      email: pick(/^email$/i) || p.email,
+      phone: pick(/^phone$/i) || p.phone,
+    }));
+    const byDir = new Map<string, ReviewField[]>();
+    rows.filter((r) => /directors? \/ signator/i.test(r.group))
+      .forEach((r) => { if (!byDir.has(r.group)) byDir.set(r.group, []); byDir.get(r.group)!.push(r); });
+    if (byDir.size) {
+      setDirs([...byDir.values()].map((fs) => {
+        const g = (re: RegExp) => fs.find((r) => re.test(r.name))?.value?.trim() ?? '';
+        return {
+          name: g(/full name/i), bvn: digits(g(/bvn/i)),
+          idType: EMPTY_DIR.idType, idNumber: g(/id\b|identification/i),
+          phone: digits(g(/phone/i)), email: g(/email/i),
+          role: matchOption(g(/designation|role/i), ROLES) ?? 'Director',
+        };
+      }));
+    }
+    setReviewing(false);
   };
   const clearUpload = () => { setV(EMPTY_CORP); setDirs([{ ...EMPTY_DIR }]); setDoc(null); setAttachment(null); };
 
@@ -164,7 +236,12 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
     // Start the REAL corporate Maestro case and link it to this record, so the
     // desk shows its live stage exactly like an individual one. Best-effort: a
     // Maestro hiccup must not lose an application the RM just captured.
-    if (corporateMaestroReady()) {
+    // An upload already started the case so the extraction could run while the RM
+    // was still capturing — reuse it rather than starting a second one. Only the
+    // fill-the-form path starts a case here.
+    if (extractionInstance) {
+      linkInstance(c.id, extractionInstance);
+    } else if (corporateMaestroReady()) {
       try {
         const instanceId = await startCorporateCase({
           applicantId: c.id,
@@ -179,6 +256,19 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
     }
     onDone(c);
   };
+
+  if (reviewing) {
+    return (
+      <ExtractionReview
+        instanceId={extractionInstance ?? ''}
+        attachmentId={attachment?.ID}
+        documentName={attachment?.FullName}
+        fallback={SAMPLE_ROWS}
+        onAccepted={applyConfirmed}
+        onClose={() => setReviewing(false)}
+      />
+    );
+  }
 
   return (
     <>

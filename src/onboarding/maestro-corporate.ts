@@ -93,6 +93,78 @@ export async function uploadCaseAttachment(file: File): Promise<JobAttachmentRef
   };
 }
 
+/** Mint a fresh pre-signed READ url for an attachment. Orchestrator returns a new
+ *  SAS on every GET, valid ~30 minutes, `RequiresAuth: false` — so it can be dropped
+ *  straight into an <iframe> or <embed>. Call it late rather than caching: the desk
+ *  re-mints on open so a review resumed hours later still shows the pages. */
+export async function attachmentReadUrl(attachmentId: string): Promise<string> {
+  const att = await orch<AttachmentCreated>('GET', `/odata/Attachments(${attachmentId})`);
+  return att?.BlobFileAccess?.Uri ?? '';
+}
+
+/** The extraction review task the case parks after IXP finishes. */
+export interface ExtractionTask {
+  taskId: number;
+  status: string;
+  /** Raw IXP result, as handed to the action app. */
+  extraction: unknown;
+  documentUri: string;
+  documentName: string;
+  attachmentId: string;
+  companyName: string;
+}
+
+const REVIEW_TASK_TITLES = ['Confirm extracted details', 'corporateextractionreviewao'];
+
+/** Find the pending extraction-review task for an instance, if the case has
+ *  reached it. Returns null while IXP is still running — the caller polls. */
+export async function findExtractionTask(instanceId: string): Promise<ExtractionTask | null> {
+  // Filter on the job only. A freshly created task is `Unassigned`, not `Pending` —
+  // filtering on Pending server-side silently skips the window we care about.
+  const r = await orch<{ value: Array<Record<string, unknown>> }>(
+    'GET',
+    `/odata/Tasks/UiPath.Server.Configuration.OData.GetTasksAcrossFolders?$filter=${
+      encodeURIComponent(`CreatorJobKey eq ${instanceId}`)}&$top=20`,
+  );
+  const open = new Set(['Unassigned', 'Pending']);
+  const hit = (r.value ?? []).find((t) =>
+    open.has(String(t.Status ?? '')) &&
+    REVIEW_TASK_TITLES.some((n) => String(t.Title ?? '').toLowerCase().includes(n.toLowerCase())));
+  if (!hit) return null;
+
+  const id = Number(hit.Id);
+  const detail = await orch<{ data?: Record<string, unknown>; status?: string }>(
+    'GET', `/tasks/GenericTasks/GetTaskDataById?taskId=${id}`);
+  const d = detail?.data ?? {};
+  return {
+    taskId: id,
+    status: String(detail?.status ?? hit.Status ?? ''),
+    extraction: d.extraction,
+    documentUri: String(d.documentUri ?? ''),
+    documentName: String(d.documentName ?? ''),
+    attachmentId: String(d.attachmentId ?? ''),
+    companyName: String(d.companyName ?? ''),
+  };
+}
+
+/** Complete the review task from the desk. Mirrors what the Action Center app
+ *  sends, so the case cannot tell which surface the reviewer used. */
+export async function completeExtractionTask(
+  taskId: number,
+  outcome: 'Accept' | 'Reject',
+  payload: { confirmed: unknown; corrections: unknown; notes?: string },
+): Promise<void> {
+  await orch('POST', '/tasks/GenericTasks/CompleteTask', {
+    taskId,
+    action: outcome,
+    data: {
+      confirmed: JSON.stringify(payload.confirmed),
+      corrections: JSON.stringify(payload.corrections),
+      notes: payload.notes ?? '',
+    },
+  });
+}
+
 export interface CorporateCaseInput {
   applicantId: string;
   companyName: string;
@@ -103,6 +175,11 @@ export interface CorporateCaseInput {
   /** The uploaded AOF, as an attachment record. Feeds the caseplan's `aofDocument`
    *  argument, which the Intake stage's IXP extraction task reads as its File input. */
   document?: JobAttachmentRef;
+  /** Pre-signed read url for the same document, passed straight through to the
+   *  extraction-review task. Action Center apps get no HTTP client, so this is the
+   *  only way the reviewer sees the pages there. ~30 minute life; the desk re-mints
+   *  its own on open, so a stale one only affects the Action Center surface. */
+  documentUri?: string;
 }
 
 /** Start a live CorporateOnboardingCase instance. Returns its instance id. */
@@ -126,6 +203,7 @@ export async function startCorporateCase(input: CorporateCaseInput): Promise<str
         // The scanned form. Only sent when an upload actually happened — the case
         // argument is optional, and a null would fail the IXP task's required File.
         ...(input.document ? { aofDocument: input.document } : {}),
+        ...(input.documentUri ? { aofDocumentUri: input.documentUri } : {}),
       }),
     },
   });
