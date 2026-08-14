@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import type { OnboardingCase } from '../../onboarding';
 import { stateMeta } from '../../onboarding/types';
+import { Brand } from '../../customer/ui';
 import Icon from '../../customer/icons';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -8,9 +9,11 @@ import Icon from '../../customer/icons';
 //
 // The pane beside the pipeline stays the operational view: where the case is,
 // what it is waiting on, what to do next. This is the other half — everything
-// the applicant actually gave us, which is reference material a banker reads in
-// one go rather than glances at. A popup suits that; it does not compete with
-// the pane, it complements it.
+// the applicant actually gave us, which is reference read in one pass.
+//
+// It is built on the capture wizard's own shell (.cx head / body / foot) rather
+// than a second set of styles, so it carries the same branding, spacing and
+// button treatment the RM just came from.
 // ─────────────────────────────────────────────────────────────────────────────
 
 function Row({ label, value }: { label: string; value?: string }) {
@@ -23,7 +26,12 @@ function Row({ label, value }: { label: string; value?: string }) {
   );
 }
 
-export default function ApplicationDetails({ c, onClose }: { c: OnboardingCase; onClose: () => void }) {
+export default function ApplicationDetails({ c, onReviewExtraction, onClose }: {
+  c: OnboardingCase;
+  /** Present while the case is still parked at its extraction gate. */
+  onReviewExtraction?: () => void;
+  onClose: () => void;
+}) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -32,48 +40,59 @@ export default function ApplicationDetails({ c, onClose }: { c: OnboardingCase; 
 
   const e = c.entity;
   const meta = stateMeta(c.state);
-  const corporate = Boolean(e);
+  const corporate = Boolean(e) || c.state === 'AWAITING_EXTRACTION';
+  const title = e?.companyName?.trim() || `${c.firstName} ${c.lastName}`.trim() || c.id;
 
   return (
     <div className="ad-scrim" onMouseDown={(ev) => { if (ev.target === ev.currentTarget) onClose(); }}>
-      <div className="ad" role="dialog" aria-modal="true" aria-label="Application details">
-        <div className="ad-head">
-          <div>
-            <div className="ad-eyebrow">{corporate ? 'Corporate application' : 'Application'}</div>
-            <h2>{corporate ? e!.companyName || c.firstName : `${c.firstName} ${c.lastName}`.trim()}</h2>
-            <div className="ad-sub">
-              <code>{c.id}</code>
-              <span className={`ad-pill ${meta.tone}`}>{meta.label}</span>
-            </div>
+      <div className="ad cx" role="dialog" aria-modal="true" aria-label="Application details">
+        <div className="cx-head">
+          <div className="cx-topline">
+            <button className="cx-back" onClick={onClose} aria-label="Close">
+              <Icon name="arrowLeft" />
+            </button>
+            <Brand sub={corporate ? 'Business' : 'Applicant'} />
+            <span className={`ad-pill ${meta.tone}`}>{meta.label}</span>
           </div>
-          <button className="ad-x" onClick={onClose} aria-label="Close details">
-            <Icon name="x" size={16} />
-          </button>
         </div>
 
-        <div className="ad-body">
-          {corporate && (
+        <div className="cx-body">
+          <h1 className="cx-h1">{title}</h1>
+          <p className="cx-p ad-ref">{c.id} · opened {new Date(c.createdAt).toLocaleString()}</p>
+
+          {onReviewExtraction && (
+            <button className="ad-cta" onClick={onReviewExtraction}>
+              <span className="ad-cta-ic"><Icon name="doc" size={17} /></span>
+              <span className="ad-cta-t">
+                <b>Review the extraction</b>
+                <em>See what was read from the form, beside the pages themselves.</em>
+              </span>
+              <Icon name="arrowRight" size={16} />
+            </button>
+          )}
+
+          {e && (
             <section className="ad-sec">
               <h3>Business</h3>
               <dl className="ad-grid">
-                <Row label="Registered name" value={e!.companyName} />
-                <Row label="RC number" value={e!.rcNumber} />
-                <Row label="Tax ID (TIN)" value={e!.tin} />
-                <Row label="Category" value={e!.businessType} />
-                <Row label="Sector" value={e!.sector} />
-                <Row label="Annual turnover" value={e!.turnover} />
-                <Row label="Registered address" value={e!.address} />
-                <Row label="Business email" value={e!.email} />
-                <Row label="Business phone" value={e!.phone} />
+                <Row label="Registered name" value={e.companyName} />
+                <Row label="RC number" value={e.rcNumber} />
+                <Row label="Tax ID (TIN)" value={e.tin} />
+                <Row label="Category" value={e.businessType} />
+                <Row label="Sector" value={e.sector} />
+                <Row label="Annual turnover" value={e.turnover} />
+                <Row label="Registered address" value={e.address} />
+                <Row label="Business email" value={e.email} />
+                <Row label="Business phone" value={e.phone} />
               </dl>
             </section>
           )}
 
-          {corporate && (e!.directors?.length ?? 0) > 0 && (
+          {e && e.directors.length > 0 && (
             <section className="ad-sec">
-              <h3>Directors and signatories <em>{e!.directors.length}</em></h3>
+              <h3>Directors and signatories <em>{e.directors.length}</em></h3>
               <div className="ad-people">
-                {e!.directors.map((d, i) => (
+                {e.directors.map((d, i) => (
                   <div className="ad-person" key={`${d.name}-${i}`}>
                     <span className="ad-ava">{(d.name || '?').slice(0, 2).toUpperCase()}</span>
                     <div>
@@ -88,7 +107,7 @@ export default function ApplicationDetails({ c, onClose }: { c: OnboardingCase; 
             </section>
           )}
 
-          {!corporate && (
+          {!e && (
             <section className="ad-sec">
               <h3>Applicant</h3>
               <dl className="ad-grid">
@@ -115,9 +134,7 @@ export default function ApplicationDetails({ c, onClose }: { c: OnboardingCase; 
             <dl className="ad-grid">
               <Row label="Channel" value={c.channel === 'self' ? 'Customer self-service' : c.channel === 'bulk' ? 'Bulk upload' : 'Walk-in / direct'} />
               <Row label="Captured by" value={c.source === 'rm' ? 'Relationship manager' : 'Customer'} />
-              <Row label="Reference" value={c.id} />
               <Row label="Batch" value={c.batchId} />
-              <Row label="Opened" value={new Date(c.createdAt).toLocaleString()} />
               <Row label="Last updated" value={new Date(c.updatedAt).toLocaleString()} />
             </dl>
           </section>
@@ -131,11 +148,12 @@ export default function ApplicationDetails({ c, onClose }: { c: OnboardingCase; 
               </dl>
             </section>
           )}
+
+          <p className="ad-note">{meta.desc}</p>
         </div>
 
-        <div className="ad-foot">
-          <span className="ad-note">{meta.desc}</span>
-          <button className="ad-btn" onClick={onClose}>Close</button>
+        <div className="cx-foot">
+          <button className="cx-btn" onClick={onClose}>Close</button>
         </div>
       </div>
     </div>

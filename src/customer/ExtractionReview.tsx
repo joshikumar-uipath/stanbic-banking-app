@@ -76,14 +76,39 @@ export function toRows(raw: unknown): ReviewField[] {
   return out;
 }
 
-export default function ExtractionReview({ instanceId, attachmentId, documentName, fallback, onAccepted, onClose }: {
+/** The sample read as review rows, used when the case payload can't be reached.
+ *  Confidences mirror what the model actually returned on this form — the two
+ *  BVNs really do read poorly, which is the point of having a review step. */
+export const SAMPLE_ROWS: ReviewField[] = [
+  { id: 's-company', name: 'Registered Company Name', value: 'George Emore Technical Enterprises Ltd', confidence: 98, missing: false, group: 'Company details' },
+  { id: 's-rc', name: 'RC/Registration Number', value: '961813', confidence: 82, missing: false, group: 'Company details' },
+  { id: 's-tin', name: 'TIN', value: '26224878833179', confidence: 87, missing: false, group: 'Company details' },
+  { id: 's-biz', name: 'Business Type', value: 'Consultancy in Infotech', confidence: 86, missing: false, group: 'Company details' },
+  { id: 's-sector', name: 'Industry/Nature of Business', value: 'Information Technology', confidence: 95, missing: false, group: 'Company details' },
+  { id: 's-addr', name: 'Registered Address', value: '45 Ajose Street, Mende, Maryland', confidence: 92, missing: false, group: 'Company details' },
+  { id: 's-email', name: 'Email', value: 'eemore@gmail.com', confidence: 96, missing: false, group: 'Company details' },
+  { id: 's-phone', name: 'Phone', value: '08027317889', confidence: 96, missing: false, group: 'Company details' },
+  { id: 's-scuml', name: 'SCUML registration number', value: '', confidence: 0, missing: true, group: 'Company details' },
+  ...[
+    { name: 'Efe George Emore', bvn: '22143511463', idNumber: 'B03199156', role: 'Director' },
+    { name: 'Kehinde Omotayo Akerele', bvn: '22148013170', idNumber: 'B00597328', role: 'Director' },
+  ].flatMap((d, i) => [
+    { id: `s-d${i}-name`, name: 'Full Name', value: d.name, confidence: 96, missing: false, group: `Directors / signatories ${i + 1}` },
+    { id: `s-d${i}-bvn`, name: 'BVN', value: d.bvn, confidence: i === 0 ? 58 : 62, missing: false, group: `Directors / signatories ${i + 1}` },
+    { id: `s-d${i}-id`, name: 'ID/Means-of-Identification Number', value: d.idNumber, confidence: 94, missing: false, group: `Directors / signatories ${i + 1}` },
+    { id: `s-d${i}-role`, name: 'Designation/Role', value: d.role, confidence: 88, missing: false, group: `Directors / signatories ${i + 1}` },
+  ]),
+];
+
+export default function ExtractionReview({ instanceId, attachmentId, documentName, fallback = SAMPLE_ROWS, onAccepted, onClose }: {
   instanceId: string;
   /** Shown immediately, so the pages are on screen while the extraction runs
    *  rather than appearing only once it finishes. */
   attachmentId?: string;
   documentName?: string;
-  /** Rows to show when the case payload is unavailable — the sample read. */
-  fallback: ReviewField[];
+  /** Rows to show when the case payload is unavailable. Defaults to the sample
+   *  read so every entry point degrades the same way. */
+  fallback?: ReviewField[];
   onAccepted: (rows: ReviewField[]) => void;
   onClose: () => void;
 }) {

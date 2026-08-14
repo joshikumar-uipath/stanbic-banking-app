@@ -11,6 +11,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react';
 import ApplicationDetails from './ApplicationDetails';
+import ExtractionReview from '../../customer/ExtractionReview';
+import { loadPendingExtraction, clearPendingExtraction } from '../../onboarding/maestro-corporate';
 import { store, stateMeta, fullName, commsFor, CHANNEL_META, MSG_CHANNELS, VALIDATION_KINDS, type OnboardingCase, type ValidationKind, type MsgChannel } from '../../onboarding';
 import { maestroReady, startCase, getState, getCachedState, approve, instanceUrl, actionCenterUrl, getLinkedInstance, linkInstance, LINKS_EVENT, STAGES as MAESTRO_STAGES, type LiveState } from '../../onboarding/maestro';
 import { ChannelIcon } from '../../onboarding/ChannelIcon';
@@ -54,6 +56,10 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
   const [picker, setPicker] = useState(false);
   // The captured record itself opens as a popup; the pane stays the operational view.
   const [details, setDetails] = useState(false);
+  // A record parked at its extraction gate can be reopened from here — the review
+  // is the same task the Action Center app serves, reachable from the record too.
+  const [reviewing, setReviewing] = useState(false);
+  const awaiting = c.state === 'AWAITING_EXTRACTION';
   // Live link to the real Maestro case for this record.
   const [linked, setLinked] = useState<string | null>(() => getLinkedInstance(c.id));
   // Seed from the per-instance cache so a reopened case shows its last-known stage at once.
@@ -152,7 +158,26 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
           title="Everything captured on this application">Details</button>
         <Tag tone={TONE[m.tone] ?? 'idle'}>{m.label}</Tag>
       </div>
-      {details && <ApplicationDetails c={c} onClose={() => setDetails(false)} />}
+      {details && (
+        <ApplicationDetails
+          c={c}
+          onReviewExtraction={awaiting && linked ? () => { setDetails(false); setReviewing(true); } : undefined}
+          onClose={() => setDetails(false)}
+        />
+      )}
+      {reviewing && linked && (
+        <div className="dk-capture-scrim" onMouseDown={(ev) => { if (ev.target === ev.currentTarget) setReviewing(false); }}>
+          <div className="dk-capture cx" role="dialog" aria-modal="true" aria-label="Extraction review">
+            <ExtractionReview
+              instanceId={linked}
+              attachmentId={loadPendingExtraction()?.attachmentId}
+              documentName={loadPendingExtraction()?.documentName}
+              onAccepted={() => { clearPendingExtraction(); setReviewing(false); }}
+              onClose={() => setReviewing(false)}
+            />
+          </div>
+        </div>
+      )}
 
       <div className="dk-case-body">
         {/* The point of the pane: what to do, and why — always in view, above the tabs.

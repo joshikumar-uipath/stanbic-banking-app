@@ -64,26 +64,6 @@ const EXTRACTED_DIRS: Dir[] = [
   { name: 'Kehinde Omotayo Akerele', bvn: '22148013170', idType: 'International Passport', idNumber: 'B00597328', phone: '08066526627', email: 'meetsweetkenny@yahoo.com', role: 'Director' },
 ];
 
-/** The sample read as review rows, used when the case payload can't be reached.
- *  Confidences mirror what the model actually returned on this form — the two
- *  BVNs really do read poorly, which is the point of having a review step. */
-const SAMPLE_ROWS: ReviewField[] = [
-  { id: 's-company', name: 'Registered Company Name', value: EXTRACTED_CORP.company, confidence: 98, missing: false, group: 'Company details' },
-  { id: 's-rc', name: 'RC/Registration Number', value: EXTRACTED_CORP.rc, confidence: 82, missing: false, group: 'Company details' },
-  { id: 's-tin', name: 'TIN', value: EXTRACTED_CORP.tin, confidence: 87, missing: false, group: 'Company details' },
-  { id: 's-biz', name: 'Business Type', value: 'Consultancy in Infotech', confidence: 86, missing: false, group: 'Company details' },
-  { id: 's-sector', name: 'Industry/Nature of Business', value: EXTRACTED_CORP.sector, confidence: 95, missing: false, group: 'Company details' },
-  { id: 's-addr', name: 'Registered Address', value: EXTRACTED_CORP.address, confidence: 92, missing: false, group: 'Company details' },
-  { id: 's-email', name: 'Email', value: EXTRACTED_CORP.email, confidence: 96, missing: false, group: 'Company details' },
-  { id: 's-phone', name: 'Phone', value: EXTRACTED_CORP.phone, confidence: 96, missing: false, group: 'Company details' },
-  { id: 's-scuml', name: 'SCUML registration number', value: '', confidence: 0, missing: true, group: 'Company details' },
-  ...EXTRACTED_DIRS.flatMap((d, i) => [
-    { id: `s-d${i}-name`, name: 'Full Name', value: d.name, confidence: 96, missing: false, group: `Directors / signatories ${i + 1}` },
-    { id: `s-d${i}-bvn`, name: 'BVN', value: d.bvn, confidence: i === 0 ? 58 : 62, missing: false, group: `Directors / signatories ${i + 1}` },
-    { id: `s-d${i}-id`, name: 'ID/Means-of-Identification Number', value: d.idNumber, confidence: 94, missing: false, group: `Directors / signatories ${i + 1}` },
-    { id: `s-d${i}-role`, name: 'Designation/Role', value: d.role, confidence: 88, missing: false, group: `Directors / signatories ${i + 1}` },
-  ]),
-];
 
 const STEPS = ['Business', 'Directors', 'Review'];
 
@@ -294,7 +274,6 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
         instanceId={extractionInstance ?? ''}
         attachmentId={attachment?.ID}
         documentName={attachment?.FullName}
-        fallback={SAMPLE_ROWS}
         onAccepted={applyConfirmed}
         onClose={() => setReviewing(false)}
       />
