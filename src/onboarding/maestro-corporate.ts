@@ -148,13 +148,21 @@ export async function findExtractionTask(instanceId: string): Promise<Extraction
 }
 
 /** Complete the review task from the desk. Mirrors what the Action Center app
- *  sends, so the case cannot tell which surface the reviewer used. */
+ *  sends, so the case cannot tell which surface the reviewer used.
+ *
+ *  A task arrives `Unassigned` and cannot be completed in that state, so claim it
+ *  first — the same two-step the individual flow's approve() uses. */
 export async function completeExtractionTask(
   taskId: number,
   outcome: 'Accept' | 'Reject',
   payload: { confirmed: unknown; corrections: unknown; notes?: string },
 ): Promise<void> {
-  await orch('POST', '/tasks/GenericTasks/CompleteTask', {
+  const me = await orch<{ Id: number }>(
+    'GET', '/odata/Users/UiPath.Server.Configuration.OData.GetCurrentUserExtended()');
+  await orch('POST', '/odata/Tasks/UiPath.Server.Configuration.OData.AssignTasks', {
+    taskAssignments: [{ TaskId: taskId, UserId: me.Id }],
+  });
+  await orch('POST', '/tasks/AppTasks/CompleteAppTask', {
     taskId,
     action: outcome,
     data: {
