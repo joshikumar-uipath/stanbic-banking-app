@@ -28,7 +28,6 @@ export type OnboardingState =
 export interface StateMeta { state: OnboardingState; label: string; desc: string; tone: 'progress' | 'good' | 'pending' | 'exception'; }
 
 export const ONBOARDING_STATES: StateMeta[] = [
-  { state: 'AWAITING_EXTRACTION',    label: 'Awaiting review',     desc: 'Form uploaded and read — waiting on the extraction review.', tone: 'pending' },
   { state: 'PRE_REGISTERED',         label: 'Pre-registered',      desc: 'Customer information captured, case created.',   tone: 'progress' },
   { state: 'VALIDATION_IN_PROGRESS', label: 'Validating',          desc: 'Async validation activities are running.',       tone: 'progress' },
   { state: 'VALIDATED',              label: 'Validated',           desc: 'All mandatory validations completed.',           tone: 'progress' },
@@ -43,8 +42,30 @@ export const ONBOARDING_STATES: StateMeta[] = [
   { state: 'DECLINED',               label: 'Declined',            desc: 'Application declined or withdrawn.',             tone: 'exception' },
 ];
 
+/** The linear happy path — the only states "Step N of M" counts.
+ *
+ *  EXCEPTION and the branch stages after it are states a case can be *in*, not
+ *  steps it passes *through*, so they are excluded and render their own label
+ *  instead. Derived from the list rather than hardcoded: this was originally
+ *  written as `ONBOARDING_STATES.length - 1`, which was right when the array
+ *  ended at EXCEPTION and silently wrong the moment the branch stages were
+ *  appended (a declined case read "Step 12 of 11"). */
+export const FUNNEL_STATES: StateMeta[] = ONBOARDING_STATES.slice(
+  0, ONBOARDING_STATES.findIndex((m) => m.state === 'FULLY_ACTIVATED') + 1,
+);
+
+/** States that sit outside the onboarding funnel. Kept out of ONBOARDING_STATES
+ *  because that array doubles as the step sequence — Opening derives "Step N of M"
+ *  from its index and length, and stateMeta falls back to its first entry. Adding
+ *  to it renumbers every case and changes what an unknown state renders as. */
+const OFF_FUNNEL_STATES: StateMeta[] = [
+  { state: 'AWAITING_EXTRACTION', label: 'Awaiting review', desc: 'Form uploaded and read — waiting on the extraction review.', tone: 'pending' },
+];
+
 export const stateMeta = (s: OnboardingState): StateMeta =>
-  ONBOARDING_STATES.find((m) => m.state === s) ?? ONBOARDING_STATES[0];
+  ONBOARDING_STATES.find((m) => m.state === s)
+  ?? OFF_FUNNEL_STATES.find((m) => m.state === s)
+  ?? ONBOARDING_STATES[0];
 
 // ── How a case entered, and who owns it ──────────────────────────────────────
 export type Channel = 'single' | 'bulk' | 'self';        // single/bulk = staff; self = customer-initiated

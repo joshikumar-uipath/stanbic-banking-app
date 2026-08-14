@@ -4,7 +4,7 @@
 // two surfaces can never drift apart. Everything around it is desk-native.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react';
-import { stateMeta, fullName, ONBOARDING_STATES, type OnboardingCase, type OnboardingState } from '../../onboarding';
+import { stateMeta, fullName, FUNNEL_STATES, type OnboardingCase, type OnboardingState } from '../../onboarding';
 import { useMaestroStates, MaestroCell } from '../maestroStatus';
 import type { LiveStateLite } from '../../onboarding/maestro';
 import AccountOpeningFlow from '../../customer/flow';
@@ -310,12 +310,15 @@ function GroupedTable({ groups, active, onPick, isOpen, toggle, mstates }: {
 function Row({ c, active, onPick, maestro }: { c: OnboardingCase; active: string | null; onPick: (id: string) => void; maestro?: LiveStateLite }) {
   const m = stateMeta(c.state);
   const tone = TONE[m.tone] ?? 'idle';
-  const step = ONBOARDING_STATES.findIndex((x) => x.state === c.state) + 1;
+  const step = FUNNEL_STATES.findIndex((x) => x.state === c.state) + 1;
   const failed = c.validations.filter((v) => v.status === 'failed' || v.status === 'timeout').map((v) => v.kind);
   const stage = c.state === 'EXCEPTION'
     ? (failed.length ? `${failed.join(' & ')} needs a person` : 'Needs review')
     : c.accountNumber ? null
-    : `Step ${step} of ${ONBOARDING_STATES.length - 1}`;
+    // Anything off the funnel — a branch stage, or a draft still at its extraction
+    // gate — has no step number, so say where the case actually is instead.
+    : step === 0 ? m.label
+    : `Step ${step} of ${FUNNEL_STATES.length}`;
   return (
     <button className="dk-row" style={GRID} aria-current={active === c.id} onClick={() => onPick(c.id)}>
       <span className="who">

@@ -137,6 +137,7 @@ const SECONDARY: SecStageDef[] = [
 
 // Which stage (spine key OR secondary key) a case's state currently sits in.
 const STATE_STAGE: Record<OnboardingState, string> = {
+  AWAITING_EXTRACTION: 'intake',   // capture is still in hand — the case sits at Intake
   PRE_REGISTERED: 'intake',
   VALIDATION_IN_PROGRESS: 'verification',
   PENDING_DOCUMENTS: 'verification',

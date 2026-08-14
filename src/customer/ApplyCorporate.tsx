@@ -5,7 +5,7 @@
 // primary signatory's identity (for validations/pipeline) plus the full entity
 // metadata (see EntityInfo). Same shared OnboardingStore as the individual flow.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { store, type OnboardingCase } from '../onboarding';
 import { getActiveCountry } from '../config/countries';
 import { useConfig } from '../config';
