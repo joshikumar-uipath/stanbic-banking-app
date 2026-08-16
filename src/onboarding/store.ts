@@ -29,6 +29,9 @@ export interface OnboardingStore {
   getByKycToken(token: string): Promise<OnboardingCase | undefined>;
   create(input: NewCaseInput): Promise<OnboardingCase>;
   update(id: string, patch: Partial<OnboardingCase>): Promise<OnboardingCase>;
+  /** Drop a record and its events entirely. Local only — it does not reach any
+   *  case, account or task the record refers to. Callers own those consequences. */
+  remove(id: string): Promise<void>;
   advance(id: string, state: OnboardingState, message?: string): Promise<OnboardingCase>;
   checkDuplicate(input: Pick<NewCaseInput, 'bvn' | 'nin' | 'phone'>): Promise<DuplicateOutcome>;
   publish(caseId: string, topic: KafkaTopic, message: string, payload?: Record<string, unknown>): Promise<void>;
@@ -40,7 +43,7 @@ export interface OnboardingStore {
 const CASES_KEY = 'aof_cases';
 const EVENTS_KEY = 'aof_events';
 const SEED_VERSION_KEY = 'aof_seed_v';
-const SEED_VERSION = '9';   // bump to force a reseed when the demo data changes
+const SEED_VERSION = '13';  // bump to force a reseed when the demo data changes
 const SEED_AT_KEY = 'aof_seed_at';   // wall-clock of the last seed, for staleness
 const SEED_COUNTRY_KEY = 'aof_seed_country';   // market the current seed was localised to
 // Seeded cases freeze their createdAt at seed time, so "opened 2h ago" drifts to
@@ -141,6 +144,15 @@ class MockOnboardingStore implements OnboardingStore {
   async events() { return [...this.log].sort((a, b) => (a.at < b.at ? 1 : -1)); }
 
   // ── writes ──
+  async remove(id: string): Promise<void> {
+    this.cases = this.cases.filter((c) => c.id !== id);
+    // Its events go too, otherwise the Kafka console keeps replaying a case that
+    // no longer exists and the log can never be reconciled against the desk.
+    this.log = this.log.filter((e) => e.caseId !== id);
+    this.save();
+    this.emit();
+  }
+
   async create(input: NewCaseInput): Promise<OnboardingCase> {
     const duplicate = await this.checkDuplicate(input);
     const now = nowIso();
@@ -158,6 +170,20 @@ class MockOnboardingStore implements OnboardingStore {
       duplicate,
       validations: emptyValidations(),
       batchId: input.batchId,
+      documentId: input.documentId,
+      documentName: input.documentName,
+      // The rest of the application form, when the capture collected it.
+      title: input.title, middleName: input.middleName, dob: input.dob,
+      gender: input.gender, maritalStatus: input.maritalStatus,
+      motherMaidenName: input.motherMaidenName, nationality: input.nationality,
+      stateOfOrigin: input.stateOfOrigin,
+      idType: input.idType, idNumber: input.idNumber, idExpiry: input.idExpiry, tin: input.tin,
+      altPhone: input.altPhone, city: input.city, stateOfResidence: input.stateOfResidence,
+      lga: input.lga, yearsAtAddress: input.yearsAtAddress,
+      employmentStatus: input.employmentStatus, occupation: input.occupation,
+      incomeBand: input.incomeBand, sourceOfFunds: input.sourceOfFunds,
+      accountType: input.accountType, accountPurpose: input.accountPurpose, branch: input.branch,
+      nextOfKin: input.nextOfKin,
       kycToken: kycToken(),
       createdAt: now, updatedAt: now,
       timeline: [],
@@ -313,14 +339,80 @@ function seed(s: MockOnboardingStore) {
     named(11, { source: 'contact-centre', state: 'PENDING_CUSTOMER', vals: { BVN: 'passed', NIN: 'passed', AML: 'passed', PEP: 'passed', FRAUD: 'passed', LIVENESS: 'passed' }, agoMin: 1560 }),
     named(12, { source: 'rm',             state: 'DECLINED',         vals: { FRAUD: 'failed', BVN: 'passed', NIN: 'passed', AML: 'passed', PEP: 'passed', LIVENESS: 'passed' }, agoMin: 4380 }),
   ];
-  rows.forEach((r) => { void seedCase(s, r); });
+  rows.forEach((r, i) => { void seedCase(s, r, i); });
 }
 
-async function seedCase(s: MockOnboardingStore, r: SeedRow) {
+/** The rest of the application form for a seeded record.
+ *
+ *  Derived from the row's own index so it is stable across reseeds and internally
+ *  consistent (the next of kin shares the applicant's surname, the salary account
+ *  has an employer). Without this every seeded record reads "Not captured" down
+ *  the whole details popup, which looks like the popup is broken rather than like
+ *  demo data. */
+function seedDetails(co: SeedCtx, r: SeedRow, n: number): Partial<NewCaseInput> {
+  const marital = ['Single', 'Married', 'Married', 'Divorced'];
+  // From the name, not the row number — "Amina · Male" is exactly the detail that
+  // makes seeded data read as broken. Markets without a name split leave it blank.
+  const gender = co.femaleNames
+    ? (co.femaleNames.includes(r.firstName) ? 'Female' : 'Male')
+    : undefined;
+  const status = marital[n % marital.length];
+  // A title that contradicts the gender ("Ms" on a male record) is the kind of
+  // detail that makes seeded data look broken rather than plausible.
+  const title = gender === 'Female' ? (status === 'Married' ? 'Mrs' : 'Ms')
+    : gender === 'Male' ? (n % 9 === 0 ? 'Dr' : 'Mr')
+    : undefined;
+  // Read the city back off the address rather than recomputing it: seedAddr is
+  // keyed by the row's own index, which is not the array position passed here, so
+  // deriving it independently put the applicant in two cities at once.
+  const addrCity = (r.address.split(',').pop() ?? '').trim();
+  const found = co.cities.indexOf(addrCity);
+  const ci = found >= 0 ? found : n % co.cities.length;
+  const idTypes = ['International Passport', "Driver's licence", "Voter's card", 'NIN slip'];
+  const employment = r.employer ? 'Employed' : ['Self-employed', 'Business owner', 'Employed'][n % 3];
+  const occupations = ['Teacher', 'Engineer', 'Trader', 'Nurse', 'Accountant', 'Driver', 'Consultant', 'Farmer'];
+  const purposes = ['Everyday banking', 'Salary account', 'Savings', 'Business banking'];
+  const funds = ['Salary', 'Business income', 'Investments', 'Pension'];
+  const cur = co.currency.symbol;
+  const incomes = [`Under ${cur}1m`, `${cur}1m – ${cur}5m`, `${cur}5m – ${cur}20m`, `Above ${cur}20m`];
+  const year = 1968 + (n * 7) % 32;
+  const pad = (x: number) => String(x).padStart(2, '0');
+  return {
+    title,
+    dob: `${year}-${pad(1 + (n * 5) % 12)}-${pad(1 + (n * 3) % 28)}`,
+    gender,
+    maritalStatus: status,
+    motherMaidenName: co.lastNames[(n + 4) % co.lastNames.length],
+    nationality: co.name,
+    stateOfOrigin: co.states[(n + 2) % co.states.length] ?? co.cities[(n + 2) % co.cities.length],
+    idType: idTypes[n % idTypes.length],
+    idNumber: `${String.fromCharCode(65 + (n % 26))}${50000000 + n * 137}`,
+    idExpiry: `${2028 + (n % 4)}-${pad(1 + (n * 2) % 12)}-15`,
+    city: co.cities[ci],
+    stateOfResidence: co.states[ci] ?? co.cities[ci],
+    lga: `${co.cities[ci]} Central`,
+    yearsAtAddress: String(1 + (n % 12)),
+    employmentStatus: employment,
+    occupation: occupations[n % occupations.length],
+    incomeBand: incomes[n % incomes.length],
+    sourceOfFunds: r.employer ? 'Salary' : funds[n % funds.length],
+    accountType: n % 5 === 0 ? 'Current' : 'Savings',
+    accountPurpose: r.employer ? 'Salary account' : purposes[n % purposes.length],
+    branch: `${co.cities[ci]} main branch`,
+    nextOfKin: {
+      name: `${co.firstNames[(n + 6) % co.firstNames.length]} ${r.lastName}`,
+      relationship: ['Spouse', 'Sibling', 'Parent', 'Child'][n % 4],
+      phone: `${co.phoneTrunk}${String(2000000 + n * 811).slice(0, 7)}`,
+    },
+  };
+}
+
+async function seedCase(s: MockOnboardingStore, r: SeedRow, n: number) {
   const c = await s.create({
     firstName: r.firstName, lastName: r.lastName, phone: r.phone, email: r.email,
     bvn: r.bvn, nin: r.nin, address: r.address, employer: r.employer,
     channel: r.channel, source: r.source, batchId: r.batchId,
+    ...seedDetails(getActiveCountry(), r, n),
   });
   const beyond = BEYOND_VALIDATION.includes(r.state);
   const at = new Date(Date.now() - r.agoMin * 60000).toISOString();

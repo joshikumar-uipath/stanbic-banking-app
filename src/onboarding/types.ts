@@ -143,7 +143,54 @@ export interface EntityInfo {
   directors: EntityDirector[];
 }
 
-export interface OnboardingCase {
+/** Who to reach if the bank cannot reach the customer. Every retail AOF asks. */
+export interface NextOfKin {
+  name: string;
+  relationship: string;
+  phone: string;
+  address?: string;
+}
+
+/** The rest of a real retail account opening form.
+ *
+ *  All optional: records created before these existed (and the bulk/payroll rows,
+ *  which genuinely arrive with less) stay valid, and the details popup shows
+ *  "Not captured" rather than inventing anything. `state` is taken by the
+ *  lifecycle, hence `stateOfResidence`. */
+export interface ApplicantDetails {
+  title?: string;                 // Mr / Mrs / Ms / Dr …
+  middleName?: string;
+  dob?: string;                   // ISO date
+  gender?: string;
+  maritalStatus?: string;
+  motherMaidenName?: string;      // the classic retail-bank security question
+  nationality?: string;
+  stateOfOrigin?: string;
+
+  idType?: string;                // International Passport / Driver's licence / …
+  idNumber?: string;
+  idExpiry?: string;
+  tin?: string;
+
+  altPhone?: string;
+  city?: string;
+  stateOfResidence?: string;
+  lga?: string;
+  yearsAtAddress?: string;
+
+  employmentStatus?: string;      // Employed / Self-employed / Student / …
+  occupation?: string;
+  incomeBand?: string;
+  sourceOfFunds?: string;
+
+  accountType?: string;           // Savings / Current / Domiciliary
+  accountPurpose?: string;
+  branch?: string;
+
+  nextOfKin?: NextOfKin;
+}
+
+export interface OnboardingCase extends ApplicantDetails {
   id: string;                 // AO-YYYY-NNNNNN
   firstName: string;
   lastName: string;
@@ -163,6 +210,12 @@ export interface OnboardingCase {
   accountNumber?: string;     // Finacle account number, once created
   batchId?: string;           // groups rows from one bulk upload
   kycToken?: string;          // tokenised customer completion link
+  /** The uploaded form this record was opened from, as an Orchestrator attachment.
+   *  Held on the record because the parked-review slot is cleared on confirm and
+   *  the task closes — leaving nowhere else to find the pages afterwards. The id
+   *  rather than a URL: read links are short-lived and minted on demand. */
+  documentId?: string;
+  documentName?: string;
   createdAt: string;
   updatedAt: string;
   timeline: CaseEvent[];
@@ -171,8 +224,15 @@ export interface OnboardingCase {
 export const fullName = (c: Pick<OnboardingCase, 'firstName' | 'lastName'>) =>
   `${c.firstName} ${c.lastName}`.trim();
 
+/** Whether a case is a business opening. The entity block is the marker, but a
+ *  corporate upload opens its draft before the extraction is confirmed — so that
+ *  state counts as corporate too, otherwise a draft would file as an individual
+ *  until the reviewer accepts it. */
+export const isCorporate = (c: Pick<OnboardingCase, 'entity' | 'state'>) =>
+  Boolean(c.entity) || c.state === 'AWAITING_EXTRACTION';
+
 // Fields a caller supplies to open a case; everything else is derived by the store.
-export interface NewCaseInput {
+export interface NewCaseInput extends ApplicantDetails {
   firstName: string;
   lastName: string;
   entity?: EntityInfo;
@@ -188,4 +248,7 @@ export interface NewCaseInput {
   /** Defaults to PRE_REGISTERED. The corporate upload path opens a record at
    *  AWAITING_EXTRACTION so the running case shows on the desk before capture ends. */
   state?: OnboardingState;
+  /** The uploaded form, when the record was opened from one. */
+  documentId?: string;
+  documentName?: string;
 }

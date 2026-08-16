@@ -40,6 +40,13 @@
 .cx-topline { display: flex; align-items: center; gap: 10px; min-height: 34px; }
 .cx-back { width: 34px; height: 34px; border-radius: 999px; display: grid; place-items: center; color: var(--soft); flex: 0 0 auto; }
 .cx-back:hover { background: var(--wash); color: var(--ink); }
+/* Dismiss, at the corner people aim for. Mirrors .cx-back so the two ends of the
+   top line match; the pill before it carries margin-left:auto, so this just rides
+   the end of the row. */
+.cx-x { width: 34px; height: 34px; border-radius: 999px; display: grid; place-items: center;
+  color: var(--soft); flex: 0 0 auto; background: none; border: 0; cursor: pointer; }
+.cx-x:hover { background: var(--wash); color: var(--ink); }
+.cx-x:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 .cx-brand { display: flex; align-items: center; gap: 9px; }
 .cx-mark { width: 28px; height: 28px; border-radius: 8px; background: var(--sky); display: grid; place-items: center; color: #fff; font: 700 14px/1 var(--f-head); flex: 0 0 auto; }
 .cx-logo { height: 24px; max-width: 132px; object-fit: contain; object-position: left center; flex: 0 0 auto; }
@@ -51,7 +58,17 @@
 .cx-body.fill { display: flex; flex-direction: column; min-height: 0; }
 /* Bottom padding clears the phone bezel's curve on desktop, and the home
    indicator on a real device. */
-.cx-foot { flex: 0 0 auto; padding: 14px 18px max(env(safe-area-inset-bottom), 28px); background: var(--card); border-top: 1px solid var(--line-2); display: flex; flex-direction: column; gap: 8px; }
+.cx-foot { flex: 0 0 auto; padding: 14px 18px max(env(safe-area-inset-bottom), 28px); background: var(--card); border-top: 1px solid var(--line-2); display: flex; flex-direction: column; gap: 8px;
+  /* Content slides under the footer rather than stopping dead at it, so a clipped
+     row reads as "there is more" instead of as a broken edge. */
+  box-shadow: 0 -10px 14px -10px rgba(17, 24, 29, .12); }
+
+/* Consent, docked above the submit button. Width is left to the shell — inside the
+   desk modal the footer tracks the body's content column (see desk.css), and on the
+   full-screen customer flow it simply fills the footer. */
+.cx-consent { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; margin-bottom: 2px; }
+.cx-consent input { margin-top: 2px; width: 18px; height: 18px; flex: 0 0 auto; accent-color: var(--blue); cursor: pointer; }
+.cx-consent span { font-size: 12.5px; line-height: 1.5; color: var(--soft); }
 
 .cx-h1 { font: 600 24px/1.2 var(--f-head); letter-spacing: -.025em; margin-bottom: 8px; text-wrap: balance; }
 .cx-h2 { font: 600 17px/1.25 var(--f-head); letter-spacing: -.02em; }
@@ -242,12 +259,23 @@
 .xv-head { display: flex; align-items: flex-start; gap: 12px; padding-bottom: 14px; flex: none; }
 .xv-head h2 { margin: 4px 0 0; font-size: 21px; letter-spacing: -.02em; }
 .xv-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--blue); }
-.xv-x { margin-left: auto; font: inherit; font-size: 13px; color: var(--soft); background: none; border: 0;
+/* Head actions sit as one right-aligned cluster, so adding a link here does not
+   fight .xv-x for the auto margin. */
+.xv-head-r { margin-left: auto; display: flex; align-items: center; gap: 4px; flex: none; }
+.xv-x { font: inherit; font-size: 13px; color: var(--soft); background: none; border: 0;
   cursor: pointer; padding: 7px 10px; border-radius: 8px; }
 .xv-x:hover { background: var(--wash); color: var(--ink); }
+.xv-mlink { font-size: 12.5px; font-weight: 600; color: var(--blue); text-decoration: none;
+  padding: 7px 10px; border-radius: 8px; white-space: nowrap; }
+.xv-mlink:hover { background: var(--wash); text-decoration: underline; }
 
 .xv-banner { margin-bottom: 12px; padding: 10px 13px; border-radius: 10px; font-size: 12.5px; flex: none;
   color: #7a5417; background: #f6ecdd; border: 1px solid #ecdcc2; }
+/* Nothing is wrong here — the review is simply already done. */
+.xv-banner.ok { color: #12805c; background: #e8f6ef; border-color: #bfe6d3; }
+/* A confirmation that did not land — the reviewer has to see this, so it takes
+   the summary slot beside the button rather than a toast that fades. */
+.xv-sum.bad { color: #c0392b; font-weight: 600; }
 
 /* The split fills whatever height is left, and each side scrolls inside itself. */
 .xv-split { display: grid; grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr); gap: 16px;
@@ -272,7 +300,13 @@
 @keyframes xvshim { from { background-position: 120% 0; } to { background-position: -120% 0; } }
 
 .xv-card { background: var(--card); border: 1px solid var(--line); border-radius: var(--r-tile); padding: 13px 14px; flex: none; }
-.xv-card.attn { border-color: #ecdcc2; background: linear-gradient(#fffdf8, var(--card) 70%); }
+/* The queue of fields with work in them. The rest of the column is confirmed by
+   default, so this one is tinted and bordered — the white inputs sitting on the
+   tint are what separate it from the plain groups. */
+.xv-card.attn { border-color: #ddc08a; background: #fdf7ec; }
+.xv-attn-h { margin-bottom: 11px; }
+.xv-attn-h b { display: block; font-size: 13px; font-weight: 700; color: #7a5417; letter-spacing: -.01em; }
+.xv-attn-h em { display: block; font-style: normal; font-size: 11.5px; line-height: 1.45; color: #937041; margin-top: 3px; }
 .xv-card-t { display: block; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: var(--faint); margin-bottom: 9px; }
 
 .xv-f { display: grid; grid-template-columns: 1fr auto; gap: 4px 9px; align-items: center;
@@ -315,5 +349,33 @@
 .xv-btn:disabled { opacity: .55; cursor: default; }
 .xv-btn.primary { background: var(--blue); color: #fff; border-color: var(--blue); }
 .xv-btn.ghost { background: var(--card); color: var(--soft); border-color: var(--line); }
+
+/* Tip for the gated Confirm. The wrapper carries it because a disabled button
+   receives no pointer events, so a title on the button itself never fires. */
+.xv-tipw { position: relative; display: inline-flex; }
+.xv-tipw[data-tip]::after {
+  content: attr(data-tip);
+  position: absolute; bottom: calc(100% + 8px); right: 0;
+  width: max-content; max-width: 34ch;
+  padding: 8px 10px; border-radius: 8px;
+  background: #1f2733; color: #fff;
+  font-size: 12px; font-weight: 500; line-height: 1.45; text-align: left;
+  opacity: 0; visibility: hidden; transform: translateY(3px);
+  transition: opacity .12s ease, transform .12s ease, visibility .12s;
+  pointer-events: none; z-index: 5;
+}
+.xv-tipw[data-tip]::before {
+  content: ''; position: absolute; bottom: calc(100% + 3px); right: 22px;
+  border: 5px solid transparent; border-top-color: #1f2733;
+  opacity: 0; visibility: hidden; transition: opacity .12s ease, visibility .12s;
+  pointer-events: none; z-index: 5;
+}
+.xv-tipw[data-tip]:hover::after, .xv-tipw[data-tip]:focus-within::after,
+.xv-tipw[data-tip]:hover::before, .xv-tipw[data-tip]:focus-within::before {
+  opacity: 1; visibility: visible; transform: translateY(0);
+}
+@media (prefers-reduced-motion: reduce) {
+  .xv-tipw[data-tip]::after { transition: none; transform: none; }
+}
 
 @media (prefers-reduced-motion: reduce) { .xv-scan, .xv-spin, .xv-skel .sk { animation: none; } .xv-f.pend { opacity: 1; transform: none; } }

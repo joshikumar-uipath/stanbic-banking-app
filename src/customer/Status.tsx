@@ -4,6 +4,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
 import { store, stateMeta, VALIDATION_KINDS, type OnboardingCase, type OnboardingState } from '../onboarding';
+import { useLiveCase, liveProgressIndex } from '../onboarding/useLiveCase';
 import { useConfig } from '../config';
 import { getActiveCountry, kycLabel, kycLabelAuthority } from '../config/countries';
 import { Button, Chip, Note, Brand } from './ui';
@@ -39,9 +40,30 @@ export function useCase(id: string | null): OnboardingCase | null {
 export default function Status({ c, onBack, onKyc }: { c: OnboardingCase; onBack: () => void; onKyc: () => void }) {
   const appName = useConfig().branding.appName;
   const m = stateMeta(c.state);
-  const at = reached(c.state);
   const isExc = c.state === 'EXCEPTION';
   const pending = c.state === 'PENDING_LIVENESS' || c.state === 'PENDING_DOCUMENTS';
+
+  // What the Maestro case has actually done. A record that was never run keeps its
+  // seeded story — that is the demo. A record with a live case must not claim
+  // stages the case has not reached, so everything below prefers the case.
+  const { state: live, live: isLive } = useLiveCase(c);
+  const liveAt = isLive ? liveProgressIndex(live) : null;
+  const at = liveAt ?? reached(c.state);
+  const liveChecks = isLive && live?.checks?.length ? live.checks : null;
+  // The seeded timeline narrates a completed opening. Against a live case that is
+  // simply untrue, so replace it with the steps the case really ran — newest first,
+  // matching the order the seeded list uses.
+  const liveActivity = isLive
+    ? [
+      ...(live?.stageTasks ?? []).slice().reverse().map((t) => ({
+        id: `t-${t.name}`,
+        message: `${t.name} — ${t.status === 'Completed' ? 'done' : t.status === 'InProgress' ? 'running' : t.status.toLowerCase()}`,
+      })),
+      ...[...(live?.completedStages ?? [])].reverse().map((s) => ({
+        id: `s-${s}`, message: `${s} stage completed`,
+      })),
+    ]
+    : null;
 
   return (
     <>
@@ -58,10 +80,18 @@ export default function Status({ c, onBack, onKyc }: { c: OnboardingCase; onBack
             <div className="cx-label">Application</div>
             <div style={{ font: '600 16px/1 var(--f-body)', letterSpacing: '.04em', marginTop: 6 }}>{c.id}</div>
           </div>
-          <Chip tone={m.tone === 'good' ? 'good' : m.tone === 'exception' ? 'crit' : m.tone === 'pending' ? 'warn' : 'info'}>{m.label}</Chip>
+          {/* The record's own label says "Fully activated" from the moment it was
+              seeded. Against a live case, say where the case actually is. */}
+          <Chip tone={isLive ? (live!.done ? 'good' : 'info')
+            : m.tone === 'good' ? 'good' : m.tone === 'exception' ? 'crit' : m.tone === 'pending' ? 'warn' : 'info'}>
+            {isLive ? (live!.done ? 'Complete' : live!.activeStage ? `${live!.activeStage} in progress` : 'In progress') : m.label}
+          </Chip>
         </div>
 
-        {c.accountNumber && (
+        {/* An account number is the loudest possible claim that the opening is done.
+            Withhold it until the live case has actually reached Activation — the
+            seeded record carries one from the start. */}
+        {c.accountNumber && (!isLive || at >= 3) && (
           <div className="cx-card" style={{ background: 'linear-gradient(150deg, var(--blue), var(--navy))', border: 'none', color: '#fff', marginBottom: 12 }}>
             <div style={{ font: '600 10.5px/1 var(--f-body)', letterSpacing: '.12em', color: 'rgba(255,255,255,.8)' }}>YOUR ACCOUNT NUMBER</div>
             <div style={{ font: '600 26px/1 var(--f-head)', letterSpacing: '.04em', margin: '10px 0 6px' }}>{c.accountNumber}</div>
@@ -104,8 +134,8 @@ export default function Status({ c, onBack, onKyc }: { c: OnboardingCase; onBack
 
         <div className="cx-card">
           <div className="cx-label" style={{ marginBottom: 10 }}>Checks</div>
-          {VALIDATION_KINDS.map((k) => {
-            const v = c.validations.find((x) => x.kind === k);
+          {(liveChecks ? liveChecks.map((v) => v.kind) : VALIDATION_KINDS).map((k) => {
+            const v = (liveChecks ?? c.validations).find((x) => x.kind === k);
             const st = v?.status ?? 'pending';
             return (
               <div className="cx-check" key={k}>
@@ -121,7 +151,7 @@ export default function Status({ c, onBack, onKyc }: { c: OnboardingCase; onBack
 
         <div className="cx-card">
           <div className="cx-label" style={{ marginBottom: 10 }}>Activity</div>
-          {c.timeline.slice(0, 6).map((e) => (
+          {(liveActivity ?? c.timeline).slice(0, 6).map((e) => (
             <div key={e.id} style={{ display: 'flex', gap: 10, padding: '7px 0', fontSize: 12.5 }}>
               <span style={{ width: 7, height: 7, borderRadius: 99, background: 'var(--sky)', marginTop: 5, flex: '0 0 auto' }} />
               <span style={{ color: 'var(--ink)' }}>{e.message}</span>

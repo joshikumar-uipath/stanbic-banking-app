@@ -4,7 +4,8 @@
 // two surfaces can never drift apart. Everything around it is desk-native.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react';
-import { stateMeta, fullName, FUNNEL_STATES, type OnboardingCase, type OnboardingState } from '../../onboarding';
+import { stateMeta, fullName, isCorporate, FUNNEL_STATES, type OnboardingCase } from '../../onboarding';
+import { FILTERS, SOURCES, KINDS, matchesFilters, type Filter, type Src, type Kind } from '../caseFilters';
 import { useMaestroStates, MaestroCell } from '../maestroStatus';
 import type { LiveStateLite } from '../../onboarding/maestro';
 import AccountOpeningFlow from '../../customer/flow';
@@ -18,25 +19,11 @@ import { ago } from '../time';
 const BULK = '__bulk__';
 
 const TONE: Record<string, Tone> = { good: 'good', pending: 'warn', exception: 'crit', progress: 'info', neutral: 'idle' };
-type Filter = 'all' | 'needs' | 'flight' | 'done';
-const FILTERS: { id: Filter; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'needs', label: 'Needs attention' },
-  { id: 'flight', label: 'In flight' },
-  { id: 'done', label: 'Done' },
-];
-type Src = 'all' | 'bulk' | 'single';
-const SOURCES: { id: Src; label: string }[] = [
-  { id: 'all', label: 'All sources' },
-  { id: 'bulk', label: 'Bulk' },
-  { id: 'single', label: 'Single' },
-];
-
-const needsAttention = (s: OnboardingState) => s === 'EXCEPTION' || s === 'PENDING_LIVENESS' || s === 'PENDING_DOCUMENTS';
 
 export default function Opening({ cases, flow, setFlow, onNewApplication, captureSeq }: { cases: OnboardingCase[]; flow: string | null; setFlow: (v: string | null) => void; onNewApplication: () => void; captureSeq: number }) {
   const [filter, setFilter] = useState<Filter>('all');
   const [source, setSource] = useState<Src>('all');
+  const [kind, setKind] = useState<Kind>('all');
   const [q, setQ] = useState('');
   // Which groups the banker has expanded/collapsed by hand. Bulk batches start
   // collapsed (so the batch roots read at a glance); direct captures start open.
@@ -63,16 +50,11 @@ export default function Opening({ cases, flow, setFlow, onNewApplication, captur
   }
 
   const list = useMemo(() => {
-    let l = cases;
-    if (source === 'bulk') l = l.filter((c) => !!c.batchId);
-    if (source === 'single') l = l.filter((c) => !c.batchId);
-    if (filter === 'needs') l = l.filter((c) => needsAttention(c.state));
-    if (filter === 'flight') l = l.filter((c) => !needsAttention(c.state) && c.state !== 'FULLY_ACTIVATED');
-    if (filter === 'done') l = l.filter((c) => c.state === 'FULLY_ACTIVATED');
+    let l = cases.filter((c) => matchesFilters(c, { filter, source, kind }));
     const t = q.trim().toLowerCase();
     if (t) l = l.filter((c) => fullName(c).toLowerCase().includes(t) || c.id.toLowerCase().includes(t));
     return l;
-  }, [cases, filter, source, q]);
+  }, [cases, filter, source, kind, q]);
 
   // A batch upload is one node; loose single captures share a "Walk-in" node.
   const groups = useMemo(() => buildGroups(list), [list]);
@@ -160,6 +142,11 @@ export default function Opening({ cases, flow, setFlow, onNewApplication, captur
               <div className="dk-segs">
                 {SOURCES.map((f) => (
                   <button key={f.id} aria-pressed={source === f.id} onClick={() => setSource(f.id)}>{f.label}</button>
+                ))}
+              </div>
+              <div className="dk-segs">
+                {KINDS.map((f) => (
+                  <button key={f.id} aria-pressed={kind === f.id} onClick={() => setKind(f.id)}>{f.label}</button>
                 ))}
               </div>
               <button className="dk-btn" style={{ marginLeft: 'auto' }} onClick={() => setAll(!anyOpen)} disabled={searching} title={searching ? 'Groups open automatically while searching' : undefined}>
@@ -325,7 +312,12 @@ function Row({ c, active, onPick, maestro }: { c: OnboardingCase; active: string
         <Dot tone={tone} live={tone === 'info'} />
         <span style={{ minWidth: 0 }}>
           <span className="nm" style={{ display: 'block' }}>{fullName(c).trim() || 'Unnamed applicant'}</span>
-          <span className="rf">{c.id}</span>
+          <span className="rf">
+            {c.id}
+            {/* Only businesses are marked. An unmarked row is an individual, which
+                is the overwhelming majority — tagging both would be noise. */}
+            {isCorporate(c) && <span className="dk-src corp" title="Business account">Corporate</span>}
+          </span>
         </span>
       </span>
       <span className="mu">

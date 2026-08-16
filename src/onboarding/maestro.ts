@@ -10,6 +10,8 @@
 // no CORS and no new backend. The active stage is derived from the pending
 // approval task's title, so the whole loop stays on the orchestrator_ surface.
 // ─────────────────────────────────────────────────────────────────────────────
+import type { ValidationKind, ValidationResult, ValidationStatus } from './types';
+
 const ORG = (import.meta.env.VITE_UIPATH_ORG_NAME as string) || 'mea';
 const TENANT = (import.meta.env.VITE_UIPATH_TENANT_NAME as string) || 'DefaultTenant';
 const TOKEN = import.meta.env.VITE_UIPATH_DEMO_TOKEN as string | undefined;
@@ -254,17 +256,59 @@ async function pims<T = unknown>(path: string): Promise<T> {
   return (text ? JSON.parse(text) : {}) as T;
 }
 
-interface ElementExec { elementType: string; elementName: string; status: string }
+/**
+ * Whether the CASE finished, from the case service itself.
+ *
+ * Not from the Orchestrator job: a Maestro case job never leaves `Running`. An
+ * instance that completed cleanly still reports `State: Running` with a null
+ * EndTime indefinitely, so deriving `done` from it pins a finished case to its
+ * last stage forever. The instance record is what the Maestro UI shows.
+ *
+ * Returns null when the read fails, so callers can fall back rather than
+ * declaring a running case complete (or vice versa) on a network blip.
+ */
+export async function instanceDone(instanceId: string): Promise<boolean | null> {
+  try {
+    const r = await pims<{ latestRunStatus?: string }>(`/api/v1/instances/${instanceId}`);
+    const s = r?.latestRunStatus;
+    return s ? s === 'Completed' || s === 'Successful' : null;
+  } catch { return null; }
+}
+
+interface ElementExec {
+  elementType: string;
+  elementName: string;
+  status: string;
+  elementId?: string;
+  /** Which stage this step belongs to — how the flat element list regains its shape. */
+  caseStageElementId?: string;
+  startedTimeUtc?: string;
+}
+
+/** Steps worth showing. The rest of the element list is plumbing a banker has no
+ *  use for — subprocesses, catch events, the guardrail agent. */
+const STEP_TYPES = new Set(['UserTask', 'ServiceTask', 'Task', 'Agent']);
+
+/** Finished work above, the live step, then what has not started. Strict start-time
+ *  order puts a long-running approval above checks that finished after it began,
+ *  which reads as though the case went backwards. This is a status list, not an
+ *  audit log — the live line should be the "you are here". */
+const STEP_RANK: Record<string, number> = { Completed: 0, Faulted: 0, InProgress: 1 };
+const byProgress = (a: { status: string; startedTimeUtc?: string }, b: { status: string; startedTimeUtc?: string }) =>
+  (STEP_RANK[a.status] ?? 2) - (STEP_RANK[b.status] ?? 2)
+  || String(a.startedTimeUtc ?? '').localeCompare(String(b.startedTimeUtc ?? ''));
+
 
 /**
  * The case instance's REAL stage progress from Maestro — persistent, unlike the
  * pending-task heuristic. `CaseStage` elements carry InProgress / Completed status
  * throughout, including while the case runs automated tasks between approvals.
  */
-async function caseStages(instanceId: string): Promise<{ active: string | null; completed: string[] } | null> {
+async function caseStages(instanceId: string): Promise<{ active: string | null; completed: string[]; tasks: StageTask[]; checks: ValidationResult[] } | null> {
   try {
     const r = await pims<{ elementExecutions?: ElementExec[] }>(`/api/v1/element-executions/case-instances/${instanceId}`);
-    const stages = (r.elementExecutions ?? []).filter((e) => e.elementType === 'CaseStage');
+    const els = r.elementExecutions ?? [];
+    const stages = els.filter((e) => e.elementType === 'CaseStage');
     // In case management a stage stays "InProgress" even after the next one starts, so a
     // stage is "reached" if it's InProgress OR Completed. The real active stage is the
     // FURTHEST reached along the main flow; everything before it counts as done.
@@ -273,7 +317,23 @@ async function caseStages(instanceId: string): Promise<{ active: string | null; 
     const active = reached.length ? reached[reached.length - 1] : null;
     const idx = active ? STAGES.indexOf(active) : -1;
     const completed = idx > 0 ? STAGES.slice(0, idx) : [];
-    return { active, completed };
+    // The steps inside the stage the case is in now, in the order it ran them —
+    // the same detail the corporate pane shows, so the two read alike.
+    const activeStageId = stages.find((e) => e.elementName === active)?.elementId;
+    const tasks: StageTask[] = !activeStageId ? [] : els
+      .filter((e) => e.caseStageElementId === activeStageId && STEP_TYPES.has(e.elementType))
+      .sort(byProgress)
+      .map((e) => ({
+        name: e.elementName,
+        kind: e.elementType === 'UserTask' ? 'human' as const : 'auto' as const,
+        status: e.status,
+      }));
+    // Checks come from EVERY stage, not just the active one — Verification's
+    // results still matter once the case has moved to Decision.
+    const checks = checksFromSteps(
+      els.filter((x) => STEP_TYPES.has(x.elementType)).map((x) => ({ name: x.elementName, status: x.status })),
+    );
+    return { active, completed, tasks, checks };
   } catch {
     return null;
   }
@@ -303,6 +363,56 @@ export async function startCase(input: CaseInput): Promise<string> {
   return id;
 }
 
+/** One step inside a stage, as the case is actually running it. `human` steps are
+ *  the ones a person has to clear — the distinction the stage bar alone can't make. */
+export interface StageTask {
+  name: string;
+  kind: 'human' | 'auto';
+  status: string;                   // Completed | InProgress | NotStarted | Faulted
+  /** Action Center deep link, for the human steps that have one. */
+  link?: string;
+}
+
+/** Which verification a case step corresponds to. Order matters: the first match
+ *  wins, so PEP is tested before the broader sanctions/AML pattern. Both the
+ *  individual and corporate case plans are covered — "NIN validation" and
+ *  "Director NIN validation (per director)" are the same check to a banker. */
+const CHECK_MATCH: [ValidationKind, RegExp][] = [
+  ['NIN', /\bNIN\b/i],
+  ['BVN', /\bBVN\b/i],
+  ['PEP', /\bPEP\b/i],
+  ['AML', /sanction|\bAML\b/i],
+  ['FRAUD', /fraud|duplicate|risk pre-screen/i],
+  ['LIVENESS', /liveness|face match|selfie/i],
+];
+
+/**
+ * The verification checks a LIVE case has actually run, derived from its steps.
+ *
+ * A linked record otherwise shows its own seeded validations — all "Pending" —
+ * beside a case that finished Verification twenty minutes ago. Same rule as the
+ * next best action: while Maestro is running the case, Maestro is the source of
+ * truth. Kinds the case plan does not perform are simply absent rather than shown
+ * as forever-pending.
+ */
+export function checksFromSteps(steps: { name: string; status: string }[]): ValidationResult[] {
+  const now = new Date().toISOString();
+  const out: ValidationResult[] = [];
+  for (const [kind, re] of CHECK_MATCH) {
+    const hits = steps.filter((s) => re.test(s.name));
+    if (!hits.length) continue;
+    // Worst status wins: one faulted director check means the check has failed,
+    // however many others passed.
+    const status: ValidationStatus =
+      hits.some((h) => h.status === 'Faulted') ? 'failed'
+      : hits.some((h) => h.status === 'InProgress') ? 'running'
+      : hits.every((h) => h.status === 'Completed') ? 'passed'
+      : 'pending';
+    out.push({ kind, status, attempts: status === 'passed' || status === 'failed' ? 1 : 0, updatedAt: now });
+  }
+  return out;
+}
+
 export interface LiveState {
   jobState: string;                 // Running | Successful | Faulted | …
   done: boolean;
@@ -310,6 +420,10 @@ export interface LiveState {
   completedStages: string[];
   pendingTaskId: number | null;
   pendingTitle: string | null;
+  /** The steps of the stage the case is in now, in the order it ran them. */
+  stageTasks?: StageTask[];
+  /** Verification checks as the live case has actually run them. */
+  checks?: ValidationResult[];
 }
 
 /** Current real state of the case: job status + which stage is awaiting approval. */
@@ -335,20 +449,30 @@ export function getCachedState(instanceId: string): LiveState | null {
 export async function getState(instanceId: string): Promise<LiveState> {
   // Fire all three reads AT ONCE — first paint is gated by the slowest call, not the sum
   // of all three. (The two extra reads are wasted only for an already-completed case.)
-  const [jr, stages, tr] = await Promise.all([
+  const [jr, stages, tr, caseDone] = await Promise.all([
     orch<{ value: { State: string }[] }>('GET', `/odata/Jobs?%24filter=Key%20eq%20${instanceId}&%24select=State`),
     caseStages(instanceId),
+    // Filter by the job SERVER-side. This used to pull the 40 most recent open
+    // tasks tenant-wide and match CreatorJobKey in the browser — so once 40 newer
+    // tasks existed anywhere on the tenant, an older parked approval fell out of
+    // the window and the desk simply stopped offering it. Nothing about the case
+    // had changed; it just aged out of a page size.
     orch<{ value: { Id: number; Title: string; OrganizationUnitId: number; CreatorJobKey: string }[] }>(
       'GET',
-      `/odata/Tasks/UiPath.Server.Configuration.OData.GetTasksAcrossFolders?%24filter=Status%20ne%20'Completed'&%24orderby=CreationTime%20desc&%24top=40`,
+      `/odata/Tasks/UiPath.Server.Configuration.OData.GetTasksAcrossFolders?%24filter=${
+        encodeURIComponent(`CreatorJobKey eq ${instanceId} and Status ne 'Completed'`)}&%24top=20`,
     ),
+    instanceDone(instanceId),
   ]);
   const jobState = jr.value?.[0]?.State ?? 'Unknown';
-  const done = jobState === 'Successful' || jobState === 'Completed';
+  // The case service is authoritative. The job state is only a fallback for when
+  // that read fails — on its own it would never report a finished case, because a
+  // Maestro case job sits at Running forever. See instanceDone().
+  const done = caseDone ?? (jobState === 'Successful' || jobState === 'Completed');
 
   let result: LiveState;
   if (done) {
-    result = { jobState, done: true, activeStage: null, completedStages: [...STAGES], pendingTaskId: null, pendingTitle: null };
+    result = { jobState, done: true, activeStage: null, completedStages: [...STAGES], pendingTaskId: null, pendingTitle: null, stageTasks: [], checks: stages?.checks ?? [] };
   } else {
     // Scope strictly to THIS instance — CreatorJobKey is the case job that spawned the task.
     const pending = (tr.value ?? []).find((t) => t.OrganizationUnitId === FOLDER_ID && t.CreatorJobKey === instanceId && STAGE_BY_TASK[t.Title]);
@@ -362,7 +486,7 @@ export async function getState(instanceId: string): Promise<LiveState> {
     }
     // A pending approval means its stage is the one awaiting action, not yet complete.
     if (pendingStage) { activeStage = pendingStage; completedStages = completedStages.filter((s) => s !== pendingStage); }
-    result = { jobState, done: false, activeStage, completedStages, pendingTaskId: pending?.Id ?? null, pendingTitle: pending?.Title ?? null };
+    result = { jobState, done: false, activeStage, completedStages, stageTasks: stages?.tasks ?? [], checks: stages?.checks ?? [], pendingTaskId: pending?.Id ?? null, pendingTitle: pending?.Title ?? null };
   }
   lastState.set(instanceId, result);
   persistCache();

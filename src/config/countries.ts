@@ -53,6 +53,13 @@ export interface CountryProfile {
   /** Timezone abbreviation shown in "last login", e.g. "WAT". */
   timezone: string;
   cities: string[];
+  /** Administrative region for the city at the same index — a seeded address can
+   *  then name a state that actually contains its city. */
+  states: string[];
+  /** Which of `firstNames` are women's names, so seeded demo records can carry a
+   *  gender and title that agree with the name. Omit for a market where the split
+   *  is not known — the seed then leaves gender uncaptured rather than guess. */
+  femaleNames?: string[];
   streets: string[];
   firstNames: string[];
   lastNames: string[];
@@ -71,11 +78,13 @@ export const COUNTRIES: Record<CountryCode, CountryProfile> = {
     currency: { code: 'NGN', symbol: '₦', locale: 'en-NG' },
     phoneCc: '+234', phoneTrunk: '0803', timezone: 'WAT',
     cities: ['Lagos', 'Abuja', 'Port Harcourt', 'Kano', 'Ibadan', 'Enugu', 'Kaduna', 'Benin City'],
+    states: ['Lagos', 'FCT', 'Rivers', 'Kano', 'Oyo', 'Enugu', 'Kaduna', 'Edo'],
     streets: ['Marina Rd', 'Ahmadu Bello Way', 'Awolowo Rd', 'Aba Rd', 'Adeola Odeku St', 'Broad St'],
     firstNames: ['Adaeze', 'Chidi', 'Ngozi', 'Emeka', 'Aisha', 'Tunde', 'Fatima', 'Blessing', 'Ibrahim', 'Amina',
       'Yakubu', 'Funke', 'Sadiq', 'Chioma', 'Obinna', 'Folake', 'Bashir', 'Segun', 'Hauwa', 'Musa'],
     lastNames: ['Okafor', 'Balogun', 'Eze', 'Nwosu', 'Yusuf', 'Adeyemi', 'Bello', 'Okoro', 'Obi', 'Umeh',
       'Chukwu', 'Nwankwo', 'Okon', 'Effiong', 'Lawal', 'Garba', 'Abubakar', 'Idris', 'Ogundipe', 'Musa'],
+    femaleNames: ['Adaeze', 'Ngozi', 'Aisha', 'Fatima', 'Blessing', 'Amina', 'Funke', 'Chioma', 'Folake', 'Hauwa'],
     companies: ['NYSC', 'Delta Co-op', 'Dangote Group', 'Flour Mills', 'MTN Nigeria', 'Zenith Bank', 'Access Corp'],
     merchants: { supermarket: 'Shoprite', utility: 'IKEDC Prepaid', telco: 'MTN', cafe: 'Cafe Neo', water: 'Lagos Water', otherBank: 'GTBank' },
     primaryId: { label: 'BVN', authority: 'NIBSS', numPrefix: '2221' },
@@ -86,6 +95,7 @@ export const COUNTRIES: Record<CountryCode, CountryProfile> = {
     currency: { code: 'KES', symbol: 'KSh', locale: 'en-KE' },
     phoneCc: '+254', phoneTrunk: '0722', timezone: 'EAT',
     cities: ['Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret', 'Thika', 'Nyeri', 'Machakos'],
+    states: ['Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Uasin Gishu', 'Kiambu', 'Nyeri', 'Machakos'],
     streets: ['Moi Ave', 'Kenyatta Ave', 'Ngong Rd', 'Kimathi St', 'Biashara St', 'Haile Selassie Ave'],
     firstNames: ['Wanjiru', 'Otieno', 'Kamau', 'Achieng', 'Mwangi', 'Njeri', 'Brian', 'Wafula', 'Nyokabi', 'Omondi',
       'Chebet', 'Mutua', 'Grace', 'Dennis', 'Faith', 'Kevin', 'Mercy', 'Collins', 'Cynthia', 'Victor'],
@@ -101,6 +111,7 @@ export const COUNTRIES: Record<CountryCode, CountryProfile> = {
     currency: { code: 'GHS', symbol: '₵', locale: 'en-GH' },
     phoneCc: '+233', phoneTrunk: '024', timezone: 'GMT',
     cities: ['Accra', 'Kumasi', 'Takoradi', 'Tamale', 'Cape Coast', 'Tema', 'Sunyani', 'Koforidua'],
+    states: ['Greater Accra', 'Ashanti', 'Western', 'Northern', 'Central', 'Greater Accra', 'Bono', 'Eastern'],
     streets: ['Oxford St', 'Ring Rd', 'Liberation Rd', 'Independence Ave', 'Spintex Rd', 'High St'],
     firstNames: ['Kwame', 'Ama', 'Kofi', 'Akosua', 'Yaw', 'Abena', 'Kojo', 'Adwoa', 'Kwabena', 'Efua',
       'Kwaku', 'Esi', 'Nii', 'Akua', 'Yaa', 'Kwadwo', 'Afia', 'Selorm', 'Abla', 'Kojo'],
@@ -116,6 +127,7 @@ export const COUNTRIES: Record<CountryCode, CountryProfile> = {
     currency: { code: 'ZAR', symbol: 'R', locale: 'en-ZA' },
     phoneCc: '+27', phoneTrunk: '082', timezone: 'SAST',
     cities: ['Johannesburg', 'Cape Town', 'Durban', 'Pretoria', 'Gqeberha', 'Bloemfontein', 'Soweto', 'Polokwane'],
+    states: ['Gauteng', 'Western Cape', 'KwaZulu-Natal', 'Gauteng', 'Eastern Cape', 'Free State', 'Gauteng', 'Limpopo'],
     streets: ['Long St', 'Commissioner St', 'West St', 'Rivonia Rd', 'Church St', 'Loop St'],
     firstNames: ['Thabo', 'Lerato', 'Sipho', 'Nomsa', 'Bongani', 'Zanele', 'Themba', 'Ayanda', 'Mandla', 'Nandi',
       'Sibusiso', 'Thandiwe', 'Kagiso', 'Palesa', 'Tebogo', 'Naledi', 'Lwazi', 'Zinhle', 'Andile', 'Nokuthula'],
@@ -131,6 +143,7 @@ export const COUNTRIES: Record<CountryCode, CountryProfile> = {
     currency: { code: 'AED', symbol: 'AED', locale: 'en-AE' },
     phoneCc: '+971', phoneTrunk: '050', timezone: 'GST',
     cities: ['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Al Ain', 'Ras Al Khaimah', 'Fujairah', 'Umm Al Quwain'],
+    states: ['Dubai', 'Abu Dhabi', 'Sharjah', 'Ajman', 'Abu Dhabi', 'Ras Al Khaimah', 'Fujairah', 'Umm Al Quwain'],
     streets: ['Sheikh Zayed Rd', 'Al Wasl Rd', 'Jumeirah Beach Rd', 'Khalifa St', 'Corniche Rd', 'Al Maktoum Rd'],
     firstNames: ['Mohammed', 'Ahmed', 'Fatima', 'Aisha', 'Omar', 'Mariam', 'Khalid', 'Noura', 'Rashid', 'Hessa',
       'Saeed', 'Latifa', 'Hamdan', 'Shamma', 'Sultan', 'Alia', 'Majid', 'Reem', 'Tariq', 'Salama'],
@@ -146,6 +159,7 @@ export const COUNTRIES: Record<CountryCode, CountryProfile> = {
     currency: { code: 'SAR', symbol: 'SR', locale: 'en-SA' },
     phoneCc: '+966', phoneTrunk: '050', timezone: 'AST',
     cities: ['Riyadh', 'Jeddah', 'Mecca', 'Medina', 'Dammam', 'Khobar', 'Tabuk', 'Abha'],
+    states: ['Riyadh', 'Makkah', 'Makkah', 'Madinah', 'Eastern Province', 'Eastern Province', 'Tabuk', 'Asir'],
     streets: ['King Fahd Rd', 'Olaya St', 'Tahlia St', 'King Abdullah Rd', 'Prince Sultan Rd', 'Al Urubah Rd'],
     firstNames: ['Mohammed', 'Abdullah', 'Sara', 'Noura', 'Faisal', 'Reem', 'Khalid', 'Aisha', 'Fahad', 'Latifa',
       'Sultan', 'Maha', 'Turki', 'Hessa', 'Bandar', 'Amal', 'Saud', 'Lama', 'Nayef', 'Jawaher'],
@@ -161,6 +175,7 @@ export const COUNTRIES: Record<CountryCode, CountryProfile> = {
     currency: { code: 'GBP', symbol: '£', locale: 'en-GB' },
     phoneCc: '+44', phoneTrunk: '07700', timezone: 'GMT',
     cities: ['London', 'Manchester', 'Birmingham', 'Leeds', 'Glasgow', 'Bristol', 'Liverpool', 'Edinburgh'],
+    states: ['Greater London', 'Greater Manchester', 'West Midlands', 'West Yorkshire', 'Scotland', 'Bristol', 'Merseyside', 'Scotland'],
     streets: ['High St', 'Baker St', 'Kings Rd', 'Victoria Rd', 'Church Ln', 'Station Rd'],
     firstNames: ['Oliver', 'Amelia', 'Harry', 'Isla', 'Jack', 'Ava', 'George', 'Mia', 'Noah', 'Emily',
       'Charlie', 'Grace', 'Thomas', 'Sophie', 'James', 'Poppy', 'Oscar', 'Freya', 'William', 'Ella'],
@@ -176,6 +191,7 @@ export const COUNTRIES: Record<CountryCode, CountryProfile> = {
     currency: { code: 'USD', symbol: '$', locale: 'en-US' },
     phoneCc: '+1', phoneTrunk: '415', timezone: 'ET',
     cities: ['New York', 'Los Angeles', 'Chicago', 'Houston', 'Miami', 'Seattle', 'Austin', 'Boston'],
+    states: ['NY', 'CA', 'IL', 'TX', 'FL', 'WA', 'TX', 'MA'],
     streets: ['Main St', 'Broadway', 'Park Ave', 'Elm St', 'Oak Ave', 'Sunset Blvd'],
     firstNames: ['James', 'Mary', 'Michael', 'Jennifer', 'Robert', 'Linda', 'David', 'Emily', 'Daniel', 'Ashley',
       'Christopher', 'Jessica', 'Matthew', 'Amanda', 'Joshua', 'Sarah', 'Andrew', 'Nicole', 'Ryan', 'Olivia'],

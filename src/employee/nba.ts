@@ -31,6 +31,10 @@ export interface Nba {
   opens?: 'kyc' | 'channels';
   /** A tel: / mailto: link rather than an action. */
   href?: string;
+  /** Another door to the *same* action — rendered beside the primary button, not
+   *  under "if that doesn't work". Opening a task in Action Center is not a
+   *  fallback; it is the same approval somewhere else. */
+  alt?: { label: string; href: string };
 }
 
 const MANDATORY: ValidationKind[] = ['NIN', 'BVN', 'AML', 'PEP', 'FRAUD'];
@@ -185,6 +189,71 @@ export function nextBestActions(c: OnboardingCase): Nba[] {
       opens: 'kyc',
     });
     return out;
+  }
+
+  // ── Branch stages ────────────────────────────────────────────────────────
+  // These used to fall through to the "complete" card below, so a case sitting on
+  // a compliance hold told the RM there was nothing to do. Each owns a person and
+  // a next step; say who, and what.
+  if (c.state === 'COMPLIANCE_HOLD') {
+    const hit = c.validations.find((v) => (v.kind === 'PEP' || v.kind === 'AML') && v.status === 'failed');
+    return [{
+      id: 'compliance',
+      title: 'With Compliance — screening hit to clear',
+      why: `${hit ? `${label(hit.kind)} came back a hit` : 'A screening check came back a hit'}, so the case is with Compliance escalations. They clear or confirm it and the case returns to Verification. A screening hit cannot be overridden from the desk.`,
+      kind: 'wait',
+    }, {
+      id: 'compliance-call',
+      title: `Call ${c.firstName || 'the customer'} while it sits`,
+      why: 'A hit is often a name collision. Anything the customer can tell you shortens the review.',
+      href: c.phone ? `tel:${c.phone}` : undefined,
+      kind: 'do',
+    }];
+  }
+
+  if (c.state === 'EDD_REVIEW') {
+    return [{
+      id: 'edd',
+      title: 'Enhanced due diligence in progress',
+      why: 'The risk rating pushed this case into EDD. Source of funds and the customer profile are being established before a decision — it returns to Decision when that completes.',
+      kind: 'wait',
+    }];
+  }
+
+  if (c.state === 'PENDING_CUSTOMER') {
+    return [{
+      id: 'rfi-chase',
+      title: `Chase ${c.firstName || 'the customer'} for what was requested`,
+      why: 'The case is paused waiting on the customer and will sit there until someone asks. A call moves it; waiting does not.',
+      href: c.phone ? `tel:${c.phone}` : undefined,
+      kind: 'do',
+      primary: true,
+    }, {
+      id: 'rfi-link',
+      title: 'Re-send the KYC link',
+      why: 'If what is outstanding is a document or a selfie, the link is the fastest route.',
+      opens: 'channels',
+      kind: 'do',
+    }];
+  }
+
+  if (c.state === 'DECLINED') {
+    return [{
+      id: 'declined',
+      title: 'Declined — nothing further',
+      why: 'The application was declined or withdrawn and the reason is on the record. Reopening means a new application, not a change to this one.',
+      kind: 'done',
+    }];
+  }
+
+  if (c.state === 'AWAITING_EXTRACTION') {
+    return [{
+      id: 'await-extraction',
+      title: 'Review what was read from the form',
+      why: 'The uploaded form has been read and the case is holding at its review gate. Nothing else moves until someone confirms the values.',
+      kind: 'do',
+      primary: true,
+    }];
   }
 
   // FULLY_ACTIVATED

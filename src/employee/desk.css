@@ -226,6 +226,13 @@
 .dk-qhead h1 { font-size: 19px; font-weight: 700; letter-spacing: -.02em; }
 .dk-qhead .n { font-family: var(--d-num); font-variant-numeric: tabular-nums; font-size: 13px; color: #a0a09a; margin-left: 8px; font-weight: 400; }
 .dk-qhead .sub { font-size: 12.5px; color: var(--d-ink-2); margin-top: 2px; }
+/* My desk's filter row. Open an account keeps its filters inline with the search
+   box; here they sit on their own line under the heading. */
+.dk-deskfilters { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding-bottom: 4px; }
+.dk-clearf { font: inherit; font-size: 12px; color: var(--d-ink-3); background: none; border: 0; cursor: pointer;
+  padding: 6px 8px; text-decoration: underline; text-underline-offset: 2px; }
+.dk-clearf:hover { color: var(--d-ink); }
+
 .dk-eyebrow { font-family: var(--d-mono); font-size: 10.5px; font-weight: 500; letter-spacing: .1em; color: var(--d-ink-3); margin: 22px 0 11px; text-transform: uppercase; display: flex; align-items: center; gap: 11px; }
 .dk-eyebrow .no { font-style: normal; color: var(--d-gold-ink); font-weight: 600; letter-spacing: 0; }
 .dk-eyebrow .ln { flex: 1; height: 1px; background: var(--d-line); }
@@ -269,6 +276,9 @@
   max-width: 132px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: 1px; }
 .dk-src.bulk { background: rgba(var(--d-brand-rgb), .1); color: var(--d-brand); }
 .dk-src.single { background: var(--d-wash); color: var(--d-ink-3); }
+/* Business marker. Distinct from the bulk/walk-in source chips it sits beside —
+   it answers a different question — so it takes the gold accent, not the blue. */
+.dk-src.corp { background: var(--d-gold-bg); color: var(--d-gold-ink); box-shadow: inset 0 0 0 1px var(--d-gold-line); }
 .dk-row .ch { color: var(--d-ink-4); display: grid; place-items: center; }
 
 /* Column headers for the two status lanes (Maestro stage · Outcome). Aligned to the
@@ -422,6 +432,16 @@
 .dk-capture .cx-body:not(:has(.cx-field)):not(:has(.cx-row)) .cx-h1,
 .dk-capture .cx-body:not(:has(.cx-field)):not(:has(.cx-row)) .cx-p { margin-inline: auto; }
 
+/* The action row tracks whichever column the body is using. Sibling combinator,
+   not :has() on the shell — :has() cannot be nested inside :has(), so hoisting the
+   test up to .dk-capture silently drops the whole rule. The footer is the body's
+   sibling, which keeps it to one level. Left unconstrained, a full-bleed button
+   under a 620px card stack reads as belonging to another page, and the consent
+   above it wraps to an unreadable ~100-character measure. */
+.dk-capture .cx-body:not(:has(.cx-field)):not(:has(.cx-row)):not(:has(.cx-faceid)) ~ .cx-foot > * {
+  width: 100%; max-width: 620px; margin-inline: auto;
+}
+
 @media (max-width: 1080px) {
   .dk-capture { max-width: none; height: 100%; }
   .dk-capture-scrim { padding: 0; }
@@ -477,11 +497,22 @@
 
 /* Next best action — the reason this pane exists. */
 .dk-nba { border: 1px solid var(--d-line-2); border-radius: 0; padding: 14px; background: var(--d-surface); }
-.dk-nba.do { border-color: rgba(var(--d-brand-rgb), .3); background: rgba(var(--d-brand-rgb), .04); }
-.dk-nba.done { border-color: #cfe9d9; background: var(--d-green-bg); }
+/* Two cards, two jobs, two colours. The action card is the bank's recommendation —
+   warm, because it is your worklist. The live case below is the system speaking, so
+   it keeps brand blue. They read as blue-on-blue otherwise: the Maestro card also
+   carries .dk-nba.do, so it inherited this tint. */
+.dk-nba.do:not(.dk-nba-maestro) { border: 1px solid #e2cba6; border-top: 2px solid var(--d-gold);
+  background: #f9f0df; }
+.dk-nba.do:not(.dk-nba-maestro) .hd { color: var(--d-gold); }
+/* The ladder's divider has to hold its own against the deeper fill. */
+.dk-nba.do:not(.dk-nba-maestro) .alt { border-top-color: #e2cba6; }
+.dk-nba.done:not(.dk-nba-maestro) { border-color: #cfe9d9; background: var(--d-green-bg); }
+/* Anything that follows the action card is a separate thought — give it air. */
+.dk-nba + .dk-nba, .dk-nba + .dk-run-maestro { margin-top: 14px; }
 
 /* ── Live Maestro link inside a case record ── */
-.dk-nba-maestro { border-top: 2px solid var(--d-brand); }
+.dk-nba-maestro { border: 1px solid rgba(var(--d-brand-rgb), .3); border-top: 2px solid var(--d-brand);
+  background: rgba(var(--d-brand-rgb), .04); }
 .dk-nba-live { margin-left: auto; font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
   color: var(--d-brand); background: rgba(var(--d-brand-rgb), .1); border-radius: 0; padding: 2px 8px; }
 .dk-nba-live.ok { color: var(--d-green-ink); background: var(--d-green-bg); }
@@ -493,6 +524,26 @@
   box-shadow: 0 0 0 2px rgba(var(--d-brand-rgb), .12); }
 .dk-mlink { display: inline-block; margin-top: 10px; font-size: 12px; font-weight: 600; color: var(--d-brand); text-decoration: none; }
 .dk-mlink:hover { text-decoration: underline; }
+
+/* The steps inside the current stage. Deliberately quiet: it is a running
+   commentary, not an action — the one live line is the only thing that lifts. */
+.dk-steps { margin-top: 12px; padding: 11px 12px; background: #fbfbf9; border: 1px solid var(--d-line-2); }
+.dk-steps-h { font-family: var(--d-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--d-ink-4); margin-bottom: 8px; }
+.dk-step { display: flex; align-items: center; gap: 8px; padding: 3px 0; font-size: 12px; color: var(--d-ink-3); }
+.dk-step .pip { width: 6px; height: 6px; flex: 0 0 auto; border-radius: 50%; background: var(--d-line); }
+.dk-step .nm { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dk-step.done { color: var(--d-ink-3); }
+.dk-step.done .pip { background: #16a34a; }
+.dk-step.done .nm { text-decoration: none; }
+.dk-step.now { color: var(--d-ink); font-weight: 600; }
+.dk-step.now .pip { background: var(--d-brand); box-shadow: 0 0 0 3px rgba(var(--d-brand-rgb), .16); }
+.dk-step.bad { color: #b91c1c; }
+.dk-step.bad .pip { background: #b91c1c; }
+.dk-step .who { flex: 0 0 auto; font-size: 10px; font-weight: 700; letter-spacing: .02em; text-transform: uppercase;
+  color: var(--d-gold-ink); background: var(--d-gold-bg); padding: 1px 6px; }
+.dk-step .go { flex: 0 0 auto; margin-left: auto; font-size: 11px; font-weight: 600; color: var(--d-brand); text-decoration: none; }
+.dk-step .go:hover { text-decoration: underline; }
 
 /* Inline Action Center task box — the human task backing the current stage */
 .dk-actask { display: flex; align-items: center; gap: 11px; margin-top: 12px; padding: 10px 12px;
@@ -516,6 +567,11 @@
 .dk-nba .ttl { font-size: 15px; font-weight: 600; letter-spacing: -.01em; }
 .dk-nba .why { font-size: 12.5px; line-height: 1.55; color: var(--d-ink-2); margin-top: 5px; }
 .dk-nba .acts { margin-top: 12px; }
+/* The same action by another route, sitting with the button rather than in the
+   fallback ladder below. */
+.dk-nba-alt { display: block; margin-top: 8px; text-align: center; font-size: 12px; font-weight: 600;
+  color: var(--d-brand); text-decoration: none; }
+.dk-nba-alt:hover { text-decoration: underline; }
 .dk-nba .acts .dk-btn { width: 100%; justify-content: center; }
 .dk-nba .alt { margin-top: 14px; border-top: 1px solid var(--d-line-2); padding-top: 10px; }
 .dk-nba .alt-h { font-family: var(--d-num); font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--d-ink-4); margin-bottom: 6px; }
@@ -618,6 +674,26 @@
 .dk-ch-opt[aria-pressed="true"] .chk { background: var(--d-brand); border-color: var(--d-brand); color: #fff; }
 .dk-modal-acts { display: flex; gap: 8px; }
 .dk-modal-acts .dk-btn { flex: 1; justify-content: center; padding: 10px; }
+/* Destructive action. Outlined by default and only solid on hover — a red slab
+   sitting permanently at the foot of every record reads as an instruction. */
+.dk-btn.danger { color: #b91c1c; border-color: #f0c9c9; background: #fff; }
+.dk-btn.danger:hover:not(:disabled) { background: #b91c1c; border-color: #b91c1c; color: #fff; }
+.dk-btn.danger:disabled { opacity: .55; }
+
+/* The delete zone, set apart from the workflow actions above it. */
+.dk-danger { display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  margin-top: 26px; padding: 14px; border: 1px solid var(--d-line-2); background: #fdfcfb; }
+.dk-danger b { display: block; font-size: 13px; color: var(--d-ink); }
+.dk-danger span { display: block; font-size: 11.5px; color: var(--d-ink-3); margin-top: 2px; line-height: 1.45; }
+.dk-danger .dk-btn { flex: 0 0 auto; }
+
+/* Consequences of deleting, in the confirm dialog. */
+.dk-warns { list-style: none; margin: 14px 0 18px; padding: 12px; display: flex; flex-direction: column; gap: 10px;
+  background: #fdf6f6; border: 1px solid #f0dada; }
+.dk-warns li { display: flex; gap: 9px; font-size: 12.5px; line-height: 1.5; color: var(--d-ink-2); }
+.dk-warns .ic { flex: 0 0 auto; color: #b91c1c; margin-top: 1px; }
+.dk-warns a { color: var(--d-brand); }
+
 @keyframes dkFade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes dkPop { from { opacity: 0; transform: translateY(8px) scale(.97); } to { opacity: 1; transform: none; } }
 
@@ -651,14 +727,18 @@
 /* Built on the capture wizard's shell so it carries the same branding and
    spacing — these rules only size the dialog and style what the shell has no
    equivalent for (definition rows, people cards). */
-.ad-scrim { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 28px;
+.ad-scrim { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 18px;
   background: rgba(17,24,29,.42); backdrop-filter: blur(2px); animation: dkFade .16s ease-out; }
-.ad { width: 100%; max-width: 720px; height: min(800px, 88vh); overflow: hidden;
+/* One width for every tab. The dialog resizing as you move between tabs is more
+   distracting than the extra room costs — the fact grid gains a column instead. */
+.ad { width: 100%; max-width: 1380px; height: min(1000px, 94vh); overflow: hidden;
   background: #fff; border: 1px solid var(--d-line-2); border-radius: 18px;
   box-shadow: 0 40px 90px -30px rgba(17,24,29,.5); animation: dkPop .2s cubic-bezier(.2,.7,.3,1); }
 /* Match the roomier padding the desk overlay gives the wizard. */
 .ad .cx-head { padding: 16px 24px 12px; }
 .ad .cx-body { padding: 20px 24px; }
+/* The Document tab manages its own scrolling per column. */
+.ad .cx-head.strip { padding-bottom: 12px; border-bottom: 1px solid var(--d-line-2); }
 .ad .cx-foot { padding: 14px 24px 18px; }
 
 .ad-pill { margin-left: auto; font-size: 10.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
@@ -666,7 +746,99 @@
 .ad-pill.pending  { background: #fdf5e6; color: #b7791f; }
 .ad-pill.good     { background: #e8f6ef; color: #12805c; }
 .ad-pill.exception{ background: #fdecea; color: #c0392b; }
-.ad-ref { font-size: 12.5px; margin-bottom: 16px; font-variant-numeric: tabular-nums; }
+.ad-title { font: 600 22px/1.2 var(--f-head, inherit); letter-spacing: -.025em; margin-top: 12px; }
+.ad-ref { font-size: 12.5px; margin-top: 3px; font-variant-numeric: tabular-nums; color: rgba(17,24,29,.48); }
+
+/* Tab bar. The record is too big for one scroll — the checks and the event trail
+   were the parts that got buried, and they are what a banker usually opens this for. */
+.ad-tabs { display: flex; gap: 2px; margin: 14px -4px -12px; overflow-x: auto; }
+.ad-tabs button { position: relative; flex: 0 0 auto; padding: 9px 11px 11px; font-size: 12.5px; font-weight: 500;
+  color: rgba(17,24,29,.55); background: none; border: 0; cursor: pointer; white-space: nowrap; }
+.ad-tabs button:hover { color: var(--d-ink); }
+.ad-tabs button[aria-selected="true"] { color: var(--d-brand); font-weight: 700;
+  background: rgba(var(--d-brand-rgb), .07); }
+.ad-tabs button[aria-selected="true"]::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0;
+  height: 2.5px; background: var(--d-brand); }
+.ad-tabs .n { margin-left: 6px; font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 999px;
+  background: rgba(17,24,29,.07); color: rgba(17,24,29,.55); }
+.ad-tabs button[aria-selected="true"] .n { background: rgba(var(--d-brand-rgb), .12); color: var(--d-brand); }
+
+/* Why a panel is empty, rather than an empty panel. */
+.ad-none { font-size: 13px; color: rgba(17,24,29,.48); padding: 4px 0 2px; line-height: 1.5; }
+
+/* Document tab: the dialog itself splits into two full-height frames, so the pages
+   run from under the brand strip to the footer rather than sitting in a box inside
+   the body. The left frame carries the title, tabs and fields. */
+.ad-split { flex: 1; min-height: 0; display: grid;
+  /* The left frame has a floor: the tab bar has to fit without clipping "Document". */
+  grid-template-columns: minmax(490px, 0.9fr) minmax(0, 1.4fr);
+  /* The row must fill the container, not size to its content. */
+  grid-template-rows: minmax(0, 1fr); }
+@media (max-width: 1100px) { .ad-split { grid-template-columns: 1fr; } }
+.ad-left { display: flex; flex-direction: column; min-width: 0; min-height: 0;
+  border-right: 1px solid var(--d-line-2); }
+.ad-left-head { flex: none; padding: 14px 20px 0; }
+.ad-left-head .ad-title { font-size: 19px; margin-top: 0; }
+.ad-left-head .ad-tabs { margin-bottom: 0; }
+.ad-left-body { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 20px 18px; }
+.ad-doc-pane { display: flex; flex-direction: column; min-width: 0; min-height: 0;
+  background: #fff; overflow: hidden; }
+.ad-doc-h { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--d-line-2);
+  font-size: 12.5px; font-weight: 600; color: var(--d-ink-2); flex: none; }
+.ad-doc-h .n { margin-left: auto; font-weight: 500; color: var(--d-ink-4); }
+.ad-doc-body { position: relative; flex: 1; min-height: 0; background: #f4f6fb; overflow: hidden; }
+.ad-frame { width: 100%; height: 100%; border: 0; display: block; }
+.ad-doc-none { height: 100%; display: grid; place-items: center; padding: 20px; text-align: center;
+  font-size: 12.5px; color: var(--d-ink-4); }
+/* Sweeps only while the read is outstanding — it stops when the data lands. */
+.ad-scan { position: absolute; left: 0; right: 0; height: 130px; top: -130px; pointer-events: none; z-index: 2;
+  background: linear-gradient(180deg, rgba(0,51,161,0) 0%, rgba(0,51,161,.08) 55%, rgba(0,145,218,.26) 92%, rgba(0,145,218,.85) 100%);
+  border-bottom: 1.5px solid #0091da; box-shadow: 0 6px 22px rgba(0,145,218,.4);
+  animation: adsweep 2.4s cubic-bezier(.4,0,.5,1) infinite; }
+@keyframes adsweep { 0% { top: -130px; } 100% { top: 100%; } }
+@media (prefers-reduced-motion: reduce) { .ad-scan { animation: none; } }
+
+/* Read-only extraction rows. Not editable here — this is the record of what was
+   captured; correcting it is the review screen's job. */
+.ad-read { display: flex; flex-direction: column; }
+.ad-read-r { display: flex; align-items: baseline; gap: 12px; padding: 8px 2px;
+  border-bottom: 1px solid rgba(17,24,29,.06); }
+.ad-read-r:last-child { border-bottom: 0; }
+.ad-read-r .k { flex: 0 0 38%; font-size: 12px; color: rgba(17,24,29,.45); }
+.ad-read-r .v { flex: 1; font-size: 13.5px; font-weight: 500; word-break: break-word; }
+.ad-read-r .v.empty { color: rgba(17,24,29,.40); font-weight: 400; font-style: italic; }
+.ad-conf { flex: 0 0 auto; font-size: 10.5px; font-weight: 700; padding: 2px 7px; border-radius: 999px;
+  font-variant-numeric: tabular-nums; }
+.ad-conf.hi  { color: #12805c; background: #e8f6ef; }
+.ad-conf.mid { color: #b7791f; background: #fdf5e6; }
+.ad-conf.lo  { color: #c0392b; background: #fdecea; }
+
+/* Checks — the six validations with their retry history. */
+.ad-checks { display: flex; flex-direction: column; }
+.ad-check { display: flex; align-items: center; gap: 11px; padding: 11px 2px;
+  border-bottom: 1px solid rgba(17,24,29,.06); }
+.ad-check:last-child { border-bottom: 0; }
+.ad-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: rgba(17,24,29,.18); }
+.ad-dot.good { background: #16a34a; }
+.ad-dot.progress { background: #0033a1; }
+.ad-dot.exception { background: #dc2626; }
+.ad-check-t { flex: 1; min-width: 0; }
+.ad-check-t b { display: block; font-size: 13.5px; font-weight: 500; }
+.ad-check-t em { display: block; font-style: normal; font-size: 11.5px; color: rgba(17,24,29,.48); margin-top: 1px; }
+.ad-check-m, .ad-check-w { flex: 0 0 auto; font-size: 11.5px; color: rgba(17,24,29,.40); font-variant-numeric: tabular-nums; }
+.ad-check .ad-pill { margin-left: 0; min-width: 74px; text-align: center; text-transform: capitalize; }
+.ad-pill.idle { background: rgba(17,24,29,.06); color: rgba(17,24,29,.50); }
+
+/* Event trail. */
+.ad-tl { display: flex; flex-direction: column; }
+.ad-tl-i { display: flex; gap: 12px; }
+.ad-tl-i .rail { flex: 0 0 auto; width: 9px; display: flex; flex-direction: column; align-items: center; }
+.ad-tl-i .rail .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--d-brand); margin-top: 5px; }
+.ad-tl-i:not(:last-child) .rail::after { content: ''; flex: 1; width: 1px; background: rgba(17,24,29,.10); margin: 3px 0; }
+.ad-tl-i > div { padding-bottom: 14px; min-width: 0; }
+.ad-tl-i .msg { font-size: 13.5px; }
+.ad-tl-i .meta { display: flex; gap: 10px; margin-top: 3px; font-size: 11.5px; color: rgba(17,24,29,.42); }
+.ad-tl-i .meta .tp { font-family: var(--d-mono); }
 
 /* The way back into the extraction, when the case is still parked at that gate. */
 .ad-cta { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; cursor: pointer;
@@ -683,10 +855,12 @@
 .ad-sec:first-of-type { border-top: 0; padding-top: 0; }
 .ad-sec h3 { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase;
   color: rgba(17,24,29,.40); margin-bottom: 11px; }
-.ad-sec h3 em { font-style: normal; color: rgba(17,24,29,.58); }
+.ad-sec h3 em { font-style: normal; color: rgba(17,24,29,.58); margin-left: 7px; }
 
-.ad-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 22px; }
-@media (max-width: 620px) { .ad-grid { grid-template-columns: 1fr; } }
+.ad-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 11px 26px; }
+@media (max-width: 1240px) { .ad-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 1000px) { .ad-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 620px)  { .ad-grid { grid-template-columns: 1fr; } }
 .ad-row { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
 .ad-row dt { flex: 0 0 42%; font-size: 12px; color: rgba(17,24,29,.40); }
 .ad-row dd { flex: 1; font-size: 13.5px; font-weight: 500; word-break: break-word; }

@@ -5,7 +5,7 @@
 // primary signatory's identity (for validations/pipeline) plus the full entity
 // metadata (see EntityInfo). Same shared OnboardingStore as the individual flow.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { store, type OnboardingCase } from '../onboarding';
 import { getActiveCountry } from '../config/countries';
 import { useConfig } from '../config';
@@ -13,7 +13,7 @@ import { Button, Field, Note, Rail, KV, Brand } from './ui';
 import Icon from './icons';
 import type { ApplyMode } from './Apply';
 import { extractAof } from './ixp';
-import { attachmentReadUrl, clearPendingExtraction, corporateMaestroReady, loadPendingExtraction, savePendingExtraction, startCorporateCase, uploadCaseAttachment, type JobAttachmentRef } from '../onboarding/maestro-corporate';
+import { attachmentReadUrl, clearPendingExtraction, corporateMaestroReady, loadPendingExtraction, savePendingExtraction, startCorporateCase, uploadCaseAttachment, type JobAttachmentRef, type PendingExtraction } from '../onboarding/maestro-corporate';
 import ExtractionReview, { type ReviewField } from './ExtractionReview';
 import { linkInstance } from '../onboarding/maestro';
 
@@ -48,6 +48,10 @@ type Corp = { company: string; rc: string; bizType: string; sector: string; tin:
 const BIZ_TYPES = ['Limited Liability Company', 'Partnership', 'Sole Proprietor', 'Schools', 'Other'];
 const ROLES = ['Director', 'Shareholder', 'Signatory'];
 const TURNOVERS = [`Less than ${CUR}400m`, `${CUR}400m – ${CUR}1bn`, `${CUR}1bn – ${CUR}4bn`, `Greater than ${CUR}4bn`];
+
+/** Stands in on the desk between "form uploaded" and "we know the company name".
+ *  Never the file name — a record is the business, not the scan it arrived on. */
+const PLACEHOLDER_NAME = 'Business application';
 
 const EMPTY_DIR: Dir = { name: '', bvn: '', idType: 'International Passport', idNumber: '', phone: '', email: '', role: 'Director' };
 const EMPTY_CORP: Corp = { company: '', rc: '', bizType: BIZ_TYPES[0], sector: '', tin: '', turnover: TURNOVERS[0], address: '', email: '', phone: '' };
@@ -105,7 +109,18 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
   const [reviewDone, setReviewDone] = useState(false);
   // A review parked with "Finish later" survives closing the wizard entirely, so
   // offer it back rather than stranding a case that is already running.
-  const [resume, setResume] = useState(() => loadPendingExtraction());
+  // Only offered once the record behind it is confirmed to still exist. A parked
+  // review whose record is gone (discarded, or cleared by a demo reseed) is an
+  // orphan — offering it would invite the RM to resume a stranger's document.
+  const [resume, setResume] = useState<PendingExtraction | null>(null);
+  useEffect(() => {
+    const p = loadPendingExtraction();
+    if (!p) return;
+    void store.get(p.recordId).then((rec) => {
+      if (rec) setResume(p);
+      else clearPendingExtraction();
+    });
+  }, []);
   // The record opened at upload. Submit fills it in rather than creating a second one.
   const [draftId, setDraftId] = useState<string | null>(null);
 
@@ -114,12 +129,24 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
   const addDir = () => setDirs((ds) => [...ds, { ...EMPTY_DIR }]);
   const removeDir = (i: number) => setDirs((ds) => (ds.length > 1 ? ds.filter((_, j) => j !== i) : ds));
 
+  /** Put the read company name onto the parked record, so the desk stops showing a
+   *  placeholder as soon as we know who this is. Best-effort: a failure here must
+   *  not cost the RM the upload. */
+  const nameDraft = async (id: string | null, company: string | undefined) => {
+    const name = (company ?? '').trim();
+    if (!id || !name) return;
+    try { await store.update(id, { firstName: name, lastName: '' }); } catch { /* keeps the placeholder */ }
+  };
+
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     e.target.value = '';
     if (!f) return;
     setDoc({ name: f.name, phase: 'reading', note: 'Uploading the form…' });
     setAttachment(null);
+    // Held locally as well as in state: the read finishes in the same call, before
+    // a state update from this handler would be readable.
+    let createdDraftId: string | null = null;
     // Park the document in Orchestrator first, then start the case immediately so
     // the server-side extraction is already running while the RM is still on this
     // screen. The review step opens against that same instance.
@@ -134,16 +161,20 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
             document: att, documentUri: uri,
           });
           setExtractionInstance(id);
-          // Open the record now so the running case is visible on the desk. It carries
-          // the file name until the review confirms a company name.
+          // Open the record now so the running case is visible on the desk. A record
+          // is named for its business, never for the file it arrived on — the document
+          // name belongs to the extraction (and shows in the details popup). This
+          // placeholder stands for the few seconds until the read returns a name.
           const draft = await store.create({
-            firstName: f.name, lastName: '',
+            firstName: PLACEHOLDER_NAME, lastName: '',
             phone: '', email: '', bvn: '', nin: '', address: '',
             channel: 'single', source: 'rm', state: 'AWAITING_EXTRACTION',
+            documentId: att.ID, documentName: att.FullName,
           });
+          createdDraftId = draft.id;
           setDraftId(draft.id);
           linkInstance(draft.id, id);
-          savePendingExtraction({ instanceId: id, attachmentId: att.ID, documentName: att.FullName });
+          savePendingExtraction({ recordId: draft.id, instanceId: id, attachmentId: att.ID, documentName: att.FullName });
         } catch { /* review falls back to the local read */ }
       } catch { /* case starts without it */ }
     }
@@ -170,12 +201,14 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
         })));
       }
       setDoc({ name: f.name, phase: 'done', source: 'ixp' });
+      await nameDraft(createdDraftId, x.company.companyName);
     } catch {
       // IXP unreachable (in production the app token still lacks the Du.* scopes) —
       // fall back to the sample read so the walkthrough never dead-ends.
       setV(EXTRACTED_CORP);
       setDirs(EXTRACTED_DIRS.map((d) => ({ ...d })));
       setDoc({ name: f.name, phase: 'done', source: 'sample' });
+      await nameDraft(createdDraftId, EXTRACTED_CORP.company);
     }
     // The RM confirms what was read before the case moves on. Opening this is what
     // makes the review a step rather than a screen they might never look at.
@@ -186,6 +219,9 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
    *  from what the reviewer accepted, not from the raw read. */
   const applyConfirmed = (rows: ReviewField[]) => {
     const pick = (re: RegExp) => rows.find((r) => re.test(r.name))?.value?.trim() ?? '';
+    // The reviewer may have corrected the company name — the record should carry
+    // what they confirmed, not what was first read.
+    void nameDraft(draftId, pick(/company name/i));
     setV((p) => ({
       ...p,
       company: pick(/company name/i) || p.company,
@@ -402,25 +438,41 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
               <KV k="Address" v={v.address} />
               <KV k="Contact" v={`${v.email}${v.email && v.phone ? ' · ' : ''}${digits(v.phone)}`} />
             </div>
-            <div className="cx-label" style={{ margin: '14px 0 8px' }}>{dirs.length} director{dirs.length === 1 ? '' : 's'} / signatories</div>
+            {/* `auto` on the inline axis, not 0: this is a direct child of .cx-body,
+                which centres its children in the content column. An inline margin
+                beats the stylesheet, so a literal 0 here parks the label at the far
+                left while the cards it labels stay centred. */}
+            <div className="cx-label" style={{ margin: '14px auto 8px' }}>{dirs.length} director{dirs.length === 1 ? '' : 's'} / signatories</div>
             <div className="cx-card">
               {dirs.map((d, i) => (
                 <KV key={i} k={d.name.trim() || `Director ${i + 1}`} v={`${d.role} · ${CO.primaryId.label} ${digits(d.bvn) || '—'}`} />
               ))}
             </div>
-            <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginTop: 16, cursor: 'pointer' }}>
-              <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} style={{ marginTop: 2, width: 18, height: 18, accentColor: 'var(--blue)' }} />
-              <span style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--soft)' }}>
-                The signatories confirm these details are correct and consent to {appName} verifying the company and each director with {CO.primaryId.authority}, {CO.secondaryId.authority} and screening partners.
-              </span>
-            </label>
           </>
         )}
       </div>
 
       <div className="cx-foot">
+        {/* The consent sits with the button it belongs to, not at the end of the
+            scroll. As the last row of the body it fell below the fold on a short
+            window — the reviewer saw a half-sentence cut off by the footer and had
+            to scroll a card list to find the tick box. The foot is already a
+            column with a gap, so it stacks here by design. */}
+        {step === 2 && (
+          <label className="cx-consent">
+            <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} />
+            <span>
+              The signatories confirm these details are correct and consent to {appName} verifying the company and each director with {CO.primaryId.authority}, {CO.secondaryId.authority} and screening partners.
+            </span>
+          </label>
+        )}
         {step < 2 ? (
-          <Button onClick={next}>Continue<Icon name="arrowRight" size={17} /></Button>
+          // A business account has to have a business name. It normally arrives from
+          // the read, so this only bites when the read found nothing — which is
+          // exactly when someone has to type it.
+          <Button onClick={next} disabled={step === 0 && !v.company.trim()}>
+            Continue<Icon name="arrowRight" size={17} />
+          </Button>
         ) : (
           <Button onClick={submit} disabled={busy}>{busy ? 'Submitting…' : 'Submit application'}</Button>
         )}

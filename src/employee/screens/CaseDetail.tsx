@@ -11,10 +11,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState, useEffect } from 'react';
 import ApplicationDetails from './ApplicationDetails';
-import ExtractionReview from '../../customer/ExtractionReview';
-import { loadPendingExtraction, clearPendingExtraction } from '../../onboarding/maestro-corporate';
-import { store, stateMeta, fullName, commsFor, CHANNEL_META, MSG_CHANNELS, VALIDATION_KINDS, type OnboardingCase, type ValidationKind, type MsgChannel } from '../../onboarding';
-import { maestroReady, startCase, getState, getCachedState, approve, instanceUrl, actionCenterUrl, getLinkedInstance, linkInstance, LINKS_EVENT, STAGES as MAESTRO_STAGES, type LiveState } from '../../onboarding/maestro';
+import ExtractionReview, { entityFromRows, type ReviewField } from '../../customer/ExtractionReview';
+import { loadPendingExtraction, clearPendingExtraction, getCorporateState, getCachedCorporateState, approveCorporate, corporateMaestroUrl } from '../../onboarding/maestro-corporate';
+import { store, stateMeta, fullName, isCorporate, commsFor, CHANNEL_META, MSG_CHANNELS, VALIDATION_KINDS, type OnboardingCase, type ValidationKind, type MsgChannel } from '../../onboarding';
+import { maestroReady, startCase, getState, getCachedState, approve, instanceUrl, actionCenterUrl, getLinkedInstance, linkInstance, unlinkInstance, LINKS_EVENT, STAGES as MAESTRO_STAGES, type LiveState } from '../../onboarding/maestro';
 import { ChannelIcon } from '../../onboarding/ChannelIcon';
 import Kyc from '../../customer/Kyc';
 import { nextBestActions, type Nba } from '../nba';
@@ -59,20 +59,64 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
   // A record parked at its extraction gate can be reopened from here — the review
   // is the same task the Action Center app serves, reachable from the record too.
   const [reviewing, setReviewing] = useState(false);
+  // Where the review was opened from, so closing it goes back there rather than
+  // dismissing the details popup the reviewer was reading a moment ago.
+  const [reviewFromDetails, setReviewFromDetails] = useState(false);
+  // Declared up here with the other overlay flags: the Escape handler below reads
+  // them all, and a state declared after it would be in the temporal dead zone.
+  const [confirmDel, setConfirmDel] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const awaiting = c.state === 'AWAITING_EXTRACTION';
   // Live link to the real Maestro case for this record.
   const [linked, setLinked] = useState<string | null>(() => getLinkedInstance(c.id));
-  // Seed from the per-instance cache so a reopened case shows its last-known stage at once.
-  const [mstate, setMstate] = useState<LiveState | null>(() => { const i = getLinkedInstance(c.id); return i ? getCachedState(i) : null; });
-  const [mbusy, setMbusy] = useState(false);
 
-  useEffect(() => { const i = getLinkedInstance(c.id); setLinked(i); setMstate(i ? getCachedState(i) : null); }, [c.id]);
-  // Esc closes the detail pane.
+  // Individual and corporate openings are two different Maestro cases in two
+  // different Orchestrator folders, and every helper pins its own folder header.
+  // Reading a corporate instance through the individual helpers returns 404s and
+  // builds a deep link Maestro cannot resolve, so the record's type picks the set.
+  const corporate = isCorporate(c);
+  const fetchState = (id: string): Promise<LiveState> =>
+    corporate ? getCorporateState(id) : getState(id);
+  // Seed from the per-instance cache so a reopened case shows its last-known stage
+  // at once. The cache is written by the individual poller, so it is only valid here.
+  const seed = (i: string | null) => (!i ? null : corporate ? getCachedCorporateState(i) : getCachedState(i));
+  const [mstate, setMstate] = useState<LiveState | null>(() => seed(getLinkedInstance(c.id)));
+  const [mbusy, setMbusy] = useState(false);
+  /** The approval currently in flight, held so the card can stay put while the
+   *  case closes one stage and opens the next. Null whenever nothing is advancing. */
+  const [advancing, setAdvancing] = useState<{ stage: string | null; title: string | null; taskId: number } | null>(null);
+  // Whether the live case has answered *this session* for this record. Never
+  // seeded from the cache: a cached state can predate a fix (or simply be stale),
+  // and treating it as an answer is what let "nothing to do" paint first and then
+  // reverse itself. A cache that already holds an approval still paints instantly,
+  // because that arrives through `mstate`, not through this flag.
+  const [mAsked, setMAsked] = useState(false);
+
+  // Reset during render, not in an effect. An effect runs after paint, so the new
+  // record got one frame carrying the PREVIOUS record's live state — long enough to
+  // show someone else's "Approve Decision & advance" on the pane you just opened.
+  const [stateFor, setStateFor] = useState(c.id);
+  if (stateFor !== c.id) {
+    const i = getLinkedInstance(c.id);
+    setStateFor(c.id);
+    setLinked(i);
+    setMstate(seed(i));
+    setMAsked(false);
+    // Never carry an in-flight approval onto a different record.
+    setAdvancing(null);
+  }
+  // Esc closes the detail pane — but only when the pane is the top layer. Each
+  // overlay owns Escape while it is open, otherwise one press collapses the whole
+  // stack and the reviewer loses the pane they were working in, not just the dialog.
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (details || reviewing || picker || confirmDel) return;
+      onClose();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [onClose, details, reviewing, picker, confirmDel]);
   // Data Fabric hydrate can land after mount (or a colleague may link this record on
   // another machine) — re-read the shared link when it changes so we flip to live.
   useEffect(() => {
@@ -83,7 +127,9 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
   useEffect(() => {
     if (!linked) return;
     let alive = true;
-    const tick = () => void getState(linked).then((s) => { if (alive) setMstate(s); }).catch(() => {});
+    const tick = () => void fetchState(linked)
+      .then((s) => { if (alive) { setMstate(s); setMAsked(true); } })
+      .catch(() => { if (alive) setMAsked(true); });
     tick();
     const iv = setInterval(() => { if (!mstate?.done) tick(); }, 4000);
     return () => { alive = false; clearInterval(iv); };
@@ -98,18 +144,169 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
     } catch (e) { setToast('Maestro: ' + (e as Error).message); window.setTimeout(() => setToast(null), 4000); }
     finally { setMbusy(false); }
   };
+  const closeReview = () => {
+    setReviewing(false);
+    if (reviewFromDetails) { setDetails(true); setReviewFromDetails(false); }
+  };
+
+  /**
+   * Confirming from the desk has to move the record, not just close the screen.
+   * The Maestro task is completed by the review itself; this is the local half —
+   * without it the record sits at AWAITING_EXTRACTION forever, still offering a
+   * review whose task is already gone.
+   */
+  const acceptExtraction = async (rows: ReviewField[]) => {
+    const entity = entityFromRows(rows);
+    const primary = entity.directors[0];
+    try {
+      await store.update(c.id, {
+        entity,
+        firstName: entity.companyName || c.firstName,
+        lastName: '',
+        phone: entity.phone || primary?.phone || c.phone,
+        email: entity.email || primary?.email || c.email,
+        bvn: primary?.bvn || c.bvn,
+        address: entity.address || c.address,
+        state: 'PRE_REGISTERED',
+      });
+    } catch (e) {
+      setToast('Saved in Maestro, but the record did not update: ' + (e as Error).message);
+      window.setTimeout(() => setToast(null), 5000);
+    }
+    clearPendingExtraction();
+    setReviewing(false);
+    setReviewFromDetails(false);
+  };
+
+  /** Local only. The Maestro case, any Action Center task and anything already
+   *  created in Finacle are untouched — the dialog says so before this runs. */
+  const deleteRecord = async () => {
+    setDeleting(true);
+    try {
+      if (loadPendingExtraction(c.id)) clearPendingExtraction();
+      unlinkInstance(c.id);
+      await store.remove(c.id);
+      onClose();
+    } catch (e) {
+      setToast('Could not delete: ' + (e as Error).message);
+      window.setTimeout(() => setToast(null), 4000);
+      setDeleting(false);
+      setConfirmDel(false);
+    }
+  };
+
   const approveMaestro = async () => {
     if (!linked || !mstate?.pendingTaskId) return;
+    const doneId = mstate.pendingTaskId;
     setMbusy(true);
-    try { await approve(mstate.pendingTaskId); await new Promise((r) => setTimeout(r, 1600)); setMstate(await getState(linked)); }
+    // Snapshot what the card is showing right now. The optimistic clear below
+    // empties the live actions, and without this the builder falls through to
+    // "Nothing for you to do" until the next poll lands — a ~2s dip to the quiet
+    // card between two "Working…" states. Holding the snapshot keeps the card
+    // byte-identical while the case advances; only the button changes.
+    setAdvancing({ stage: stageNow, title: mstate.pendingTitle, taskId: doneId });
+    try {
+      await (corporate ? approveCorporate(doneId) : approve(doneId));
+      // Drop it from the card the moment the task is completed. Leaving the
+      // approval on screen while the case catches up invites a second click on a
+      // task that no longer exists — and reads as though nothing happened.
+      setMstate((s) => (s ? { ...s, pendingTaskId: null, pendingTitle: null } : s));
+      // Then chase the real answer in place rather than making anyone reload. The
+      // case takes a few seconds to close the stage and open the next one.
+      for (let i = 0; i < 8; i++) {
+        await new Promise((r) => setTimeout(r, 1500));
+        const fresh = await fetchState(linked);
+        setMstate(fresh);
+        setMAsked(true);
+        if (fresh.pendingTaskId !== doneId) break;
+      }
+    }
     catch (e) { setToast('Approve failed: ' + (e as Error).message); window.setTimeout(() => setToast(null), 4000); }
-    finally { setMbusy(false); }
+    // Released together: the card must not drop the snapshot while the button is
+    // still busy, or the dip reappears in the gap between the two.
+    finally { setMbusy(false); setAdvancing(null); }
   };
 
   if (kyc) return <div className="dk-flow"><Kyc c={c} onExit={() => setKyc(false)} /></div>;
 
   const m = stateMeta(c.state);
-  const actions = nextBestActions(c);
+  // The recommendation shown on every record. When the live case is parked on a
+  // human task, that approval IS the next best action, so it leads here with the
+  // stage as its reason — rather than competing from the status card below.
+  const stageNow = mstate?.activeStage ?? null;
+  // Only once the live case has actually answered — otherwise the panel would
+  // flip from seeded data to live data a second after opening.
+  const liveChecks = linked && mAsked && mstate?.checks?.length ? mstate.checks : null;
+  // Built from either the live state or the in-flight snapshot, so the card is
+  // identical in both — an approval mid-flight must not redraw the pane.
+  const approvalCards = (stage: string | null, pendingTitle: string | null, taskId: number): Nba[] => [{
+    id: 'maestro-approve',
+    title: `Approve ${stage ?? 'the stage'} & advance`,
+    why: `The case is parked at ${stage ?? 'this stage'} on "${pendingTitle ?? 'a human task'}". Approving here completes that task in Maestro and the case moves on.`,
+    kind: 'do',
+    primary: true,
+    run: async () => { await approveMaestro(); return `${stage ?? 'Stage'} approved — the case is moving.`; },
+    // Same approval, different queue — a route, not a fallback.
+    alt: { label: 'Open in Action Center ↗', href: actionCenterUrl(taskId) },
+  }, {
+    // An actual fallback: what to do when you cannot approve it.
+    id: 'maestro-blocked',
+    title: `Call ${c.firstName || 'the customer'} before approving`,
+    why: 'Approve only what you can stand behind. If the reviewer is waiting on something only the customer has, get it first — an approval you have to reverse costs more than the call.',
+    href: c.phone ? `tel:${c.phone}` : undefined,
+    kind: 'do',
+  }];
+
+  const actions: Nba[] = (() => {
+    // An approval is in flight. Hold the card exactly as it was until the case
+    // reports its next stage — the alternative is a dip through "Nothing for you
+    // to do" while Maestro closes one stage and opens the next.
+    if (linked && advancing) return approvalCards(advancing.stage, advancing.title, advancing.taskId);
+
+    const base = nextBestActions(c);
+    const live: Nba[] = [];
+    if (linked && mstate?.pendingTaskId && !mstate.done) {
+      live.push(...approvalCards(stageNow, mstate.pendingTitle, mstate.pendingTaskId));
+    }
+    if (awaiting && linked) {
+      live.push({
+        id: 'open-review',
+        title: 'Review what was read from the form',
+        why: 'The case is holding at its extraction gate until someone confirms the values.',
+        kind: 'do',
+        primary: !live.length,
+        run: async () => { setReviewing(true); return ''; },
+      });
+    }
+    // ── One source of truth per case ──────────────────────────────────────
+    // While a Maestro case is running this record, ONLY Maestro decides what to
+    // do next. The state-based actions below it are driven by the record's own
+    // validations, which the live case does not know about — so "Retry the NIN"
+    // would sit under "Approve Decision", and take over the moment the approval
+    // was granted. Two systems recommending different next steps for the same
+    // case is worse than either one alone.
+    if (linked && !mstate?.done) {
+      if (live.length) return live;
+      if (!mAsked) {
+        return [{
+          id: 'checking',
+          title: 'Checking the live case…',
+          why: 'Reading where the Maestro case is and whether it is waiting on anyone.',
+          kind: 'wait',
+        }];
+      }
+      return [{
+        id: 'maestro-running',
+        title: 'Nothing for you to do',
+        why: stageNow
+          ? `The case is running the ${stageNow} stage — automated steps are in flight. The next approval will surface here.`
+          : 'The case is running. The next approval will surface here.',
+        kind: 'wait',
+      }];
+    }
+    // No live case (or it has finished): the record's own state is the guide.
+    return base;
+  })();
   const msgs = commsFor(c);
   const name = fullName(c).trim() || 'Unnamed applicant';
 
@@ -161,19 +358,29 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
       {details && (
         <ApplicationDetails
           c={c}
-          onReviewExtraction={awaiting && linked ? () => { setDetails(false); setReviewing(true); } : undefined}
+          instanceId={linked}
+          onReviewExtraction={awaiting && linked
+            ? () => { setReviewFromDetails(true); setDetails(false); setReviewing(true); }
+            : undefined}
           onClose={() => setDetails(false)}
         />
       )}
       {reviewing && linked && (
-        <div className="dk-capture-scrim" onMouseDown={(ev) => { if (ev.target === ev.currentTarget) setReviewing(false); }}>
+        <div className="dk-capture-scrim" onMouseDown={(ev) => { if (ev.target === ev.currentTarget) closeReview(); }}>
           <div className="dk-capture cx" role="dialog" aria-modal="true" aria-label="Extraction review">
+            {/* Scoped to this record: the slot holds one parked review at a time,
+                and an entry belonging to another record must not lend its document
+                to this one. */}
             <ExtractionReview
-              instanceId={linked}
-              attachmentId={loadPendingExtraction()?.attachmentId}
-              documentName={loadPendingExtraction()?.documentName}
-              onAccepted={() => { clearPendingExtraction(); setReviewing(false); }}
-              onClose={() => setReviewing(false)}
+              instanceId={loadPendingExtraction(c.id)?.instanceId ?? linked}
+              // The record's own document outlives the parked slot, which is
+              // cleared the moment the review is confirmed.
+              attachmentId={loadPendingExtraction(c.id)?.attachmentId ?? c.documentId}
+              documentName={loadPendingExtraction(c.id)?.documentName ?? c.documentName}
+              // Accepting finishes the job the popup sent them to do, so it lands
+              // back on the pane; closing without accepting returns to the popup.
+              onAccepted={(rows) => { void acceptExtraction(rows); }}
+              onClose={closeReview}
             />
           </div>
         </div>
@@ -183,12 +390,18 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
         {/* The point of the pane: what to do, and why — always in view, above the tabs.
             When the record is linked to a real Maestro case, the action becomes the
             live stage approval that advances the real instance. */}
-        {maestroReady() && linked
-          ? <MaestroAction instanceId={linked} state={mstate} busy={mbusy} onApprove={approveMaestro} />
-          : <>
-              <Action actions={actions} busy={busy} onFire={fire} />
-              {maestroReady() && <button className="dk-run-maestro" disabled={mbusy} onClick={runMaestro}>{mbusy ? 'Starting…' : '▶ Run this case in Maestro'}</button>}
-            </>}
+        {/* The recommendation, on every record — never conditional on whether the
+            case happens to be linked to Maestro. The live case sits below it as
+            status, having handed its approve button up here. */}
+        <Action actions={actions} busy={mbusy ? 'maestro-approve' : busy} onFire={fire} />
+        {maestroReady() && linked && (
+          <MaestroAction instanceId={linked} corporate={corporate} state={mstate} />
+        )}
+        {/* Only offered for individuals: startCase runs the individual case plan,
+            which would be the wrong process for a business opening. */}
+        {maestroReady() && !linked && !corporate && (
+          <button className="dk-run-maestro" disabled={mbusy} onClick={runMaestro}>{mbusy ? 'Starting…' : '▶ Run this case in Maestro'}</button>
+        )}
 
         <div className="dk-tabs" role="tablist">
           {(['overview', 'messages', 'activity'] as const).map((t) => (
@@ -213,10 +426,16 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
               </div>
             )}
 
-            <div className="dk-eyebrow" style={{ marginTop: c.accountNumber ? 18 : 2 }}>Checks</div>
+            {/* Live case → the checks IT ran. A linked record otherwise shows its own
+                seeded validations, all "Pending", beside a case that cleared
+                Verification twenty minutes ago. Same rule as the action card: while
+                Maestro is running this record, Maestro is the source of truth. */}
+            <div className="dk-eyebrow" style={{ marginTop: c.accountNumber ? 18 : 2 }}>
+              Checks{liveChecks ? <span className="n">from the live case</span> : null}
+            </div>
             <div className="dk-checks">
-              {VALIDATION_KINDS.map((k) => {
-                const v = c.validations.find((x) => x.kind === k);
+              {(liveChecks ? liveChecks.map((v) => v.kind) : VALIDATION_KINDS).map((k) => {
+                const v = (liveChecks ?? c.validations).find((x) => x.kind === k);
                 const st = v?.status ?? 'pending';
                 const t = CHECK_TONE[st] ?? 'idle';
                 return (
@@ -287,10 +506,102 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
             )}
           </div>
         )}
+
+        {/* Last thing in the pane, and visually apart from the workflow actions —
+            it is not a step in the process, it is the way out of one. */}
+        <div className="dk-danger">
+          <div>
+            <b>Delete this record</b>
+            <span>Removes it from the desk. Nothing it has already started is undone.</span>
+          </div>
+          <button className="dk-btn danger" onClick={() => setConfirmDel(true)}>Delete</button>
+        </div>
       </div>
 
+      {confirmDel && (
+        <DeleteRecord
+          c={c}
+          liveInstance={linked && !mstate?.done ? linked : null}
+          instanceHref={linked ? (corporate ? corporateMaestroUrl : instanceUrl)(linked) : null}
+          parkedReview={Boolean(loadPendingExtraction(c.id))}
+          busy={deleting}
+          onCancel={() => setConfirmDel(false)}
+          onConfirm={deleteRecord}
+        />
+      )}
       {picker && <ChannelPicker c={c} onCancel={() => setPicker(false)} onSend={sendKyc} />}
       {toast && <div className="dk-toast">{toast}</div>}
+    </div>
+  );
+}
+
+/**
+ * Delete confirmation.
+ *
+ * Deleting is local: it removes the row and its events, and nothing else. The
+ * warnings are therefore not decoration — they are the difference between what
+ * a banker assumes "delete" does and what it does. Only consequences this record
+ * actually carries are listed, so the dialog stays worth reading.
+ */
+function DeleteRecord({ c, liveInstance, instanceHref, parkedReview, busy, onCancel, onConfirm }: {
+  c: OnboardingCase;
+  liveInstance: string | null;
+  instanceHref: string | null;
+  parkedReview: boolean;
+  busy: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onCancel(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onCancel, busy]);
+
+  const who = fullName(c).trim() || c.entity?.companyName || c.id;
+  const warnings: { key: string; text: React.ReactNode }[] = [];
+  if (liveInstance) {
+    warnings.push({
+      key: 'maestro',
+      text: <>The Maestro case <b>keeps running</b>. Deleting the record here does not stop or cancel it{instanceHref
+        ? <> — <a href={instanceHref} target="_blank" rel="noreferrer">open it in Maestro</a> if you want to cancel it there</>
+        : null}.</>,
+    });
+  }
+  if (parkedReview) {
+    warnings.push({ key: 'review', text: <>The parked extraction review is discarded. The task itself stays open in Action Center.</> });
+  }
+  if (c.accountNumber) {
+    warnings.push({
+      key: 'acct',
+      text: <>Account <b className="num">{c.accountNumber}</b> already exists in the core banking system. Deleting this record does not close it.</>,
+    });
+  }
+  if (c.cif && !c.accountNumber) {
+    warnings.push({ key: 'cif', text: <>A CIF (<b className="num">{c.cif}</b>) already exists for this customer and is not removed.</> });
+  }
+
+  return (
+    <div className="dk-modal-back" onClick={() => !busy && onCancel()}>
+      <div className="dk-modal" role="alertdialog" aria-label="Delete this record" onClick={(e) => e.stopPropagation()}>
+        <h3>Delete {who}?</h3>
+        <div className="sub">{c.id} · this cannot be undone.</div>
+
+        {warnings.length > 0 && (
+          <ul className="dk-warns">
+            {warnings.map((w) => (
+              <li key={w.key}><span className="ic"><I n="alert" s={13} w={2.2} /></span><span>{w.text}</span></li>
+            ))}
+          </ul>
+        )}
+
+        <div className="dk-modal-acts">
+          <button className="dk-btn" disabled={busy} onClick={onCancel}>Keep it</button>
+          <button className="dk-btn danger" disabled={busy} onClick={onConfirm}>
+            {busy ? 'Deleting…' : 'Delete record'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -347,7 +658,11 @@ function Action({ actions, busy, onFire }: { actions: Nba[]; busy: string | null
         <span className="ic">
           <I n={first.kind === 'do' ? 'zap' : first.kind === 'done' ? 'check' : 'clock'} s={14} w={2.2} />
         </span>
-        <span>{quiet ? 'Status' : 'Next best action'}</span>
+        {/* Always name the box. Relabelling it "Status" in the quiet state left a
+            card that said "Nothing for you to do" with nothing to say what it was
+            about — the reader had to infer both the subject and the verdict. The
+            heading stays constant; the icon, tone and title carry the state. */}
+        <span>Next best action</span>
       </div>
 
       <div className="ttl">{first.title}</div>
@@ -358,6 +673,9 @@ function Action({ actions, busy, onFire }: { actions: Nba[]; busy: string | null
           <button className="dk-btn pri lg" disabled={busy === first.id} onClick={() => onFire(first)}>
             {busy === first.id ? 'Working…' : first.title}
           </button>
+          {first.alt && (
+            <a className="dk-nba-alt" href={first.alt.href} target="_blank" rel="noreferrer">{first.alt.label}</a>
+          )}
         </div>
       )}
 
@@ -381,7 +699,10 @@ function Action({ actions, busy, onFire }: { actions: Nba[]; busy: string | null
 
 // When the record is linked to a real Maestro case, the action panel becomes the
 // live stage approval — completing it advances the actual instance in Maestro.
-function MaestroAction({ instanceId, state, busy, onApprove }: { instanceId: string; state: LiveState | null; busy: boolean; onApprove: () => void }) {
+/** The live case, as status. Its approve button moved into the action card above —
+ *  two cards each with a filled button made the pane argue with itself about what
+ *  to press. This says where the case is; that says what to do about it. */
+function MaestroAction({ instanceId, corporate, state }: { instanceId: string; corporate: boolean; state: LiveState | null }) {
   const done = Boolean(state?.done);
   const stage = state?.activeStage ?? null;
   const awaiting = Boolean(state?.pendingTaskId);   // human approval pending at this stage
@@ -413,22 +734,32 @@ function MaestroAction({ instanceId, state, busy, onApprove }: { instanceId: str
         })}
       </div>
 
-      {!done && state?.pendingTaskId && (
-        <div className="dk-actask">
-          <span className="dk-actask-ic"><I n="idcard" s={15} w={2} /></span>
-          <div className="dk-actask-t">
-            <b>{state.pendingTitle ?? 'Human task'}</b>
-            <span>Action Center · app task · Unassigned</span>
-          </div>
-          <a className="dk-actask-open" href={actionCenterUrl(state.pendingTaskId)} target="_blank" rel="noreferrer">Open in Action Center ↗</a>
+      {/* The stage bar says where the case is; this says what it is actually doing
+          inside that stage, and whether the thing it is waiting on needs a person.
+          Without it "Intake · in progress" can mean anything for an hour. */}
+      {!done && (state?.stageTasks?.length ?? 0) > 0 && (
+        <div className="dk-steps">
+          <div className="dk-steps-h">In {stage}</div>
+          {state!.stageTasks!.map((t, i) => {
+            const st = t.status === 'Completed' ? 'done'
+              : t.status === 'InProgress' ? 'now'
+              : t.status === 'Faulted' ? 'bad' : 'next';
+            return (
+              <div className={`dk-step ${st}`} key={`${t.name}-${i}`}>
+                <span className="pip" />
+                <span className="nm">{t.name}</span>
+                {t.kind === 'human' && st === 'now' && <span className="who">needs a person</span>}
+                {st === 'now' && t.link && (
+                  <a href={t.link} target="_blank" rel="noreferrer" className="go">Open ↗</a>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
       <div className="acts">
-        {!done && state?.pendingTaskId && (
-          <button className="dk-btn pri lg" disabled={busy} onClick={onApprove}>{busy ? 'Working…' : `Approve ${stage ?? 'stage'} & advance`}</button>
-        )}
-        <a className="dk-mlink" href={instanceUrl(instanceId)} target="_blank" rel="noreferrer">Open in Maestro ↗</a>
+        <a className="dk-mlink" href={(corporate ? corporateMaestroUrl : instanceUrl)(instanceId)} target="_blank" rel="noreferrer">Open in Maestro ↗</a>
       </div>
     </div>
   );

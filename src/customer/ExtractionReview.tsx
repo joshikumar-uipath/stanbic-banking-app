@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { attachmentReadUrl, completeExtractionTask, findExtractionTask } from '../onboarding/maestro-corporate';
+import { attachmentReadUrl, completeExtractionTask, fetchCaseExtraction, findCaseDocument, findExtractionTask, reviewTaskState, corporateMaestroUrl } from '../onboarding/maestro-corporate';
 import type { ExtractionTask } from '../onboarding/maestro-corporate';
+import type { EntityInfo } from '../onboarding';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Extraction review — the desk-side twin of the Action Center app.
@@ -51,20 +52,39 @@ export function toRows(raw: unknown): ReviewField[] {
   const doc = payload?.ExtractionResult?.ResultsDocument ?? payload?.ResultsDocument ?? payload;
   const out: ReviewField[] = [];
 
-  const push = (f: any, groupHint?: string, idx?: number) => {
+  const push = (f: any, groupHint?: string, idx?: number, value?: any) => {
     const nm = f?.FieldName ?? f?.FieldId ?? '';
     if (!nm) return;
     const { group, label } = splitName(nm);
-    const v = (f?.Value ?? f?.UnformattedValue ?? '').toString();
+    const v = (value?.Value ?? value?.UnformattedValue ?? f?.Value ?? f?.UnformattedValue ?? '').toString();
     out.push({
       id: `${f?.FieldId ?? nm}${idx == null ? '' : `#${idx}`}`,
-      name: label, value: v, confidence: pct(f?.Confidence),
+      name: label, value: v, confidence: pct(value?.Confidence ?? f?.Confidence),
       missing: Boolean(f?.IsMissing) || !v.trim(),
       group: groupHint ?? group,
     });
   };
 
-  (Array.isArray(doc?.Fields) ? doc.Fields : []).forEach((f: any) => push(f));
+  // A field's value sits in Values[], and a FieldGroup's real fields hang off
+  // Values[].Components[] — reading Field.Value alone yields empty group rows.
+  // A group repeated on the form (two directors) arrives as repeated Values, so
+  // each occurrence is numbered to keep the two people apart.
+  const walk = (fields: any[], groupHint?: string) => {
+    (Array.isArray(fields) ? fields : []).forEach((f: any) => {
+      const values = Array.isArray(f?.Values) ? f.Values : [];
+      const componentsIn = values.filter((v: any) => Array.isArray(v?.Components) && v.Components.length);
+      if (componentsIn.length) {
+        const { label } = splitName(f?.FieldName ?? f?.FieldId ?? '');
+        componentsIn.forEach((v: any, i: number) =>
+          walk(v.Components, componentsIn.length > 1 ? `${label} ${i + 1}` : (groupHint ?? label)));
+        return;
+      }
+      if (!values.length) { push(f, groupHint); return; }
+      values.forEach((v: any, i: number) => push(f, groupHint, values.length > 1 ? i : undefined, v));
+    });
+  };
+
+  walk(Array.isArray(doc?.Fields) ? doc.Fields : []);
   (Array.isArray(doc?.Tables) ? doc.Tables : []).forEach((t: any, ti: number) => {
     const tableName = splitName(t?.FieldName ?? t?.TableName ?? 'Directors / signatories').label;
     const rows = t?.Values ?? t?.Rows ?? t?.Entries ?? [];
@@ -74,6 +94,39 @@ export function toRows(raw: unknown): ReviewField[] {
     });
   });
   return out;
+}
+
+/** Confirmed rows → the entity block a record stores. Shared so the desk and the
+ *  wizard agree on what "confirmed" means, rather than each mapping field names
+ *  its own way. */
+export function entityFromRows(rows: ReviewField[]): EntityInfo {
+  const inGroup = (re: RegExp) => rows.filter((r) => re.test(r.group));
+  const pick = (rs: ReviewField[], re: RegExp) => rs.find((r) => re.test(r.name))?.value?.trim() ?? '';
+  const co = inGroup(/^company/i);
+  const dirGroups = [...new Set(rows.filter((r) => /director|signator/i.test(r.group)).map((r) => r.group))];
+  return {
+    companyName: pick(co, /company name/i),
+    rcNumber: pick(co, /^rc|registration number/i),
+    tin: pick(co, /^tin$/i),
+    businessType: pick(co, /business type/i),
+    sector: pick(co, /industry|nature of business/i),
+    turnover: pick(co, /turnover/i),
+    address: pick(co, /address/i),
+    email: pick(co, /^email$/i),
+    phone: pick(co, /^phone$/i),
+    directors: dirGroups.map((g) => {
+      const d = rows.filter((r) => r.group === g);
+      return {
+        name: pick(d, /full name/i),
+        bvn: pick(d, /bvn/i),
+        idType: pick(d, /means|id type/i) || undefined,
+        idNumber: pick(d, /id\/means|identification number/i),
+        phone: pick(d, /^phone$/i),
+        email: pick(d, /^email$/i),
+        role: pick(d, /designation|role/i),
+      };
+    }),
+  };
 }
 
 /** The sample read as review rows, used when the case payload can't be reached.
@@ -118,46 +171,98 @@ export default function ExtractionReview({ instanceId, attachmentId, documentNam
   const [docUrl, setDocUrl] = useState('');
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  // Shown values came from a case whose review task is already gone — confirmed
+  // here, in Action Center, or in another tab. There is nothing left to complete.
+  const [settled, setSettled] = useState(false);
+  /** A confirmation that did not reach Maestro. Surfaced, never swallowed. */
+  const [err, setErr] = useState<string | null>(null);
+  // The fast poll has run its course and dropped to the sample. The case may still
+  // park the task later, so this only changes what we say, not whether we keep asking.
+  const [gaveUp, setGaveUp] = useState(false);
   const [note, setNote] = useState('Looking for the extraction…');
   const [revealed, setRevealed] = useState(0);
   const timer = useRef<number | null>(null);
 
-  // Show the pages straight away — the scan is only meaningful over the document.
+  // This screen owns Escape while it is open — the surfaces it opens over stand
+  // down, so without this the key would do nothing here. Same as "Finish later":
+  // the task stays parked, nothing is confirmed.
   useEffect(() => {
-    if (!attachmentId) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose, busy]);
+
+  // Show the pages straight away — the scan is only meaningful over the document.
+  // A confirmed review has no parked task and no pending slot left to name the
+  // attachment, so fall back to asking the case which document it read.
+  useEffect(() => {
     let alive = true;
-    attachmentReadUrl(attachmentId)
-      .then((u) => { if (alive && u) setDocUrl(u); })
-      .catch(() => { /* pane degrades to its placeholder */ });
+    (async () => {
+      let id = attachmentId;
+      if (!id) id = (await findCaseDocument(instanceId))?.attachmentId;
+      if (!id || !alive) return;
+      try {
+        const u = await attachmentReadUrl(id);
+        if (alive && u) setDocUrl(u);
+      } catch { /* pane degrades to its placeholder */ }
+    })();
     return () => { alive = false; };
-  }, [attachmentId]);
+  }, [attachmentId, instanceId]);
 
   // Poll until the case parks the review task. IXP takes ~20s on a 13-page scan,
   // so this is a real wait, not a staged one.
   useEffect(() => {
     let alive = true;
     let tries = 0;
+    let dropped = false;
     const tick = async () => {
       if (!alive) return;
       try {
-        const t = await findExtractionTask(instanceId);
-        if (t && alive) {
+        // Both at once. Asked in sequence, an already-confirmed review spends a
+        // whole round trip on "is a task parked?" before it can discover the answer
+        // is already sitting in the case — which is the spinner you see for nothing.
+        const [t, caseExtraction, reviewState] = await Promise.all([
+          findExtractionTask(instanceId),
+          fetchCaseExtraction(instanceId),
+          reviewTaskState(instanceId),
+        ]);
+        if (!alive) return;
+        if (t) {
           setTask(t);
+          // The task input first — that is where the result is meant to arrive.
+          // When it is empty, the same result is still in the case's own element
+          // outputs, so read it there rather than dropping to the sample.
           const parsed = toRows(t.extraction);
-          if (parsed.length) { setRows(parsed); setSource('case'); }
+          const rows = parsed.length ? parsed : toRows(caseExtraction);
+          if (rows.length) { setRows(rows); setSource('case'); }
           else { setRows(fallback); setSource('sample'); }
           if (t.attachmentId && !attachmentId) {
             try { setDocUrl(await attachmentReadUrl(t.attachmentId)); } catch { /* pane degrades */ }
           }
           return;
         }
+        // Settled only when the review task itself says it was completed. The
+        // extraction landing before the task is created is the normal order of
+        // events on a brand-new case, not evidence that anyone reviewed it.
+        const already = toRows(caseExtraction);
+        if (reviewState === 'done' && already.length) {
+          setRows(already); setSource('case'); setSettled(true); return;
+        }
       } catch { /* keep polling */ }
       tries += 1;
       setNote(tries < 3 ? 'Reading the form…' : `Still reading — ${tries * 4}s`);
-      // A resumed review whose task was already completed elsewhere (Action Center,
-      // another tab) has nothing to wait for — give up early rather than spending
-      // two minutes polling for a gate that is already open.
-      if (tries > 12) { setRows(fallback); setSource('sample'); return; }
+      // Nothing parked and nothing extracted after ~48s. Show the sample so the
+      // column is not empty, but keep asking on a slower beat: the confirm button
+      // is gated on the task existing, so if we stopped here the gate could never
+      // open and there would be no way through. Clicking used to be the retry.
+      if (tries > 12) {
+        // Local flag, not the state: this closure captures the first render's
+        // `gaveUp` forever, so reading the state here would re-drop to the sample
+        // on every slow tick and wipe any corrections already typed.
+        if (!dropped) { dropped = true; setRows(fallback); setSource('sample'); setGaveUp(true); }
+        timer.current = window.setTimeout(tick, 10000);
+        return;
+      }
       timer.current = window.setTimeout(tick, 4000);
     };
     tick();
@@ -190,16 +295,36 @@ export default function ExtractionReview({ instanceId, attachmentId, documentNam
   const accept = async () => {
     if (busy || !rows) return;
     setBusy(true);
+    setErr(null);
     const confirmed = rows.map((r) => ({
       fieldId: r.id, name: r.name, group: r.group,
       value: valueOf(r), confidence: r.confidence, corrected: changed(r),
     }));
-    if (task) {
+
+    // The task can appear after this screen settled — the poll gives up at ~48s,
+    // and a reopened review starts with nothing. Look once more before deciding
+    // there is nothing to complete.
+    let t = task;
+    if (!t && !settled) {
+      try { t = await findExtractionTask(instanceId); } catch { t = null; }
+    }
+
+    if (t) {
       try {
-        await completeExtractionTask(task.taskId, 'Accept', {
+        await completeExtractionTask(t.taskId, 'Accept', {
           confirmed, corrections: confirmed.filter((c) => c.corrected),
         });
-      } catch { /* the application is captured either way */ }
+      } catch (e) {
+        // Never report success for a case that is still sitting on the gate. This
+        // used to be swallowed, so the reviewer walked away believing it was done.
+        setBusy(false);
+        setErr(`Maestro did not accept the confirmation: ${(e as Error).message}. The case is still waiting — try again.`);
+        return;
+      }
+    } else if (!settled) {
+      setBusy(false);
+      setErr('The case has not parked the review task yet, so there is nothing to confirm. Give it a moment and try again.');
+      return;
     }
     setBusy(false);
     onAccepted(rows.map((r) => ({ ...r, value: valueOf(r) })));
@@ -207,17 +332,43 @@ export default function ExtractionReview({ instanceId, attachmentId, documentNam
 
   const done = rows !== null;
 
+  // Confirming needs a task to complete. `done` only means there is something to
+  // look at — after the fast poll gives up those rows are the sample, and pressing
+  // Confirm then produced "the case has not parked the review task yet". Gate the
+  // button on the thing that actually has to be true, and say so on hover.
+  const gateOpen = Boolean(task) || settled;
+  const blocked = done && !gateOpen;
+  const gateTip = !done
+    ? 'Still reading the form — the case has not finished the extraction yet.'
+    : gaveUp
+      ? 'The case has not parked the review task yet. Still checking every 10s — this enables itself the moment it appears.'
+      : 'Still reading — the case has not parked the review task yet.';
+
   return (
     <div className="xv">
       <div className="xv-head">
         <div>
           <div className="xv-eyebrow">Extraction review</div>
-          <h2>{done ? 'Check what we read' : 'Reading the form'}</h2>
+          <h2>{!done ? 'Reading the form' : settled ? 'What the case recorded' : 'Check what we read'}</h2>
         </div>
-        <button className="xv-x" onClick={onClose} aria-label="Close">Close</button>
+        <div className="xv-head-r">
+          {/* The case is running while this pane is open — a way through to the
+              instance itself, for when the read looks wrong and the question is
+              what the case actually did. */}
+          <a className="xv-mlink" href={corporateMaestroUrl(instanceId)} target="_blank" rel="noreferrer">
+            Open in Maestro ↗
+          </a>
+          <button className="xv-x" onClick={onClose} aria-label="Close">Close</button>
+        </div>
       </div>
 
-      {done && source !== 'case' && (
+      {done && settled && (
+        <div className="xv-banner ok">
+          This review is already confirmed — these are the values the case recorded. Confirming again only
+          refreshes the record on this desk.
+        </div>
+      )}
+      {done && !settled && source !== 'case' && (
         <div className="xv-banner">
           {source === 'sample'
             ? 'Showing a sample read — the live extraction was not available. Values below are illustrative.'
@@ -244,9 +395,14 @@ export default function ExtractionReview({ instanceId, attachmentId, documentNam
             </>
           )}
 
-          {done && attention.length > 0 && (
+          {done && !settled && attention.length > 0 && (
             <div className="xv-card attn">
-              <span className="xv-card-t">Needs a look · {attention.length}</span>
+              {/* Says what to do, not just that something is wrong — the rest of the
+                  column is confirmed-by-default, this is the part with work in it. */}
+              <div className="xv-attn-h">
+                <b>{attention.length} {attention.length === 1 ? 'field needs' : 'fields need'} checking</b>
+                <em>Read poorly or missing. Compare each with the form and correct it, or leave it if it is right.</em>
+              </div>
               {attention.map((r) => (
                 <Row key={`a-${r.id}`} r={r} v={valueOf(r)} changed={changed(r)} showGroup
                   onEdit={(x) => setEdits((p) => ({ ...p, [r.id]: x }))} />
@@ -282,17 +438,28 @@ export default function ExtractionReview({ instanceId, attachmentId, documentNam
       </div>
 
       <div className="xv-foot">
-        <div className="xv-sum">
-          {!done ? 'Extraction in progress'
+        <div className={`xv-sum${err ? ' bad' : ''}`}>
+          {err ? err
+            : !done ? 'Extraction in progress'
+            : blocked ? 'Waiting for the case to park the review task'
             : Object.keys(edits).length
               ? `${Object.keys(edits).length} correction${Object.keys(edits).length === 1 ? '' : 's'}`
-              : attention.length ? `${attention.length} flagged — accept if they read correctly`
+              // The instruction lives on the flagged block itself now; beside the
+              // button, a count is what is useful.
+              : settled ? `${rows!.length} fields recorded`
+              : attention.length ? `${attention.length} of ${rows!.length} fields flagged`
               : 'Everything read cleanly'}
         </div>
+        {/* Finish later stays live on purpose: it never touches Maestro, and it is
+            the way out while the gate is shut. Disabling it would trap the reviewer. */}
         <button className="xv-btn ghost" onClick={onClose} disabled={busy}>Finish later</button>
-        <button className="xv-btn primary" onClick={accept} disabled={!done || busy}>
-          {busy ? 'Confirming…' : 'Confirm and continue'}
-        </button>
+        {/* The tip hangs on the wrapper, not the button — a disabled button gets no
+            hover events, so a title on it would never show. */}
+        <span className="xv-tipw" data-tip={!gateOpen && !busy ? gateTip : undefined}>
+          <button className="xv-btn primary" onClick={accept} disabled={!gateOpen || busy}>
+            {busy ? 'Saving…' : settled ? 'Update this record' : 'Confirm and continue'}
+          </button>
+        </span>
       </div>
     </div>
   );

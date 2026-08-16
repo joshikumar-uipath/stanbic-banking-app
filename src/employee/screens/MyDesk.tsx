@@ -7,13 +7,14 @@
 // IS the Progress-First story: most of the pipeline is moving without them.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useMemo, useState } from 'react';
-import { stateMeta, fullName, type OnboardingCase } from '../../onboarding';
+import { stateMeta, fullName, isCorporate, type OnboardingCase } from '../../onboarding';
 import { approvals, money, type Approval } from '../../approvalsData';
 import { customers, type Customer } from '../../customersData';
 import { I, Tag, Dot, Stat, type Tone } from '../ui';
 import { useMaestroStates, MaestroCell } from '../maestroStatus';
 import type { LiveStateLite } from '../../onboarding/maestro';
 import { ago } from '../time';
+import { FILTERS, SOURCES, KINDS, matchesFilters, isFiltering, type Filter, type Src, type Kind } from '../caseFilters';
 import type { Dest } from '../DeskShell';
 
 /** One line on the desk, whatever it came from. */
@@ -32,6 +33,8 @@ type Item = {
   /** Where the application came from — set for openings only, so a banker can
    *  tell a payroll row from a walk-in without opening it. */
   src?: { kind: 'bulk' | 'single'; label: string };
+  /** Business openings are marked; individuals are left unmarked, being the norm. */
+  corporate?: boolean;
   rank: number;          // lower = more urgent
   go: () => void;
 };
@@ -71,6 +74,7 @@ function fromCases(cases: OnboardingCase[], open: (id: string) => void): Item[] 
       src: c.batchId
         ? { kind: 'bulk', label: c.employer || 'Bulk' }
         : { kind: 'single', label: 'Walk-in' },
+      corporate: isCorporate(c),
       rank: exc ? 0 : pend ? 2 : 5,
       go: () => open(c.id),
     };
@@ -112,11 +116,20 @@ function fromClients(list: Customer[], go: () => void): Item[] {
 }
 
 export default function MyDesk({ cases, onNavigate, onOpenCase, onNewApplication }: { cases: OnboardingCase[]; onNavigate: (d: Dest) => void; onOpenCase: (id: string) => void; onNewApplication: () => void }) {
+  const [filter, setFilter] = useState<Filter>('all');
+  const [source, setSource] = useState<Src>('all');
+  const [kind, setKind] = useState<Kind>('all');
+  const f = { filter, source, kind };
+  const narrowed = isFiltering(f);
+
   const { now, flight, health } = useMemo(() => {
     const all = [
-      ...fromCases(cases, onOpenCase),
-      ...fromApprovals(approvals, () => onNavigate('approvals')),
-      ...fromClients(customers, () => onNavigate('customers')),
+      ...fromCases(cases.filter((c) => matchesFilters(c, f)), onOpenCase),
+      // Approvals and KYC rows are not applications — they have no source and no
+      // type, so they cannot satisfy a narrowed filter. Rather than leave them
+      // sitting there looking unfiltered, they drop out until the filters clear.
+      ...(narrowed ? [] : fromApprovals(approvals, () => onNavigate('approvals'))),
+      ...(narrowed ? [] : fromClients(customers, () => onNavigate('customers'))),
     ];
     // "Needs you" is anything a person must touch. Everything else is moving.
     const now = all.filter((i) => i.rank <= 4).sort((a, b) => a.rank - b.rank);
@@ -125,16 +138,25 @@ export default function MyDesk({ cases, onNavigate, onOpenCase, onNewApplication
     // that penalises everything still legitimately in flight.
     const touched = cases.filter((c) => c.state === 'EXCEPTION' || c.validations.some((v) => v.status === 'failed' || v.status === 'timeout')).length;
     const stp = cases.length ? Math.round(((cases.length - touched) / cases.length) * 100) : 0;
+    // The health strip reads the whole desk, never the current view — it is a
+    // standing measure of the book, and a filter narrowing "Needs you" to 1 would
+    // otherwise read as the work having gone away.
+    const everything = [
+      ...fromCases(cases, onOpenCase),
+      ...fromApprovals(approvals, () => onNavigate('approvals')),
+      ...fromClients(customers, () => onNavigate('customers')),
+    ];
     return {
       now, flight,
       health: {
-        items: now.length,
+        items: everything.filter((i) => i.rank <= 4).length,
         breaching: approvals.filter((a) => a.slaBreaching).length + cases.filter((c) => c.state === 'EXCEPTION').length,
-        flight: flight.length,
+        flight: everything.filter((i) => i.rank > 4).length,
         stp,
       },
     };
-  }, [cases, onNavigate, onOpenCase]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cases, onNavigate, onOpenCase, filter, source, kind]);
 
   // Focus Flow — the desk leads with ONE next best action; "Skip for now" walks
   // the queue instead of dropping the banker into a wall of 40 rows.
@@ -162,10 +184,14 @@ export default function MyDesk({ cases, onNavigate, onOpenCase, onNewApplication
           <div className="acts">
             <button className="dk-btn pri lg" onClick={cur.go}>Open {cur.cta}</button>
             {now.length > 1 && <button className="skip" onClick={() => setFocusIdx((i) => (i + 1) % now.length)}>Skip for now →</button>}
-            <span className="q">{health.items} {health.items === 1 ? 'thing needs' : 'things need'} you</span>
+            {/* Counts what the banker is actually looking at — equal to the desk
+                total until a filter narrows the view. */}
+            <span className="q">{now.length} {now.length === 1 ? 'thing needs' : 'things need'} you</span>
           </div>
         </div>
-      ) : (
+      ) : narrowed ? null : (
+        // Only an all-clear when the whole desk really is clear. Under a filter an
+        // empty queue means "nothing matches", which is not the same news.
         <div className="dk-triage green">
           <div className="dk-tin">
             <div className="lft">
@@ -190,17 +216,44 @@ export default function MyDesk({ cases, onNavigate, onOpenCase, onNewApplication
       <div className="dk-body">
         <div className="dk-col">
           <div className="dk-qhead">
-            <h1>My desk<span className="n">{now.length + flight.length} items</span></h1>
+            <h1>My desk<span className="n">{now.length + flight.length} {now.length + flight.length === 1 ? 'item' : 'items'}</span></h1>
             <button className="dk-btn pri lg" onClick={onNewApplication}><I n="plus" s={15} w={2.4} />New application</button>
           </div>
 
+          <div className="dk-deskfilters">
+            <div className="dk-segs">
+              {FILTERS.map((x) => (
+                <button key={x.id} aria-pressed={filter === x.id} onClick={() => setFilter(x.id)}>{x.label}</button>
+              ))}
+            </div>
+            <div className="dk-segs">
+              {SOURCES.map((x) => (
+                <button key={x.id} aria-pressed={source === x.id} onClick={() => setSource(x.id)}>{x.label}</button>
+              ))}
+            </div>
+            <div className="dk-segs">
+              {KINDS.map((x) => (
+                <button key={x.id} aria-pressed={kind === x.id} onClick={() => setKind(x.id)}>{x.label}</button>
+              ))}
+            </div>
+            {narrowed && (
+              <button className="dk-clearf" onClick={() => { setFilter('all'); setSource('all'); setKind('all'); }}>
+                Clear filters
+              </button>
+            )}
+          </div>
+
           <div className="dk-eyebrow"><i className="no">01</i>Needs you now<span className="ln" /><span className="n">{now.length}</span></div>
-          {now.length ? <Rows items={now} mstates={mstates} /> : (
+          {now.length ? <Rows items={now} mstates={mstates} /> : narrowed ? (
+            <div className="dk-empty"><b>Nothing here matches</b><span>No work needing you fits the filters you have set.</span></div>
+          ) : (
             <div className="dk-empty"><b>Nothing waiting on you</b><span>Every application is either moving or done.</span></div>
           )}
 
           <div className="dk-eyebrow"><i className="no">02</i>In flight<span className="ln" /><span className="n">nothing needed from you</span></div>
-          {flight.length ? <Rows items={flight} mstates={mstates} /> : (
+          {flight.length ? <Rows items={flight} mstates={mstates} /> : narrowed ? (
+            <div className="dk-empty"><b>Nothing here matches</b><span>No application in flight fits the filters you have set.</span></div>
+          ) : (
             <div className="dk-empty"><b>Nothing in flight</b><span>Start an application and it will track here.</span></div>
           )}
         </div>
@@ -231,6 +284,7 @@ function Rows({ items, mstates }: { items: Item[]; mstates: Record<string, LiveS
               <span className="nm" style={{ display: 'block' }}>{i.who}</span>
               <span className="rf">
                 {i.ref}
+                {i.corporate && <span className="dk-src corp" title="Business account">Corporate</span>}
                 {i.src && (
                   <span className={`dk-src ${i.src.kind}`} title={i.src.kind === 'bulk' ? `Bulk upload · ${i.src.label}` : 'Single capture'}>
                     {i.src.kind === 'bulk' && <I n="layers" s={10} w={2.2} />}{i.src.label}
