@@ -14,7 +14,7 @@ type ExtractionTask = Pick<
   'taskId' | 'status' | 'extraction' | 'documentUri' | 'documentName' | 'attachmentId'
 >;
 import type { EntityInfo } from '../onboarding';
-import { rememberedExtraction, rememberExtraction } from '../onboarding/extractionCache';
+import { packSkeleton, rememberedExtraction, rememberExtraction } from '../onboarding/extractionCache';
 import { mergeVerified, verifiedPack, verifiedRows } from '../onboarding/verifiedReads';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -228,7 +228,7 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
   // itself rather than sticking.
   const remembered = useMemo(
     () => (docKey ? toRows(rememberedExtraction(docKey, corporate ? 'corporate' : 'individual'), ungrouped) : []),
-    [docKey, corporate],
+    [docKey, corporate, ungrouped],
   );
 
   // A form that has been read by a person and checked against the page. The model
@@ -376,6 +376,16 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
     timer.current = window.setTimeout(step, 220);
     return () => { if (timer.current) window.clearTimeout(timer.current); };
   }, [rows]);
+
+  // A read of a document with no pack is only remembered for this session. Offer
+  // the way to make it permanent: print it in the shape verifiedReads.ts takes.
+  useEffect(() => {
+    if (!rows || pack) return;
+    (window as unknown as { __aofPack?: () => void }).__aofPack = () => {
+      // eslint-disable-next-line no-console
+      console.log(packSkeleton(rows.map((r) => ({ group: r.group, name: r.name, value: r.value }))));
+    };
+  }, [rows, pack]);
 
   const valueOf = (r: ReviewField) => (r.id in edits ? edits[r.id] : r.value);
   const changed = (r: ReviewField) => r.id in edits && edits[r.id] !== r.value;
