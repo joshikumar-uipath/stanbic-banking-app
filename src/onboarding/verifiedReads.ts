@@ -34,6 +34,9 @@ interface Pack {
    *  an ambiguous year is worth keeping, because it puts the field in front of
    *  the reviewer instead of presenting a guess as settled. */
   fields: Record<string, Record<string, Cell>>;
+  /** A pack that covers only part of the form. What it carries wins; everything
+   *  else is filled from the live read rather than showing as missing. */
+  partial?: boolean;
   /** Fields a human flagged as hard to read. They stay flagged for the reviewer
    *  rather than being presented as certain — "Group > Field". */
   uncertain?: string[];
@@ -238,9 +241,114 @@ const PACKS: Pack[] = [
         'Account Number': null,
         Status: null,
       },
+
+      // ── Boxes the form carries that the model has no field for yet ──────────
+      // Kept because they were read and they are true, not because anything
+      // downstream consumes them. Naming the group this way is the disclosure:
+      // a reviewer can see the difference between "the model missed it" and
+      // "the model was never asked".
+      'Employment Details › Not in the model': {
+        'Employer Nearest Bus Stop': 'Ikeja',
+        'Fax Number': null,
+      },
+      'Next of Kin › Address': {
+        'House Number': '4',
+        'Street Name': 'Tinubu Street',
+        'Nearest Bus Stop': 'Ketu',
+        'City or Town': 'Lagos',
+        LGA: 'Kosofe',
+        State: 'Lagos',
+        'Email Address': { value: 'fida2kemmy@gmail.com', confidence: 0.7 },
+      },
+      'Account Services Requested': {
+        'Mobile Banking': 'Yes',
+        'Internet Banking': 'Yes',
+        'Interactive Voice Recording': 'No',
+        'SMS Alerts': 'Yes',
+        'Email Alerts': 'Yes',
+        'Alerts — Credit Only': 'No',
+        'Alerts — Debit Only': 'No',
+        'Naira Debit Card': 'Yes',
+        'Visa Card': 'No',
+        'Cheque Book': 'No',
+        'Preferred Username': null,
+      },
+      'FATCA / CRS Declaration': {
+        Name: 'Dada Olumuyiwa Oluwafemi',
+        'Country of Residence': 'Nigeria',
+        'Country of Birth': 'Nigeria',
+        'US Resident': 'No',
+        'US Citizen': 'No',
+        'US Permanent Resident (Green Card)': 'No',
+        'Resident in a Listed OECD Country': 'No',
+        'Controlling Persons Resident in a Listed OECD Country': 'No',
+        Date: '06/07/2026',
+      },
+      'Bank Use Only — KYC Checks': {
+        'Passport Photograph Checked': 'Yes',
+        'Identification Checked': 'Yes',
+        'Data Processing Consent Checked': 'Yes',
+        'BVN / NIN Checked': 'Yes',
+        'References Checked': 'Yes',
+        'Politically Exposed Person': 'No',
+      },
+      'About This Form': {
+        Bank: 'FirstBank of Nigeria Limited',
+        'Residential Reading': 'Alapere, Ketu, Kosofe LGA, Lagos State',
+        'Employer Reading': 'Alausa, Ikeja, Lagos State',
+      },
+    },
+  },
+
+  {
+    id: 'firstbank-corporate',
+    label: 'FirstBank corporate / SME account opening form',
+    taxonomy: 'corporate',
+    match: /aof[\s_-]*corporate|corporate[\s_-]*aof/i,
+    // Pages 3–16 are not transcribed yet — the directors table, beneficial
+    // owners, turnover and the contact block. What is here wins; the rest comes
+    // from the live read rather than reading as fourteen missing pages.
+    partial: true,
+    fields: {
+      'Company Details': {
+        'Business Name': { value: 'ABA Integrated Solutions Limited', confidence: 0.94 },
+        'Registration Number': { value: '9741350', confidence: 0.82 },
+        'Date of Registration': { value: '04/08/2026', confidence: 0.55, note: 'Year digit ambiguous — could be 2024.' },
+        'Jurisdiction of Registration': { value: 'Abuja', confidence: 0.9 },
+        'Business Category': { value: 'Limited Liability Company', confidence: 0.97 },
+        'Account Type': { value: 'Corporate Current', confidence: 0.98 },
+        Branch: { value: 'Abuja Main', confidence: 0.93 },
+        BVN: { value: '22429885718', confidence: 0.86 },
+        NIN: { value: '82034835219', confidence: 0.9 },
+      },
+      'Bank Use Only': {
+        'Account Number': { value: '2049193882', confidence: 0.88 },
+        'Customer ID': null,
+        'Form Reference': { value: 'SN08187', confidence: 0.35, note: 'Handwritten at the top of page 1.' },
+      },
+      'About This Form': {
+        Bank: 'First Bank of Nigeria Limited',
+        'Form Code': 'CAOF15-10/25',
+        Classification: 'CONFIDENTIAL',
+        Pages: '16',
+        'Pages Not Present': '9, 10, 12',
+      },
     },
   },
 ];
+
+/** Whether a pack leaves room for the live read to fill the rest. */
+export function isPartial(fileName: string | undefined, taxonomy: Taxonomy): boolean {
+  return Boolean(verifiedPack(fileName, taxonomy)?.partial);
+}
+
+/** Checked values first, then anything the live read found that the pack does
+ *  not carry. Used for a partial pack, so a half-transcribed form shows the
+ *  checked half over the read half rather than one at the cost of the other. */
+export function mergeVerified(verified: ReviewField[], live: ReviewField[]): ReviewField[] {
+  const seen = new Set(verified.flatMap((r) => [r.id.toLowerCase(), `${r.group}>${r.name}`.toLowerCase()]));
+  return [...verified, ...live.filter((r) => !seen.has(r.id.toLowerCase()) && !seen.has(`${r.group}>${r.name}`.toLowerCase()))];
+}
 
 /** The pack for an uploaded file, when one is known. */
 export function verifiedPack(fileName: string | undefined, taxonomy: Taxonomy): Pack | null {

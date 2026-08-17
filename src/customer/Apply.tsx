@@ -325,6 +325,13 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
       })(),
       ...set('nokRelationship', KIN, /relationship/i, (x) => snap(x, RELATIONSHIPS, KIN_OF)),
       ...set('nokPhone', KIN, /mobile|phone/i),
+      // The kin's address is on the form even where the model has no field for
+      // it — same house-number-plus-street shape as the applicant's.
+      ...(() => {
+        const line = [val(KIN, /house number/i), val(KIN, /street name/i)]
+          .filter(Boolean).join(' ') || val(KIN, /address/i);
+        return line ? { nokAddress: line } : {};
+      })(),
     }));
     setDoc({ name: attachment?.FullName ?? 'the form', phase: 'done', fields: rows.length });
     setReviewing(false);

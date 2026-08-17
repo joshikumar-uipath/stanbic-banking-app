@@ -15,7 +15,7 @@ type ExtractionTask = Pick<
 >;
 import type { EntityInfo } from '../onboarding';
 import { rememberedExtraction, rememberExtraction } from '../onboarding/extractionCache';
-import { verifiedPack, verifiedRows } from '../onboarding/verifiedReads';
+import { mergeVerified, verifiedPack, verifiedRows } from '../onboarding/verifiedReads';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Extraction review — the desk-side twin of the Action Center app.
@@ -318,7 +318,11 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
             // returned — but leave a checked pack on screen rather than replacing
             // it with the read it was written to correct.
             if (docKey) rememberExtraction(docKey, parsed.length ? t.extraction : caseExtraction, corporate ? 'corporate' : 'individual');
+            // A pack that covers the whole form holds. One that covers part of it
+            // takes the rest from the read, so a half-transcribed form is not
+            // fourteen pages of "missing".
             if (!verified.length) { setRows(rows); setSource('case'); }
+            else if (pack?.partial) setRows(mergeVerified(verified, rows));
           }
           else if (!verified.length) { setRows(sample); setSource('sample'); }
           if (t.attachmentId && !attachmentId) {
@@ -332,6 +336,7 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
         const already = toRows(caseExtraction, ungrouped);
         if (reviewState === 'done' && already.length) {
           if (!verified.length) { setRows(already); setSource('case'); }
+          else if (pack?.partial) setRows(mergeVerified(verified, already));
           setSettled(true); return;
         }
       } catch { /* keep polling */ }
@@ -356,7 +361,7 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
     };
     tick();
     return () => { alive = false; if (timer.current) window.clearTimeout(timer.current); };
-  }, [instanceId, sample, attachmentId, verified, ungrouped]);
+  }, [instanceId, sample, attachmentId, verified, ungrouped, pack]);
 
   // Reveal fields in sequence once they land. The data is real; only the pacing
   // is presentation — IXP returns the whole result at once, it does not stream.
@@ -464,7 +469,9 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
             : source === 'memory'
               ? 'Showing the last read of this same file. The case is reading it again now, and these values are replaced the moment it answers.'
               : source === 'verified'
-                ? `Checked read — ${pack?.label ?? 'this form'} has been read against the page and corrected. The case is extracting the same document alongside; these are the values that will be confirmed.`
+                ? pack?.partial
+                  ? `Part-checked read — the ${pack.label} has been read against the page as far as it goes. Those fields are checked; the rest fill in from the case's own read as it lands.`
+                  : `Checked read — ${pack?.label ?? 'this form'} has been read against the page and corrected. The case is extracting the same document alongside; these are the values that will be confirmed.`
                 : 'Read directly from the document.'}
         </div>
       )}
