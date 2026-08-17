@@ -94,7 +94,7 @@ export default function ApplicationDetails({ c, instanceId, onReviewExtraction, 
     if (!instanceId) return;
     let alive = true;
     api.fetchCaseExtraction(instanceId)
-      .then((x) => { if (alive) setRead(toRows(x)); })
+      .then((x) => { if (alive) setRead(toRows(x, corporate ? 'Company details' : 'Applicant details')); })
       .catch(() => { /* tab shows why it is empty */ });
     return () => { alive = false; };
   }, [instanceId, corporate, api]);

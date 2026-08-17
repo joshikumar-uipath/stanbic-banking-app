@@ -103,11 +103,16 @@ const PACKS: Pack[] = [
     taxonomy: 'individual',
     // The uploaded file is named for the form, not the bank, so match either.
     match: /first\s*bank|aof[\s_-]*individual/i,
-    uncertain: ['Identification > ID Issue Date', 'Next of Kin > Mobile Number'],
+    uncertain: [
+      'Identification > ID Issue Date',
+      'Contact Details > Phone Number 1',
+      'Next of Kin > Mobile Number',
+      'Next of Kin > First Name',
+    ],
     fields: {
       'Account Setup': {
         Branch: 'Alapere',
-        BVN: '2231106341',
+        BVN: '22311063412',
         NIN: '570299450623',
         'Account Category': 'Individual Account',
         'Account Type': 'Current',

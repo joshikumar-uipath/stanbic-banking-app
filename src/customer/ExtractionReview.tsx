@@ -57,15 +57,15 @@ const pct = (c: unknown) =>
   typeof c === 'number' && !Number.isNaN(c) ? Math.round(c <= 1 ? c * 100 : c) : 0;
 
 /** Names arrive as taxonomy paths — "Company Details > Directors/Signatories > BVN". */
-function splitName(raw: string): { group: string; label: string } {
+function splitName(raw: string, fallback = 'Company details'): { group: string; label: string } {
   const parts = String(raw || '').split('>').map((s) => s.trim()).filter(Boolean);
-  if (parts.length <= 1) return { group: 'Company details', label: parts[0] || 'Field' };
+  if (parts.length <= 1) return { group: fallback, label: parts[0] || 'Field' };
   return { group: parts.slice(0, -1).join(' › '), label: parts[parts.length - 1] };
 }
 
 /** Flatten an IXP ExtractionResult into rows. Deliberately forgiving: a shape
  *  change upstream should cost a field, not the screen. */
-export function toRows(raw: unknown): ReviewField[] {
+export function toRows(raw: unknown, ungrouped = 'Company details'): ReviewField[] {
   let payload: any = raw;
   if (typeof raw === 'string') { try { payload = JSON.parse(raw); } catch { return []; } }
   if (!payload || typeof payload !== 'object') return [];
@@ -75,7 +75,7 @@ export function toRows(raw: unknown): ReviewField[] {
   const push = (f: any, groupHint?: string, idx?: number, value?: any) => {
     const nm = f?.FieldName ?? f?.FieldId ?? '';
     if (!nm) return;
-    const { group, label } = splitName(nm);
+    const { group, label } = splitName(nm, ungrouped);
     const v = (value?.Value ?? value?.UnformattedValue ?? f?.Value ?? f?.UnformattedValue ?? '').toString();
     out.push({
       id: `${f?.FieldId ?? nm}${idx == null ? '' : `#${idx}`}`,
@@ -216,6 +216,9 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
 }) {
   // Pinned per render from the case type — every call below goes through this.
   const api = corporate ? corp : indiv;
+  // Where a field with no taxonomy path belongs. An individual record has no
+  // company on it, so the corporate default read as a mislabelled section.
+  const ungrouped = corporate ? 'Company details' : 'Applicant details';
   // The sample has to match the KIND of application, not just exist.
   const sample = fallback ?? (corporate ? SAMPLE_ROWS : INDIVIDUAL_SAMPLE_ROWS);
   const maestroUrl = corporate ? corp.corporateMaestroUrl : indiv.instanceUrl;
@@ -224,7 +227,7 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
   // and overwrites this the moment the case answers, so a stale memory corrects
   // itself rather than sticking.
   const remembered = useMemo(
-    () => (docKey ? toRows(rememberedExtraction(docKey, corporate ? 'corporate' : 'individual')) : []),
+    () => (docKey ? toRows(rememberedExtraction(docKey, corporate ? 'corporate' : 'individual'), ungrouped) : []),
     [docKey, corporate],
   );
 
@@ -308,8 +311,8 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
           // The task input first — that is where the result is meant to arrive.
           // When it is empty, the same result is still in the case's own element
           // outputs, so read it there rather than dropping to the sample.
-          const parsed = toRows(t.extraction);
-          const rows = parsed.length ? parsed : toRows(caseExtraction);
+          const parsed = toRows(t.extraction, ungrouped);
+          const rows = parsed.length ? parsed : toRows(caseExtraction, ungrouped);
           if (rows.length) {
             // Remember the live read either way — it is what the case actually
             // returned — but leave a checked pack on screen rather than replacing
@@ -326,7 +329,7 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
         // Settled only when the review task itself says it was completed. The
         // extraction landing before the task is created is the normal order of
         // events on a brand-new case, not evidence that anyone reviewed it.
-        const already = toRows(caseExtraction);
+        const already = toRows(caseExtraction, ungrouped);
         if (reviewState === 'done' && already.length) {
           if (!verified.length) { setRows(already); setSource('case'); }
           setSettled(true); return;
@@ -353,7 +356,7 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
     };
     tick();
     return () => { alive = false; if (timer.current) window.clearTimeout(timer.current); };
-  }, [instanceId, sample, attachmentId, verified]);
+  }, [instanceId, sample, attachmentId, verified, ungrouped]);
 
   // Reveal fields in sequence once they land. The data is real; only the pacing
   // is presentation — IXP returns the whole result at once, it does not stream.

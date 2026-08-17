@@ -36,7 +36,7 @@ type Vals = {
 const TITLES = ['Mr', 'Mrs', 'Ms', 'Dr', 'Chief', 'Prof'];
 const GENDERS = ['Male', 'Female'];
 const MARITAL = ['Single', 'Married', 'Divorced', 'Widowed'];
-const ID_TYPES = ['International Passport', "Driver's licence", "Voter's card", 'NIN slip'];
+const ID_TYPES = ['International Passport', 'National ID card', "Driver's licence", "Voter's card", 'NIN slip'];
 const EMPLOYMENT = ['Employed', 'Self-employed', 'Business owner', 'Student', 'Retired', 'Unemployed'];
 const INCOME = [`Under ${CO.currency.symbol}1m`, `${CO.currency.symbol}1m – ${CO.currency.symbol}5m`,
   `${CO.currency.symbol}5m – ${CO.currency.symbol}20m`, `Above ${CO.currency.symbol}20m`];
@@ -194,6 +194,43 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
 
   /** Confirmed review rows → the wizard's fields. Names come from the IXP taxonomy,
    *  so this matches on what the field is called rather than on a field id. */
+  /** A date box on a form is written the way the form asks — 02/12/1992 on the
+   *  Nigerian AOFs — and <input type="date"> accepts only yyyy-mm-dd. Anything
+   *  else is silently dropped by the browser, so the field just stays empty and
+   *  the extraction looks like it missed. Normalise before it gets there. */
+  const asDate = (raw: string): string => {
+    const t = raw.trim();
+    if (!t) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+    const m = t.match(/^(\d{1,2})[\/\-. ](\d{1,2})[\/\-. ](\d{4})$/);   // dd/mm/yyyy
+    if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+    const d = t.match(/^(\d{2})(\d{2})(\d{4})$/);                          // ddmmyyyy, boxed
+    if (d) return `${d[3]}-${d[2]}-${d[1]}`;
+    return '';
+  };
+
+  /** Every one of these wizard fields is a <select>. Writing a value that is not
+   *  one of its options leaves the control showing nothing, so an extracted
+   *  "National ID Card" or "Sister" would read as "the model missed it" when in
+   *  fact it read it correctly. Snap onto the closest option, or keep what was
+   *  there — never write a value the control cannot show. */
+  const snap = (raw: string, options: string[], synonyms: Record<string, string> = {}): string => {
+    const t = raw.trim().toLowerCase();
+    if (!t) return '';
+    const exact = options.find((o) => o.toLowerCase() === t);
+    if (exact) return exact;
+    for (const [k, v] of Object.entries(synonyms)) if (new RegExp(k, 'i').test(t)) return v;
+    return options.find((o) => {
+      const l = o.toLowerCase();
+      return l.includes(t) || t.includes(l);
+    }) ?? '';
+  };
+  const KIN_OF: Record<string, string> = {
+    'sister|brother|sibling': 'Sibling', 'mother|father|parent': 'Parent',
+    'son|daughter': 'Child', 'wife|husband|spouse': 'Spouse',
+    'cousin|uncle|aunt|niece|nephew': 'Other relative',
+  };
+
   const applyRows = (rows: ReviewField[]) => {
     // Scope every lookup to a GROUP first. The taxonomy repeats field names across
     // sections — Surname, First Name, Date of Birth and Gender all appear under
@@ -206,10 +243,19 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
     const CONTACT = inGroup(/contact/i);
     const WORK = inGroup(/employ/i);
     const ID = inGroup(/identification|account setup/i);
+    // Branch, account type and purpose are on the form and were being read
+    // and then thrown away — nothing applied them to the wizard.
+    const ACCOUNT = inGroup(/account setup/i);
 
     const val = (rs: ReviewField[], re: RegExp) => rs.find((r) => re.test(r.name))?.value?.trim() ?? '';
-    const set = (k: keyof Vals, rs: ReviewField[], re: RegExp) => {
-      const x = val(rs, re); return x ? { [k]: x } : {};
+    const set = (k: keyof Vals, rs: ReviewField[], re: RegExp, via?: (v: string) => string) => {
+      const x = val(rs, re);
+      if (!x) return {};
+      const out = via ? via(x) : x;
+      // A transform that cannot place the value (an unparseable date, an option
+      // this select does not carry) returns empty — leave the field alone rather
+      // than blanking what the applicant already typed.
+      return out ? { [k]: out } : {};
     };
 
     // Names decide what the record is CALLED on the desk, so they get their own
@@ -233,33 +279,51 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
       ...(names.firstName ? { firstName: names.firstName } : {}),
       ...(names.lastName ? { lastName: names.lastName } : {}),
       ...set('middleName', APPLICANT, /other name|middle name/i),
-      ...set('title', APPLICANT, /^title$/i),
-      ...set('dob', APPLICANT, /date of birth/i),
-      ...set('gender', APPLICANT, /^gender$/i),
-      ...set('maritalStatus', APPLICANT, /marital/i),
+      ...set('title', APPLICANT, /^title$/i, (x) => snap(x, TITLES)),
+      ...set('dob', APPLICANT, /date of birth/i, asDate),
+      ...set('gender', APPLICANT, /^gender$/i, (x) => snap(x, GENDERS)),
+      ...set('maritalStatus', APPLICANT, /marital/i, (x) => snap(x, MARITAL)),
       ...set('motherMaidenName', APPLICANT, /maiden/i),
       ...set('nationality', APPLICANT, /nationality/i),
       ...set('stateOfOrigin', APPLICANT, /state of origin/i),
       ...set('tin', APPLICANT, /\bTIN\b/i),
       ...set('bvn', ID, /\bBVN\b/i),
       ...set('nin', ID, /\bNIN\b/i),
-      ...set('idType', ID, /id type|means of identification/i),
+      ...set('idType', ID, /id type|means of identification/i,
+        (x) => snap(x, ID_TYPES, { 'national id|nimc': 'National ID card', 'nin': 'NIN slip', 'passport': 'International Passport' })),
       ...set('idNumber', ID, /id number/i),
-      ...set('idExpiry', ID, /expiry/i),
+      ...set('idExpiry', ID, /expiry/i, asDate),
       ...set('phone', CONTACT, /phone number 1|^phone/i),
       ...set('altPhone', CONTACT, /phone number 2|alternate/i),
       ...set('email', CONTACT, /^email/i),
-      ...set('address', CONTACT, /street name|address/i),
+      // House Number and Street Name are separate boxes on the form. Reading only
+      // one of them puts "Tinubu" in the address line instead of "4 Tinubu".
+      ...(() => {
+        const line = [val(CONTACT, /house number|house no/i), val(CONTACT, /street name/i)]
+          .filter(Boolean).join(' ') || val(CONTACT, /address/i);
+        return line ? { address: line } : {};
+      })(),
       ...set('city', CONTACT, /city|town/i),
       ...set('stateOfResidence', CONTACT, /^state$/i),
       ...set('lga', CONTACT, /\bLGA\b|local govt/i),
-      ...set('employmentStatus', WORK, /employment status/i),
+      ...set('employmentStatus', WORK, /employment status/i, (x) => snap(x, EMPLOYMENT, { 'civil servant|salaried': 'Employed' })),
       ...set('occupation', WORK, /occupation/i),
       ...set('employer', WORK, /employer name/i),
-      ...set('incomeBand', WORK, /salary|income/i),
+      // The form's own band ("NGN 51,000 – NGN 250,000") is not one of ours, so
+      // this usually declines to write rather than inventing a bracket.
+      ...set('incomeBand', WORK, /salary|income/i, (x) => snap(x, INCOME)),
+      ...set('branch', ACCOUNT, /^branch$/i),
+      ...set('accountType', ACCOUNT, /account type/i, (x) => snap(x, ACCOUNT_TYPES)),
+      ...set('accountPurpose', ACCOUNT, /purpose/i, (x) => snap(x, PURPOSES)),
       // Next of kin is a DIFFERENT PERSON — only ever read from the kin group.
-      ...set('nokName', KIN, /surname|full name/i),
-      ...set('nokRelationship', KIN, /relationship/i),
+      // The kin's name is three boxes, same as the applicant's. Matching on
+      // /surname/ alone put a lone "Dada" on the record.
+      ...(() => {
+        const full = [val(KIN, /first name/i), val(KIN, /other name/i), val(KIN, /surname|last name/i)]
+          .filter(Boolean).join(' ') || val(KIN, /full name|^name$/i);
+        return full ? { nokName: full } : {};
+      })(),
+      ...set('nokRelationship', KIN, /relationship/i, (x) => snap(x, RELATIONSHIPS, KIN_OF)),
       ...set('nokPhone', KIN, /mobile|phone/i),
     }));
     setDoc({ name: attachment?.FullName ?? 'the form', phase: 'done', fields: rows.length });
