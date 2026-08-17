@@ -304,6 +304,21 @@
    default, so this one is tinted and bordered — the white inputs sitting on the
    tint are what separate it from the plain groups. */
 .xv-card.attn { border-color: #ddc08a; background: #fdf7ec; }
+/* Form-level exceptions. Warmer than the field card and above it: these are the
+   reasons the case stops, not fields to retype. */
+.xv-card.xcp { border-color: #e5b4b4; background: #fdf1f1; }
+.xv-card.xcp .xv-attn-h b { color: #8c2f2f; }
+.xv-card.xcp .xv-attn-h em { color: #a05f5f; }
+.xcp-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.xcp-list li { display: flex; gap: 9px; align-items: flex-start; }
+.xcp-list li > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.xcp-list b { font-size: 12px; font-weight: 650; color: #6f2828; }
+.xcp-list span:last-child { font-size: 11.5px; line-height: 1.45; color: #8a5c5c; }
+.xcp-sev { flex: none; margin-top: 1px; font-size: 9.5px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; padding: 2px 6px; border-radius: 999px; border: 1px solid transparent; }
+.xcp-sev.high { color: #8c2020; background: #f7dada; border-color: #eebcbc; }
+.xcp-sev.medium { color: #8a5a12; background: #fbeed4; border-color: #eed7a6; }
+.xcp-sev.low { color: #4b5563; background: #eceef1; border-color: #dcdfe4; }
 .xv-attn-h { margin-bottom: 11px; }
 .xv-attn-h b { display: block; font-size: 13px; font-weight: 700; color: #7a5417; letter-spacing: -.01em; }
 .xv-attn-h em { display: block; font-style: normal; font-size: 11.5px; line-height: 1.45; color: #937041; margin-top: 3px; }

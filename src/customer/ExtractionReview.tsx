@@ -379,6 +379,7 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
 
   const valueOf = (r: ReviewField) => (r.id in edits ? edits[r.id] : r.value);
   const changed = (r: ReviewField) => r.id in edits && edits[r.id] !== r.value;
+  const blockers = useMemo(() => (pack?.exceptions ?? []).filter((x) => x.severity === 'high'), [pack]);
   const attention = useMemo(() => (rows ?? []).filter((r) => r.missing || r.confidence < MID), [rows]);
   const groups = useMemo(() => {
     const m = new Map<string, ReviewField[]>();
@@ -494,6 +495,43 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
               ))}
             </>
           )}
+
+          {/* Why this form cannot go straight through. These come off the reader,
+              not off any single field — a missing seal and an undefined mandate
+              are not things a value can express, and they are the first thing an
+              approver needs to see. */}
+          {done && !settled && (pack?.exceptions?.length || pack?.checks?.some((c) => c.result !== 'pass')) ? (
+            <div className="xv-card xcp">
+              <div className="xv-attn-h">
+                <b>
+                  {blockers.length
+                    ? `${blockers.length} ${blockers.length === 1 ? 'blocker' : 'blockers'} to straight-through processing`
+                    : 'Points raised on this form'}
+                </b>
+                <em>Raised against the form as a whole, not against a single value. Each names the field it came from.</em>
+              </div>
+              <ul className="xcp-list">
+                {(pack?.exceptions ?? []).map((x) => (
+                  <li key={x.code}>
+                    <span className={`xcp-sev ${x.severity}`}>{x.severity}</span>
+                    <div>
+                      <b>{x.field}</b>
+                      <span>{x.detail}</span>
+                    </div>
+                  </li>
+                ))}
+                {(pack?.checks ?? []).filter((c) => c.result !== 'pass').map((c) => (
+                  <li key={c.check}>
+                    <span className="xcp-sev low">check</span>
+                    <div>
+                      <b>{c.check}</b>
+                      <span>{c.note ?? `Cross-field check came back ${c.result}.`}</span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {done && !settled && attention.length > 0 && (
             <div className="xv-card attn">

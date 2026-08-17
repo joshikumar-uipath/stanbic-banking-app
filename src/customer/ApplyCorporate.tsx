@@ -222,29 +222,44 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
   /** Fold confirmed values back into the form so the rest of the wizard starts
    *  from what the reviewer accepted, not from the raw read. */
   const applyConfirmed = (rows: ReviewField[]) => {
-    const pick = (re: RegExp) => rows.find((r) => re.test(r.name))?.value?.trim() ?? '';
+    // Scope to the company's own section first. The form carries a TIN under the
+    // beneficial owners, a Company Name under them too, and an address for every
+    // officer — searching by field name across all of them lets a director's
+    // details land on the business.
+    const own = rows.filter((r) => /company details/i.test(r.group) && !/›|>/.test(r.group));
+    const pick = (re: RegExp) => (own.length ? own : rows).find((r) => re.test(r.name))?.value?.trim() ?? '';
+    // "Registered Company Name" was renamed to "Business Name" to match the words
+    // on both banks' forms — accept either, or the record loses its name.
+    const name = pick(/business name|company name/i);
     // The reviewer may have corrected the company name — the record should carry
     // what they confirmed, not what was first read.
-    void nameDraft(draftId, pick(/company name/i));
+    void nameDraft(draftId, name);
     setV((p) => ({
       ...p,
-      company: pick(/company name/i) || p.company,
+      company: name || p.company,
       rc: pick(/^rc|registration number/i) || p.rc,
       tin: pick(/^tin$/i) || p.tin,
-      sector: pick(/industry|nature of business/i) || p.sector,
-      address: pick(/address/i) || p.address,
+      sector: pick(/sector|industry/i) || pick(/nature of business/i) || p.sector,
+      address: pick(/operating business address|registered office address|^address/i) || p.address,
       email: pick(/^email$/i) || p.email,
-      phone: pick(/^phone$/i) || p.phone,
+      phone: pick(/^phone$|phone number 1/i) || p.phone,
+      // Both are <select>. An extracted value that is not one of the options has
+      // to be snapped or dropped — written raw it shows as nothing at all.
+      bizType: matchOption(pick(/business category|type\/nature of business/i), BIZ_TYPES) ?? p.bizType,
+      turnover: matchOption(pick(/annual turnover|turnover/i), TURNOVERS) ?? p.turnover,
     }));
     const byDir = new Map<string, ReviewField[]>();
-    rows.filter((r) => /directors? \/ signator/i.test(r.group))
+    // The taxonomy writes this group without spaces around the slash; a live read
+    // has been seen both ways. Tolerate either rather than silently finding none.
+    rows.filter((r) => /directors?\s*\/\s*signator/i.test(r.group))
       .forEach((r) => { if (!byDir.has(r.group)) byDir.set(r.group, []); byDir.get(r.group)!.push(r); });
     if (byDir.size) {
       setDirs([...byDir.values()].map((fs) => {
         const g = (re: RegExp) => fs.find((r) => re.test(r.name))?.value?.trim() ?? '';
         return {
           name: g(/full name/i), bvn: digits(g(/bvn/i)),
-          idType: EMPTY_DIR.idType, idNumber: g(/id\b|identification/i),
+          idType: matchOption(g(/means of identification|id type/i), ['International Passport', 'National ID card', "Driver's licence", "Voter's card"]) ?? EMPTY_DIR.idType,
+          idNumber: g(/id\b|identification/i),
           phone: digits(g(/phone/i)), email: g(/email/i),
           role: matchOption(g(/designation|role/i), ROLES) ?? 'Director',
         };
