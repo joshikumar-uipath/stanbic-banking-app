@@ -379,7 +379,10 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
 
   const valueOf = (r: ReviewField) => (r.id in edits ? edits[r.id] : r.value);
   const changed = (r: ReviewField) => r.id in edits && edits[r.id] !== r.value;
-  const blockers = useMemo(() => (pack?.exceptions ?? []).filter((x) => x.severity === 'high'), [pack]);
+  const blockers = useMemo(
+    () => (pack?.exceptions ?? []).filter((x) => x.severity === 'critical' || x.severity === 'high'),
+    [pack],
+  );
   const attention = useMemo(() => (rows ?? []).filter((r) => r.missing || r.confidence < MID), [rows]);
   const groups = useMemo(() => {
     const m = new Map<string, ReviewField[]>();
