@@ -19,6 +19,9 @@ import type { ReviewField } from '../customer/ExtractionReview';
 
 type Taxonomy = 'individual' | 'corporate';
 
+/** A checked value. Confidence is 0..1 as the reader reported it. */
+type Cell = string | null | { value: string | null; confidence?: number; note?: string };
+
 interface Pack {
   id: string;
   /** Named in the banner, so the reviewer knows which form was recognised. */
@@ -26,8 +29,11 @@ interface Pack {
   taxonomy: Taxonomy;
   /** Tested against the uploaded file's name. */
   match: RegExp;
-  /** Group → field → value. `null` means the box is blank on the form. */
-  fields: Record<string, Record<string, string | null>>;
+  /** Group → field → value. `null` means the box is blank on the form. A cell
+   *  may instead be `{ value, confidence }` where the reader rated it — a 0.55 on
+   *  an ambiguous year is worth keeping, because it puts the field in front of
+   *  the reviewer instead of presenting a guess as settled. */
+  fields: Record<string, Record<string, Cell>>;
   /** Fields a human flagged as hard to read. They stay flagged for the reviewer
    *  rather than being presented as certain — "Group > Field". */
   uncertain?: string[];
@@ -36,6 +42,52 @@ interface Pack {
 /** Taxonomy field ids, so a confirmation carries the same ids the case expects
  *  rather than a name the resolver has to guess at. Keyed "Group > Field". */
 const FIELD_IDS: Record<string, string> = {
+  // ── Corporate ──────────────────────────────────────────────────────────────
+  'Company Details > Business Name': '8f24880166ea0d3d',
+  'Company Details > Registration Number': '39a539f6b0c00736',
+  'Company Details > TIN': '603e6c3832be0789',
+  'Company Details > Type/Nature of Business': '4006c3c1f30f95dd',
+  'Company Details > Date of Registration': 'b3267d70947cea67',
+  'Company Details > Operating Business Address': 'c88a884dd2610145',
+  'Company Details > City': 'd44ba638647b27bc',
+  'Company Details > State': '7f0c6e399288104d',
+  'Company Details > Phone': 'a0aff64c921237ae',
+  'Company Details > Email': '495e11930bf97709',
+  'Company Details > Sector/Industry': '68e75d0b5fafab9e',
+  'Company Details > Annual Turnover': 'c788a180e797e66c',
+  'Company Details > Branch': '0af097527546ea02',
+  'Company Details > Account Type': '77fe1b8ac70d126c',
+  'Company Details > Business Category': '7b50510b227e5539',
+  'Company Details > BVN': 'db2db844b01ef123',
+  'Company Details > NIN': '9e09875e59f28dcd',
+  'Company Details > Jurisdiction of Registration': 'bed2b10261ba412b',
+  'Company Details > Registered Office Address': '3da066e57394fca9',
+  'Company Details > Phone Number 2': 'c20b0c81b7d5fbb5',
+  'Company Details > Website': '822025969f0cf1a6',
+  'Company Details > Social Media Handle': '47ae59cea0ecdc35',
+  'Company Details > NEPC Registration Number': '90cee08fa2bdb231',
+  'Company Details > Quoted on Stock Exchange': '6a5469d5ad14beae',
+  'Company Details > Stock Exchange and Symbol': 'fcf9a7a3c044c10f',
+  'Company Details > UBO Name': '8e7610367bb0c057',
+  'Directors/Signatories > Full Name': '19d81cc798585270',
+  'Directors/Signatories > BVN': 'feb18b12637a64dd',
+  'Directors/Signatories > Nationality': '737748118c6d9bf6',
+  'Directors/Signatories > Date of Birth': 'e3f2f48705baa385',
+  'Directors/Signatories > ID/Means-of-Identification Number': 'e2a2c74e224a410b',
+  'Directors/Signatories > Phone': 'f9197d78e2737549',
+  'Directors/Signatories > Email': '39e441664086e236',
+  'Directors/Signatories > Designation/Role': '5fd34ab8934d2b65',
+  'Beneficial Owners > Company Name': 'c3965d4b14487f39',
+  'Beneficial Owners > Nature of Business': '6b73c333f7335ee4',
+  'Beneficial Owners > Percentage of Shares': 'c650d01e7b264909',
+  'Beneficial Owners > RC Number': '21b7b26a56836949',
+  'Beneficial Owners > TIN': '66b9b3e7e6fc032e',
+  'Other Bank Accounts > Bank Name and Address (corporate)': 'feebf567172bc10d',
+  'Other Bank Accounts > Account Name (corporate)': '1c8de7949e33cb11',
+  'Other Bank Accounts > Account Number (corporate)': '0ba5a24e54c304e6',
+  'Other Bank Accounts > Status (corporate)': '23ee3b5aa01a8155',
+
+  // ── Individual ─────────────────────────────────────────────────────────────
   'Account Setup > Branch': '8f41733a7389cafc',
   'Account Setup > BVN': '747c737368b887ed',
   'Account Setup > NIN': '8ce7babd54f884a0',
@@ -205,14 +257,18 @@ export function verifiedRows(fileName: string | undefined, taxonomy: Taxonomy): 
   const shaky = new Set(pack.uncertain ?? []);
   const rows: ReviewField[] = [];
   Object.entries(pack.fields).forEach(([group, fields]) => {
-    Object.entries(fields).forEach(([name, value]) => {
+    Object.entries(fields).forEach(([name, cell]) => {
       const path = `${group} > ${name}`;
-      const v = (value ?? '').trim();
+      const rated = cell !== null && typeof cell === 'object';
+      const v = ((rated ? cell.value : cell) ?? '').trim();
+      // A reader's own confidence wins; the uncertain list is the same statement
+      // made without a number. Everything else is a value checked against the page.
+      const rating = rated && typeof cell.confidence === 'number' ? Math.round(cell.confidence * 100) : null;
       rows.push({
-        id: FIELD_IDS[path] ?? path,
+        id: FIELD_IDS[`${path} (${pack.taxonomy})`] ?? FIELD_IDS[path] ?? path,
         name,
         value: v,
-        confidence: v ? (shaky.has(path) ? 62 : 100) : 0,
+        confidence: v ? (rating ?? (shaky.has(path) ? 62 : 100)) : 0,
         missing: !v,
         group,
       });
