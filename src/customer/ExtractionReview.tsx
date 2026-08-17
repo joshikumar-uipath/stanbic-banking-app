@@ -15,6 +15,7 @@ type ExtractionTask = Pick<
 >;
 import type { EntityInfo } from '../onboarding';
 import { rememberedExtraction, rememberExtraction } from '../onboarding/extractionCache';
+import { verifiedPack, verifiedRows } from '../onboarding/verifiedReads';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Extraction review — the desk-side twin of the Action Center app.
@@ -39,7 +40,7 @@ export interface ReviewField {
   group: string;
 }
 
-type Source = 'case' | 'ixp' | 'sample' | 'memory';
+type Source = 'case' | 'ixp' | 'sample' | 'memory' | 'verified';
 
 /** How long to keep saying "reading" before showing the illustrative sample.
  *  Deliberately generous: a large scanned pack can take well over a minute to
@@ -227,9 +228,22 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
     [docKey, corporate],
   );
 
+  // A form that has been read by a person and checked against the page. The model
+  // still mis-reads characters on these handwritten scans, so where a checked
+  // answer exists it is what gets shown — announced as such, and it holds: a
+  // later live read does not put LACTOS back on screen mid-review.
+  const taxonomy = corporate ? 'corporate' : 'individual';
+  const docName = documentName ?? docKey?.split('::')[0];
+  const pack = useMemo(() => verifiedPack(docName, taxonomy), [docName, taxonomy]);
+  const verified = useMemo(() => verifiedRows(docName, taxonomy), [docName, taxonomy]);
+
   const [task, setTask] = useState<ExtractionTask | null>(null);
-  const [rows, setRows] = useState<ReviewField[] | null>(remembered.length ? remembered : null);
-  const [source, setSource] = useState<Source>(remembered.length ? 'memory' : 'sample');
+  const [rows, setRows] = useState<ReviewField[] | null>(
+    verified.length ? verified : remembered.length ? remembered : null,
+  );
+  const [source, setSource] = useState<Source>(
+    verified.length ? 'verified' : remembered.length ? 'memory' : 'sample',
+  );
   const [docUrl, setDocUrl] = useState('');
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -297,10 +311,13 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
           const parsed = toRows(t.extraction);
           const rows = parsed.length ? parsed : toRows(caseExtraction);
           if (rows.length) {
-            setRows(rows); setSource('case');
+            // Remember the live read either way — it is what the case actually
+            // returned — but leave a checked pack on screen rather than replacing
+            // it with the read it was written to correct.
             if (docKey) rememberExtraction(docKey, parsed.length ? t.extraction : caseExtraction, corporate ? 'corporate' : 'individual');
+            if (!verified.length) { setRows(rows); setSource('case'); }
           }
-          else { setRows(sample); setSource('sample'); }
+          else if (!verified.length) { setRows(sample); setSource('sample'); }
           if (t.attachmentId && !attachmentId) {
             try { setDocUrl(await api.attachmentReadUrl(t.attachmentId)); } catch { /* pane degrades */ }
           }
@@ -311,7 +328,8 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
         // events on a brand-new case, not evidence that anyone reviewed it.
         const already = toRows(caseExtraction);
         if (reviewState === 'done' && already.length) {
-          setRows(already); setSource('case'); setSettled(true); return;
+          if (!verified.length) { setRows(already); setSource('case'); }
+          setSettled(true); return;
         }
       } catch { /* keep polling */ }
       tries += 1;
@@ -324,7 +342,10 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
         // Local flag, not the state: this closure captures the first render's
         // `gaveUp` forever, so reading the state here would re-drop to the sample
         // on every slow tick and wipe any corrections already typed.
-        if (!dropped) { dropped = true; setRows(sample); setSource('sample'); setGaveUp(true); }
+        if (!dropped) {
+          dropped = true; setGaveUp(true);
+          if (!verified.length) { setRows(sample); setSource('sample'); }
+        }
         timer.current = window.setTimeout(tick, 10000);
         return;
       }
@@ -332,7 +353,7 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
     };
     tick();
     return () => { alive = false; if (timer.current) window.clearTimeout(timer.current); };
-  }, [instanceId, sample, attachmentId]);
+  }, [instanceId, sample, attachmentId, verified]);
 
   // Reveal fields in sequence once they land. The data is real; only the pacing
   // is presentation — IXP returns the whole result at once, it does not stream.
@@ -439,7 +460,9 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
             ? 'Showing a sample read — the live extraction was not available. Values below are illustrative.'
             : source === 'memory'
               ? 'Showing the last read of this same file. The case is reading it again now, and these values are replaced the moment it answers.'
-              : 'Read directly from the document.'}
+              : source === 'verified'
+                ? `Checked read — ${pack?.label ?? 'this form'} has been read against the page and corrected. The case is extracting the same document alongside; these are the values that will be confirmed.`
+                : 'Read directly from the document.'}
         </div>
       )}
 
