@@ -61,7 +61,7 @@ function fromCases(cases: OnboardingCase[], open: (id: string) => void): Item[] 
           : 'The account is open but required documents are still outstanding from the customer.')
         : m.desc;
     return {
-      key: `c-${c.id}`,
+      key: `c-${c.uid ?? c.id}`,
       dot: STATE_TONE[m.tone] ?? 'idle',
       who: fullName(c).trim() || 'Unnamed applicant',
       ref: c.id,

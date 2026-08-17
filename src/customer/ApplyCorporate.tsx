@@ -14,6 +14,7 @@ import Icon from './icons';
 import type { ApplyMode } from './Apply';
 import { extractAof } from './ixp';
 import { attachmentReadUrl, clearPendingExtraction, corporateMaestroReady, loadPendingExtraction, savePendingExtraction, startCorporateCase, uploadCaseAttachment, type JobAttachmentRef, type PendingExtraction } from '../onboarding/maestro-corporate';
+import { fingerprint } from '../onboarding/extractionCache';
 import ExtractionReview, { type ReviewField } from './ExtractionReview';
 import { linkInstance } from '../onboarding/maestro';
 
@@ -104,6 +105,8 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
   // desk and Action Center are two doors onto the same task.
   const [extractionInstance, setExtractionInstance] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState(false);
+  /** Fingerprint of the uploaded file, so a document seen before paints at once. */
+  const [docKey, setDocKey] = useState<string | null>(null);
   // Whether the reviewer has actually confirmed. "Finish later" leaves this false,
   // so the banner keeps saying the gate is open and the way back stays visible.
   const [reviewDone, setReviewDone] = useState(false);
@@ -142,6 +145,7 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
     const f = e.target.files?.[0];
     e.target.value = '';
     if (!f) return;
+    setDocKey(fingerprint(f));
     setDoc({ name: f.name, phase: 'reading', note: 'Uploading the form…' });
     setAttachment(null);
     // Held locally as well as in state: the read finishes in the same call, before
@@ -308,6 +312,7 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
     return (
       <ExtractionReview
         instanceId={extractionInstance ?? ''}
+        docKey={docKey ?? undefined}
         attachmentId={attachment?.ID}
         documentName={attachment?.FullName}
         onAccepted={applyConfirmed}

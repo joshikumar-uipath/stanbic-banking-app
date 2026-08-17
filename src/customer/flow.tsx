@@ -10,6 +10,7 @@ import Apply, { type ApplyMode } from './Apply';
 import ApplyCorporate from './ApplyCorporate';
 import Status, { useCase } from './Status';
 import Kyc from './Kyc';
+import { getLinkedInstance } from '../onboarding/maestro';
 import { rememberMyApp } from './mine';
 import { Button, Note, Brand } from './ui';
 import Icon from './icons';
@@ -51,7 +52,15 @@ export default function AccountOpeningFlow({ onExit, startCaseId, mode = 'self' 
   const onCreated = (created: OnboardingCase) => {
     // Only the customer's own device keeps a "mine" list — staff see the branch pipeline.
     if (mode === 'self') rememberMyApp(created.id);
-    setId(created.id); setScreen('received'); simulate(created.id);
+    setId(created.id); setScreen('received');
+    // The simulator and a real Maestro case cannot both drive one record. Left to
+    // run together they fight: the timer marches the record to "account created"
+    // while the case is still at Intake, so the status screen flips between the
+    // two — checks pass then revert, progress advances then snaps back, and an
+    // "account is open" banner appears over a case that has not opened one.
+    // A record with a live case is narrated by the case; only an unrun record
+    // gets the demo story.
+    if (!getLinkedInstance(created.id)) simulate(created.id);
   };
 
   return (

@@ -289,6 +289,18 @@
   .who .nm { min-width: 0; }
   .who .nm b { display: block; font-weight: 600; font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .who .nm span { display: block; font-size: 12.5px; color: var(--ink-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Provenance chips. Deliberately small and quiet — they answer "who is behind
+     this" at a glance without competing with the name or stealing a column. The
+     reason line above them stays the loud thing. */
+  .who .nm .pvs { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 3px; }
+  .who .nm .pvs .pv { display: inline-block; font-size: 10.5px; line-height: 1.5;
+    padding: 0 6px; border-radius: 3px; white-space: nowrap;
+    background: rgba(17,24,29,.05); color: var(--ink-3); border: 1px solid rgba(17,24,29,.08); }
+  /* No operator behind it — the one chip worth noticing. */
+  .who .nm .pvs .pv.amber { background: #fdf5e6; color: #b7791f; border-color: #f0dcb8; }
+  .who .nm .pvs .pv.batch { background: #eef3fb; color: #0033a1; border-color: #d6e2f5; }
+  /* Taken by a human, but not one of ours — neither "already owned" nor "nobody". */
+  .who .nm .pvs .pv.agent { background: #eef7f3; color: #12805c; border-color: #cfe6dc; }
   /* Match the desk's status tags: uppercase, bold, sharp (see .dk-tag). */
   .state { display: inline-flex; align-items: center; gap: 6px; font-size: 10.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 9px; border-radius: 0; white-space: nowrap; }
   .state i { width: 6px; height: 6px; border-radius: 50%; }
@@ -673,7 +685,26 @@ const STATE_META = {
   activated:   { label: "Fully activated", dot: "#16a34a", bg: "#f0f9f3", fg: "#15803d" }
 };
 
-function mk(o) { return o; }
+function mk(o) {
+  // These curated cases predate the provenance chips, but they already SAY where
+  // they came from — the first line of every trail is "Captured from …". Read it
+  // rather than hand-stamping an origin onto each one and risking the chip
+  // disagreeing with the trail sitting right beneath it in the panel.
+  if (!o.origin && o.trail && o.trail.length) {
+    var first = String(o.trail[0][1] || "");
+    if (/whatsapp/i.test(first)) o.origin = "whatsapp";
+    else if (/branch tablet|branch/i.test(first)) o.origin = "branch";
+    else if (/mobile app/i.test(first)) o.origin = "mobile";
+    else if (/internet|online|web/i.test(first)) o.origin = "web";
+    else if (/agent/i.test(first)) o.origin = "agent";
+    else if (/contact centre|call centre/i.test(first)) o.origin = "contact-centre";
+    else if (/corporate portal|partner|aggregator/i.test(first)) o.origin = "partner";
+    else if (/email/i.test(first)) o.origin = "email";
+    // A row with no trail has no provenance to read. Showing nothing is right —
+    // a guessed origin would be worse than an honest blank.
+  }
+  return o;
+}
 let CASES = [
   mk({ id: "AO-2026-000007", name: "Aisha Yusuf", cause: "name_mismatch", st: "exception", sla: -11, age: 62, asg: null, risk: 40, step: 1,
     reason: "NIN name mismatch, one character",
@@ -938,8 +969,13 @@ function mapStoreCase(c) {
     : cause ? "Captured on the desk, needs review" : (STATE_META[st] ? STATE_META[st].label : st);
   return {
     src: "store", id: c.id, name: ((c.firstName || "") + " " + (c.lastName || "")).trim() || "Unnamed applicant",
+    // Provenance, for the row chips. Operations works the whole bank, so where a
+    // case came from — a named RM at a branch, a payroll batch, or the customer's
+    // own phone with nobody behind it — changes who should pick it up.
+    origin: c.source || null, chan: c.channel || null, batch: c.batchId || null,
+    branch: c.branch || null, employer: c.employer || null, by: c.capturedBy || null,
     cause: cause, st: st, sla: st === "exception" ? -(ageMin) : (st === "validating" ? 30 - ageMin : 1440),
-    age: ageMin, asg: c.source === "rm" ? null : null, risk: st === "exception" ? 35 : 15, step: STEP_MAP[st] || 1,
+    age: ageMin, asg: c.capturedBy || null, risk: st === "exception" ? 35 : 15, step: STEP_MAP[st] || 1,
     reason: reason,
     checks: { nin: toCheck(vstat(c, "NIN")), bvn: toCheck(vstat(c, "BVN")), liveness: toCheck(vstat(c, "LIVENESS")),
       docs: c.state === "PENDING_DOCUMENTS" ? "fail" : "pass", aml: toCheck(vstat(c, "AML")),
@@ -1304,6 +1340,45 @@ function rowbarHTML() {
     '<div class="segs">' + segs + "</div></div>";
 }
 
+// ── Provenance chips ─────────────────────────────────────────────────────────
+// Where a case came from, as small marks under the name. Operations triages the
+// whole bank, so the useful question is not only "what is stuck" but "who is
+// already on it" — a self-served application has nobody behind it and needs
+// picking up, while an RM capture already has an owner to chase. Rendered as
+// chips rather than columns because the table is already seven columns wide.
+// Tone carries the triage meaning, not the brand of the channel:
+//   ""      staff-operated — somebody at this bank already owns it
+//   amber   self-served    — nobody is behind it; Ops has to pick it up
+//   agent   agent banking  — a human took it, but not a bank employee
+var ORIGIN_CHIP = {
+  rm:              { t: "RM",              c: "" },
+  branch:          { t: "Branch",          c: "" },
+  "contact-centre":{ t: "Contact centre",  c: "" },
+  agent:           { t: "Agent banking",   c: "agent" },
+  customer:        { t: "Self-served",     c: "amber" },
+  mobile:          { t: "Mobile app",      c: "amber" },
+  web:             { t: "Internet banking",c: "amber" },
+  whatsapp:        { t: "WhatsApp",        c: "amber" },
+  partner:         { t: "Partner",         c: "amber" },
+  email:           { t: "Email",           c: "amber" }
+};
+function chipsHTML(x) {
+  var out = [];
+  var o = ORIGIN_CHIP[x.origin];
+  // Self-served leads and is tinted: no operator means no one is chasing it yet.
+  if (o) out.push('<span class="pv ' + o.c + '">' + o.t + (x.by ? " · " + esc(x.by) : "") + "</span>");
+  else if (x.by) out.push('<span class="pv">' + esc(x.by) + "</span>");
+  // A branch only means something when someone stood in one. Records predating
+  // this rule carry a branch regardless of origin, so the guard lives here too —
+  // otherwise an internet-banking case still claims a branch it never saw.
+  var branchy = x.origin === "rm" || x.origin === "branch";
+  if (x.branch && branchy && x.chan !== "bulk") out.push('<span class="pv">' + esc(x.branch) + "</span>");
+  // A payroll batch is loaded centrally; the batch is where it came from.
+  if (x.batch) out.push('<span class="pv batch">' + esc(x.batch) + "</span>");
+  else if (x.chan === "bulk" && x.employer) out.push('<span class="pv batch">' + esc(x.employer) + "</span>");
+  return out.length ? '<span class="pvs">' + out.join("") + "</span>" : "";
+}
+
 function rowsHTML() {
   const L = list();
   if (!L.length) return '<p class="empty">Nothing here. This queue is clear.</p>';
@@ -1314,7 +1389,7 @@ function rowsHTML() {
     return '<button class="row" role="option" data-id="' + x.id + '" aria-selected="' + (x.id === selected) + '">' +
       '<span class="id">' + x.id.replace("AO-2026-", "") + "</span>" +
       '<span class="who"><span class="ava" style="background:' + avaColor(x.name) + '">' + initials(x.name) + "</span>" +
-      '<span class="nm"><b>' + esc(x.name) + "</b><span>" + esc(x.reason) + "</span></span></span>" +
+      '<span class="nm"><b>' + esc(x.name) + "</b><span>" + esc(x.reason) + "</span>" + chipsHTML(x) + "</span></span>" +
       maestroCellHTML(x) +
       '<span><span class="state" style="background:' + sm.bg + ";color:" + sm.fg + '"><i style="background:' + sm.dot + '"></i>' + sm.label + "</span></span>" +
       '<span class="sla" style="color:' + slaColor(x.sla) + '"><b>' + slaText(x.sla) + "</b>" +

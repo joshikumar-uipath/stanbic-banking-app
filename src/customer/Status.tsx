@@ -134,7 +134,10 @@ export default function Status({ c, onBack, onKyc }: { c: OnboardingCase; onBack
 
         <div className="cx-card">
           <div className="cx-label" style={{ marginBottom: 10 }}>Checks</div>
-          {(liveChecks ? liveChecks.map((v) => v.kind) : VALIDATION_KINDS).map((k) => {
+          {/* The full set, always — the live case reports only the checks it has
+              reached, and an applicant watching rows disappear as their case moves
+              would have no idea what happened. Unreached checks read Pending. */}
+          {VALIDATION_KINDS.map((k) => {
             const v = (liveChecks ?? c.validations).find((x) => x.kind === k);
             const st = v?.status ?? 'pending';
             return (

@@ -4,10 +4,16 @@
 // Writes through the shared OnboardingStore; no waiting on downstream systems.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useState } from 'react';
-import { store, type OnboardingCase, type DuplicateOutcome } from '../onboarding';
+import { store, type OnboardingCase, type DuplicateOutcome, type NewCaseInput } from '../onboarding';
+import {
+  clearPendingExtraction, linkInstance, maestroReady, savePendingExtraction,
+  startCase, uploadCaseAttachment, type JobAttachmentRef,
+} from '../onboarding/maestro';
 import { useConfig } from '../config';
 import { getActiveCountry } from '../config/countries';
 import { Button, Field, Note, Rail, KV, Brand } from './ui';
+import { fingerprint } from '../onboarding/extractionCache';
+import ExtractionReview, { type ReviewField } from './ExtractionReview';
 import Icon from './icons';
 
 const CO = getActiveCountry();
@@ -52,20 +58,19 @@ const EMPTY: Vals = {
 const STEPS = ['About you', 'Identity', 'Address', 'Employment', 'Account', 'Review'];
 const LAST = STEPS.length - 1;
 
-// What a UiPath Document Understanding extract of the uploaded account-opening
-// form yields. A corporate AOF carries its directors; the account opens under the
-// signing director, so we map the primary signatory into the individual capture.
-// (Demo stand-in for a live DU/IXP call — swap onUpload's body for the real one.)
-// Partial by nature: a scanned form yields the fields it happens to carry, not
-// every field the wizard now asks for.
+// Illustrative pre-fill, used ONLY when there is no live case to read from (no
+// token, or the case failed to start). The real path reads the applicant's own
+// form through IXP — see onUpload.
 const EXTRACTED: Partial<Vals> = {
   firstName: 'Efe', lastName: 'Emore',
   phone: '08027317889', email: 'eemore@gmail.com',
   bvn: '22143511463', nin: '',
   address: '62 Ire Akari Street, Isolo, Lagos',
 };
-const EXTRACTED_ORG = 'George Emore Technical Enterprises Ltd';
-const EXTRACTED_COUNT = Object.values(EXTRACTED).filter(Boolean).length;
+
+/** Stands in until the read returns a name. A record is named for its applicant,
+ *  never for the file it arrived on. */
+const PLACEHOLDER_NAME = 'Individual application';
 
 const digits = (s: string) => s.replace(/\D/g, '');
 
@@ -108,26 +113,160 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   // Scanned-form upload → Document Understanding → pre-fill.
-  const [doc, setDoc] = useState<{ name: string; phase: 'reading' | 'done' } | null>(null);
+  const [doc, setDoc] = useState<{ name: string; phase: 'reading' | 'done' | 'deferred'; fields?: number } | null>(null);
+  /** The uploaded form, parked as an Orchestrator attachment for the case to read. */
+  const [attachment, setAttachment] = useState<JobAttachmentRef | null>(null);
+  /** The case started by the upload. Linked to the record at submit. */
+  const [extractionInstance, setExtractionInstance] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState(false);
+  /** Fingerprint of the uploaded file, so a document seen before paints at once. */
+  const [docKey, setDocKey] = useState<string | null>(null);
+  /** The record opened by the upload, filled in at submit rather than replaced. */
+  const [draftId, setDraftId] = useState<string | null>(null);
 
   const set = (k: keyof Vals) => (ev: React.ChangeEvent<HTMLInputElement>) => {
     setV((p) => ({ ...p, [k]: ev.target.value }));
   };
 
-  const onUpload = (ev: React.ChangeEvent<HTMLInputElement>) => {
+  const onUpload = async (ev: React.ChangeEvent<HTMLInputElement>) => {
     const f = ev.target.files?.[0];
     ev.target.value = '';                 // let the same file be re-picked
     if (!f) return;
+    setDocKey(fingerprint(f));
     setDoc({ name: f.name, phase: 'reading' });
-    // Stand-in for a UiPath Document Understanding / IXP extract: read the scan
-    // and return the fields. Swap this timeout for the real DU call when wired.
-    window.setTimeout(() => {
-      setV((p) => ({ ...p, ...EXTRACTED }));
-      setDoc({ name: f.name, phase: 'done' });
-    }, 1700);
+
+    // Park the form in Orchestrator, then start the case straight away so the
+    // server-side extraction is already running while the applicant is still on
+    // this screen. The review opens against that same instance.
+    //
+    // No draft record here, unlike the corporate wizard: `isCorporate()` treats
+    // AWAITING_EXTRACTION as a corporate marker, so an individual draft parked in
+    // that state would route every later read to the corporate folder and 404.
+    // Upload is an accelerator here rather than the entry point, so the record is
+    // created at submit as it always was, and the instance is linked then.
+    if (maestroReady()) {
+      try {
+        const att = await uploadCaseAttachment(f);
+        setAttachment(att);
+        const id = await startCase({
+          applicantId: 'pending',
+          firstName: v.firstName.trim() || 'Applicant',
+          lastName: v.lastName.trim(),
+          channel: rm ? 'single' : 'self',
+          document: att,
+        });
+        setExtractionInstance(id);
+
+        // Open the record NOW, so the running case is visible on the desk. Without
+        // this, "Finish later" left nothing behind at all: the case was live, the
+        // document was uploaded and IXP was reading it, but no row pointed at any
+        // of it, and the only way back was to upload the form again.
+        //
+        // PRE_REGISTERED and no `entity`, deliberately — `isCorporate()` treats
+        // AWAITING_EXTRACTION (and any entity) as a corporate marker, and a record
+        // misread as corporate sends every later read to the wrong Orchestrator
+        // folder. The parked slot below is what makes the review resumable.
+        try {
+          const draft = await store.create({
+            firstName: PLACEHOLDER_NAME, lastName: '',
+            phone: '', email: '', bvn: '', nin: '', address: '',
+            channel: rm ? 'single' : 'self', source: rm ? 'rm' : 'customer',
+            state: 'PRE_REGISTERED',
+            documentId: att.ID, documentName: att.FullName,
+          });
+          setDraftId(draft.id);
+          linkInstance(draft.id, id);
+          savePendingExtraction({ recordId: draft.id, instanceId: id, attachmentId: att.ID, documentName: att.FullName });
+        } catch { /* the review still works; it just is not on the desk yet */ }
+
+        setReviewing(true);
+        return;                            // the review screen owns the rest
+      } catch {
+        // Fall through to the local read: a Maestro hiccup must not cost the
+        // applicant the upload they just made.
+      }
+    }
+    // No live case (no token, or the start failed) — keep the illustrative read so
+    // the walkthrough still demonstrates the step.
+    setV((p) => ({ ...p, ...EXTRACTED }));
+    setDoc({ name: f.name, phase: 'done' });
   };
 
-  const clearUpload = () => { setV(EMPTY); setDoc(null); };
+  /** Confirmed review rows → the wizard's fields. Names come from the IXP taxonomy,
+   *  so this matches on what the field is called rather than on a field id. */
+  const applyRows = (rows: ReviewField[]) => {
+    // Scope every lookup to a GROUP first. The taxonomy repeats field names across
+    // sections — Surname, First Name, Date of Birth and Gender all appear under
+    // both Personal Details and Next of Kin — so a search by name alone returns
+    // whichever section happens to come first, and the applicant's identity gets
+    // filled in with their next of kin's.
+    const inGroup = (re: RegExp) => rows.filter((r) => re.test(r.group));
+    const APPLICANT = inGroup(/applicant|personal/i);
+    const KIN = inGroup(/next of kin|kin/i);
+    const CONTACT = inGroup(/contact/i);
+    const WORK = inGroup(/employ/i);
+    const ID = inGroup(/identification|account setup/i);
+
+    const val = (rs: ReviewField[], re: RegExp) => rs.find((r) => re.test(r.name))?.value?.trim() ?? '';
+    const set = (k: keyof Vals, rs: ReviewField[], re: RegExp) => {
+      const x = val(rs, re); return x ? { [k]: x } : {};
+    };
+
+    // Names decide what the record is CALLED on the desk, so they get their own
+    // handling. Discrete fields win; failing that, split a one-line name.
+    const names = (() => {
+      const first = val(APPLICANT, /first name|given name/i);
+      const last = val(APPLICANT, /surname|last name|family name/i);
+      if (first || last) return { firstName: first, lastName: last };
+      const full = val(APPLICANT, /full name|applicant name|^name$/i);
+      if (!full) return {};
+      if (/,/.test(full)) {
+        const [surname, rest] = full.split(',').map((x) => x.trim());
+        return { firstName: (rest ?? '').split(/\s+/)[0] ?? '', lastName: surname };
+      }
+      const parts = full.split(/\s+/).filter(Boolean);
+      return { firstName: parts[0] ?? '', lastName: parts.slice(1).join(' ') };
+    })();
+
+    setV((p) => ({
+      ...p,
+      ...(names.firstName ? { firstName: names.firstName } : {}),
+      ...(names.lastName ? { lastName: names.lastName } : {}),
+      ...set('middleName', APPLICANT, /other name|middle name/i),
+      ...set('title', APPLICANT, /^title$/i),
+      ...set('dob', APPLICANT, /date of birth/i),
+      ...set('gender', APPLICANT, /^gender$/i),
+      ...set('maritalStatus', APPLICANT, /marital/i),
+      ...set('motherMaidenName', APPLICANT, /maiden/i),
+      ...set('nationality', APPLICANT, /nationality/i),
+      ...set('stateOfOrigin', APPLICANT, /state of origin/i),
+      ...set('tin', APPLICANT, /\bTIN\b/i),
+      ...set('bvn', ID, /\bBVN\b/i),
+      ...set('nin', ID, /\bNIN\b/i),
+      ...set('idType', ID, /id type|means of identification/i),
+      ...set('idNumber', ID, /id number/i),
+      ...set('idExpiry', ID, /expiry/i),
+      ...set('phone', CONTACT, /phone number 1|^phone/i),
+      ...set('altPhone', CONTACT, /phone number 2|alternate/i),
+      ...set('email', CONTACT, /^email/i),
+      ...set('address', CONTACT, /street name|address/i),
+      ...set('city', CONTACT, /city|town/i),
+      ...set('stateOfResidence', CONTACT, /^state$/i),
+      ...set('lga', CONTACT, /\bLGA\b|local govt/i),
+      ...set('employmentStatus', WORK, /employment status/i),
+      ...set('occupation', WORK, /occupation/i),
+      ...set('employer', WORK, /employer name/i),
+      ...set('incomeBand', WORK, /salary|income/i),
+      // Next of kin is a DIFFERENT PERSON — only ever read from the kin group.
+      ...set('nokName', KIN, /surname|full name/i),
+      ...set('nokRelationship', KIN, /relationship/i),
+      ...set('nokPhone', KIN, /mobile|phone/i),
+    }));
+    setDoc({ name: attachment?.FullName ?? 'the form', phase: 'done', fields: rows.length });
+    setReviewing(false);
+  };
+
+  const clearUpload = () => { setV(EMPTY); setDoc(null); setAttachment(null); setExtractionInstance(null); };
 
   const next = async () => {
     if (step === 1 && (v.bvn || v.nin || v.phone)) {
@@ -139,7 +278,7 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
 
   const submit = async () => {
     setBusy(true);
-    const c = await store.create({
+    const fields: NewCaseInput = {
       firstName: v.firstName.trim(), lastName: v.lastName.trim(),
       phone: digits(v.phone), email: v.email.trim(),
       bvn: digits(v.bvn), nin: digits(v.nin), address: v.address.trim(),
@@ -161,11 +300,40 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
       nextOfKin: v.nokName.trim()
         ? { name: v.nokName.trim(), relationship: v.nokRelationship, phone: digits(v.nokPhone), address: v.nokAddress.trim() || undefined }
         : undefined,
-    });
+    };
+    // An upload already opened a record for this application — fill that one in
+    // rather than leaving it orphaned beside a second, near-identical row.
+    const c = draftId ? await store.update(draftId, fields) : await store.create(fields);
+    // Started before the record existed on the typed-entry path, so tie them
+    // together now; a no-op when the draft already carried the link.
+    if (extractionInstance) linkInstance(c.id, extractionInstance);
+    clearPendingExtraction();
     onDone(c);
   };
 
   const back = () => (step === 0 ? onBack() : setStep((s) => s - 1));
+
+  // The review takes over the whole surface while it is open — the same treatment
+  // the corporate wizard gives it, so the applicant reads the form against the
+  // pages it came from rather than in a corner of the wizard.
+  if (reviewing && extractionInstance) {
+    return (
+      <ExtractionReview
+        corporate={false}
+        instanceId={extractionInstance}
+        docKey={docKey ?? undefined}
+        attachmentId={attachment?.ID}
+        documentName={attachment?.FullName}
+        onAccepted={applyRows}
+        // Closing without confirming keeps the case running and the upload parked;
+        // the applicant can carry on typing and the review stays reachable.
+        // Finish later ≠ finished. The case keeps reading and the review stays
+        // parked, so say that and keep a way back in — otherwise the only route
+        // to a review you stepped away from is to upload the form again.
+        onClose={() => { setReviewing(false); setDoc({ name: attachment?.FullName ?? 'the form', phase: 'deferred' }); }}
+      />
+    );
+  }
 
   return (
     <>
@@ -206,9 +374,25 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
                 <span className="cx-drop-t"><b>Reading {doc.name}…</b><em>Document Understanding is extracting the fields.</em></span>
               </div>
             )}
+            {doc?.phase === 'deferred' && (
+              <Note tone="warn" icon="clock">
+                <b>{doc.name} is uploaded and the case is still reading it.</b> Nothing has been
+                filled in yet — finish the review to bring the values across, or carry on typing
+                and come back to it.
+                {extractionInstance && (
+                  <button type="button" className="cx-clearbtn" onClick={() => setReviewing(true)}>
+                    Resume review
+                  </button>
+                )}
+                <button type="button" className="cx-clearbtn" onClick={clearUpload}>Clear</button>
+              </Note>
+            )}
             {doc?.phase === 'done' && (
               <Note tone="good" icon="checkCircle">
-                <b>{EXTRACTED_COUNT} fields read from the form.</b> From {EXTRACTED_ORG} — signing director. Please check each one before you continue.
+                {/* What THIS upload produced. The old copy named a hardcoded company
+                    and a "signing director" — leftovers from the stub read, shown
+                    verbatim on every individual application. */}
+                <b>{doc.fields ?? 0} field{doc.fields === 1 ? '' : 's'} read from {doc.name}.</b> Please check each one before you continue.
                 <button type="button" className="cx-clearbtn" onClick={clearUpload}>Clear</button>
               </Note>
             )}

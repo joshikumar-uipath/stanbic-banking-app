@@ -561,14 +561,23 @@ export async function findCaseDocument(instanceId: string): Promise<{ attachment
  */
 export async function fetchCaseExtraction(instanceId: string): Promise<unknown | null> {
   const body = await caseVariables(instanceId);
-  // Newest wins: a case that re-ran extraction leaves more than one behind.
+  // Scan for ANY output carrying an ExtractionResult rather than naming the
+  // variable. The key is whatever the caseplan's IXP node happened to call its
+  // output — `output2` in the corporate plan, `output` in the individual one —
+  // and hardcoding one of them is why an individual read came back empty and the
+  // screen fell through to the illustrative sample. The task's own `extraction`
+  // input is null in both plans, and the plan's declared `extractionResult`
+  // variable is never populated either; the element output is the only real copy.
   let found: unknown = null;
   for (const el of body?.elements ?? []) {
-    const o = el.outputs?.output2 as { ExtractionResult?: unknown } | undefined;
-    if (o && typeof o === 'object' && o.ExtractionResult) found = o.ExtractionResult;
+    for (const v of Object.values(el.outputs ?? {})) {
+      const r = (v as { ExtractionResult?: unknown } | null)?.ExtractionResult;
+      if (r) found = r;                       // newest wins: a re-run leaves several
+    }
   }
   return found;
 }
+
 
 /** Approve a corporate stage task: assign, then complete.
  *

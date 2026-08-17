@@ -25,6 +25,7 @@ import GuestChat from './components/GuestChat';
 import WelcomeScreen from './components/WelcomeScreen';
 import { useVideoBlob } from './utils/useVideoBlob';
 import type { AgentRunContext } from './types';
+import { setOperator } from './onboarding/operator';
 
 const authConfig: UiPathSDKConfig = {
   clientId: import.meta.env.VITE_UIPATH_CLIENT_ID,
@@ -185,6 +186,10 @@ function MainApp({ shell = 'mobile' }: { shell?: Shell }) {
   const { firstName: userName, email: userEmail } = isAuthenticated
     ? (profile ?? parseToken(sdk.getToken()))
     : { firstName: '', email: '' };
+  // Tell the record store who is capturing, so an application taken at a desk
+  // carries the name of whoever took it. Unset on the customer's own app, which
+  // is exactly how a self-service opening is told apart from an assisted one.
+  useEffect(() => { setOperator(userName || null); }, [userName]);
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [customersOpen, setCustomersOpen] = useState(false); // Option B: Customers flow as an overlay launched from Home
   const [approvalsOpen, setApprovalsOpen] = useState(false); // Mobile Approvals — overlay launched from Home

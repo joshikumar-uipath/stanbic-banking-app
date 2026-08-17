@@ -43,7 +43,7 @@ export default function Find({ cases, onNavigate, onOpenCase }: { cases: Onboard
             ? ms.activeStage ? `${ms.activeStage} · awaiting` : 'Awaiting approval'
             : ms.activeStage ? `${ms.activeStage} · running` : 'Running'
           : undefined;
-        out.push({ key: `c-${c.id}`, who: n || 'Unnamed applicant', sub: c.id, kind: m.label,
+        out.push({ key: `c-${c.uid ?? c.id}`, who: n || 'Unnamed applicant', sub: c.id, kind: m.label,
           tone: m.tone === 'exception' ? 'crit' : m.tone === 'pending' ? 'warn' : m.tone === 'good' ? 'good' : 'info',
           maestro, go: () => onOpenCase(c.id) });
       }

@@ -372,6 +372,10 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
                 and an entry belonging to another record must not lend its document
                 to this one. */}
             <ExtractionReview
+              // This pane serves both case types, and the extraction helpers are
+              // folder-pinned — the default would send an individual instance to
+              // the corporate folder and 404 on every read.
+              corporate={corporate}
               instanceId={loadPendingExtraction(c.id)?.instanceId ?? linked}
               // The record's own document outlives the parked slot, which is
               // cleared the moment the review is confirmed.
@@ -434,7 +438,15 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
               Checks{liveChecks ? <span className="n">from the live case</span> : null}
             </div>
             <div className="dk-checks">
-              {(liveChecks ? liveChecks.map((v) => v.kind) : VALIDATION_KINDS).map((k) => {
+              {/* Always the full set, in a fixed order. The live case only reports
+                  the checks it has REACHED — at Intake that is the duplicate/risk
+                  pre-screen alone — so keying the list off it made the panel
+                  collapse from six rows to one as soon as the case answered. The
+                  set of checks a customer must pass doesn't change; only their
+                  status does. A check the case hasn't run yet reads Pending rather
+                  than borrowing the seeded record's answer, which would be the
+                  contradiction this sync exists to remove. */}
+              {VALIDATION_KINDS.map((k) => {
                 const v = (liveChecks ?? c.validations).find((x) => x.kind === k);
                 const st = v?.status ?? 'pending';
                 const t = CHECK_TONE[st] ?? 'idle';

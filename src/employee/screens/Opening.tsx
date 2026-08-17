@@ -284,7 +284,9 @@ function GroupedTable({ groups, active, onPick, isOpen, toggle, mstates }: {
             </button>
             {open && (
               <div className="dk-group-body">
-                {g.rows.map((c) => <Row key={c.id} c={c} active={active} onPick={onPick} maestro={mstates[c.id]} />)}
+                {/* uid, not id: the display reference repeats across browsers, so two
+                    unrelated applications can share it and React drops one. */}
+                {g.rows.map((c) => <Row key={c.uid ?? c.id} c={c} active={active} onPick={onPick} maestro={mstates[c.id]} />)}
               </div>
             )}
           </div>

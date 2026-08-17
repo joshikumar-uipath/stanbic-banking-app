@@ -203,12 +203,24 @@ if (typeof window !== 'undefined') {
 export function getLinkedInstance(recordId: string): string | null {
   return readLinks()[recordId] ?? null;
 }
+/** Announce a link change to anything already on screen. Without this a link
+ *  written after its row rendered is invisible until something else forces a
+ *  recompute: the desk list builds its record→instance map when the record set
+ *  changes, and a record is created BEFORE its case is linked — so the new row
+ *  read "Not started" until a page reload. The hydrate already emits this; the
+ *  local writers have to as well. */
+function announceLinks(): void {
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent(LINKS_EVENT));
+}
+
 export function linkInstance(recordId: string, instanceId: string): void {
   const m = readLinks(); m[recordId] = instanceId; writeLinks(m);
+  announceLinks();
   void pushLinkToFabric(recordId, instanceId);   // write-through to the shared store
 }
 export function unlinkInstance(recordId: string): void {
   const m = readLinks(); delete m[recordId]; writeLinks(m);
+  announceLinks();
   void deleteLinkFromFabric(recordId);
 }
 
@@ -283,6 +295,9 @@ interface ElementExec {
   /** Which stage this step belongs to — how the flat element list regains its shape. */
   caseStageElementId?: string;
   startedTimeUtc?: string;
+  /** Action Center deep link for a human step. Carries the task id, which is the
+   *  only reliable way to find it — the task is titled after the app, not the step. */
+  externalLink?: string;
 }
 
 /** Steps worth showing. The rest of the element list is plumbing a banker has no
@@ -304,7 +319,16 @@ const byProgress = (a: { status: string; startedTimeUtc?: string }, b: { status:
  * pending-task heuristic. `CaseStage` elements carry InProgress / Completed status
  * throughout, including while the case runs automated tasks between approvals.
  */
-async function caseStages(instanceId: string): Promise<{ active: string | null; completed: string[]; tasks: StageTask[]; checks: ValidationResult[] } | null> {
+/** The Action Center task id, dug out of an element's deep link
+ *  (…/actions_/tasks/101023920). The element knows which task it spawned; the
+ *  task itself is titled after the APP that serves it, so it cannot be found by
+ *  name — which is exactly why the title map below is only a fallback. */
+function taskIdFromLink(link: string | undefined): number | null {
+  const m = /\/tasks\/(\d+)/.exec(link ?? '');
+  return m ? Number(m[1]) : null;
+}
+
+async function caseStages(instanceId: string): Promise<{ active: string | null; completed: string[]; tasks: StageTask[]; checks: ValidationResult[]; pending: { id: number; title: string } | null } | null> {
   try {
     const r = await pims<{ elementExecutions?: ElementExec[] }>(`/api/v1/element-executions/case-instances/${instanceId}`);
     const els = r.elementExecutions ?? [];
@@ -333,7 +357,16 @@ async function caseStages(instanceId: string): Promise<{ active: string | null; 
     const checks = checksFromSteps(
       els.filter((x) => STEP_TYPES.has(x.elementType)).map((x) => ({ name: x.elementName, status: x.status })),
     );
-    return { active, completed, tasks, checks };
+    // The human step the case is actually parked on, named as the CASE names it
+    // rather than as Orchestrator titles it. Same mechanism corporate uses.
+    const waiting = els.find(
+      (e) => e.caseStageElementId === activeStageId && e.elementType === 'UserTask' && e.status === 'InProgress',
+    );
+    const waitingId = taskIdFromLink(waiting?.externalLink);
+    return {
+      active, completed, tasks, checks,
+      pending: waiting && waitingId ? { id: waitingId, title: waiting.elementName } : null,
+    };
   } catch {
     return null;
   }
@@ -346,16 +379,26 @@ export interface CaseInput {
   bvn?: string;
   nin?: string;
   channel?: string;
+  /** The uploaded account-opening form, as an Orchestrator attachment. Passed to
+   *  the case as `aofDocument`, which is what the extraction step reads and what
+   *  its entry condition tests — omit it and the case simply skips extraction. */
+  document?: JobAttachmentRef;
 }
 
 /** Start a live OnboardingCase instance in Maestro. Returns its instance id. */
 export async function startCase(input: CaseInput): Promise<string> {
+  const { document, ...rest } = input;
   const r = await orch<{ value: { Key: string }[] }>('POST', '/odata/Jobs/UiPath.Server.Configuration.OData.StartJobs', {
     startInfo: {
       ReleaseKey: RELEASE_KEY,
       Strategy: 'ModernJobsCount',
       JobsCount: 1,
-      InputArguments: JSON.stringify({ ...input, channel: input.channel ?? 'self', approved: true }),
+      InputArguments: JSON.stringify({
+        ...rest,
+        channel: input.channel ?? 'self',
+        approved: true,
+        ...(document ? { aofDocument: document } : {}),
+      }),
     },
   });
   const id = r.value?.[0]?.Key;
@@ -474,7 +517,12 @@ export async function getState(instanceId: string): Promise<LiveState> {
   if (done) {
     result = { jobState, done: true, activeStage: null, completedStages: [...STAGES], pendingTaskId: null, pendingTitle: null, stageTasks: [], checks: stages?.checks ?? [] };
   } else {
-    // Scope strictly to THIS instance — CreatorJobKey is the case job that spawned the task.
+    // Fallback only. Orchestrator titles an app task after the app that serves it
+    // ("onboardingapprovalappao"), not after the caseplan step, so this map misses
+    // on any case whose approval taskTitle is the app name — which left a parked
+    // case reading "Nothing for you to do" while Maestro waited on a person. The
+    // element executions above are authoritative; this stays for when they cannot
+    // be read. Scoped to THIS instance — CreatorJobKey is the case job.
     const pending = (tr.value ?? []).find((t) => t.OrganizationUnitId === FOLDER_ID && t.CreatorJobKey === instanceId && STAGE_BY_TASK[t.Title]);
     const pendingStage = pending ? STAGE_BY_TASK[pending.Title] : null;
     // Prefer the case instance's real stage; fall back to the pending task's stage.
@@ -486,7 +534,16 @@ export async function getState(instanceId: string): Promise<LiveState> {
     }
     // A pending approval means its stage is the one awaiting action, not yet complete.
     if (pendingStage) { activeStage = pendingStage; completedStages = completedStages.filter((s) => s !== pendingStage); }
-    result = { jobState, done: false, activeStage, completedStages, stageTasks: stages?.tasks ?? [], checks: stages?.checks ?? [], pendingTaskId: pending?.Id ?? null, pendingTitle: pending?.Title ?? null };
+    result = {
+      jobState, done: false, activeStage, completedStages,
+      stageTasks: stages?.tasks ?? [], checks: stages?.checks ?? [],
+      // When the elements could be read they are the authority — including when
+      // they say nothing is parked. The task query is scoped to the job, not the
+      // stage, so an approval still open in an EARLIER stage would otherwise be
+      // offered under the CURRENT stage's name.
+      pendingTaskId: stages ? stages.pending?.id ?? null : pending?.Id ?? null,
+      pendingTitle: stages ? stages.pending?.title ?? null : pending?.Title ?? null,
+    };
   }
   lastState.set(instanceId, result);
   persistCache();
@@ -532,8 +589,14 @@ export async function getStates(instanceIds: string[]): Promise<Record<string, L
     const done = jobState === 'Successful' || jobState === 'Completed';
     const task = taskByKey.get(id);
     const awaitStage = task?.stage ?? null;
-    const stage = awaitStage ?? getCachedState(id)?.activeStage ?? null;
-    out[id] = { jobState, done, awaiting: Boolean(awaitStage), stage };
+    const cached = getCachedState(id);
+    const stage = awaitStage ?? cached?.activeStage ?? null;
+    // The task query can only recognise an approval whose title is a caseplan step
+    // name, and Orchestrator titles app tasks after the app — so on its own this
+    // reports a case that is parked on a person as merely "running". getState
+    // resolves the pending task from the case's own elements and writes it here,
+    // so trust that too rather than under-reporting the row.
+    out[id] = { jobState, done, awaiting: Boolean(awaitStage) || Boolean(!done && cached?.pendingTaskId), stage };
     // Seed the shared per-instance cache so opening this case paints instantly (with its
     // approve button, since we captured the task id). getState refines it on the detail poll.
     if (jobState !== 'Unknown') {
@@ -563,4 +626,222 @@ export async function approve(taskId: number): Promise<void> {
   const userId = await currentUserId();
   await orch('POST', '/odata/Tasks/UiPath.Server.Configuration.OData.AssignTasks', { taskAssignments: [{ TaskId: taskId, UserId: userId }] });
   await orch('POST', '/tasks/AppTasks/CompleteAppTask', { taskId, data: { decision: 'Approve' }, action: 'Approve' });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Extraction half — upload a filled account-opening form, let the case read it,
+// review what came back.
+//
+// These mirror the corporate implementations in maestro-corporate.ts one for one.
+// They are deliberately NOT shared yet: corporate is the working, demo-critical
+// path and cannot be verified end to end from here, so it keeps its own copy for
+// now. Once the individual flow has run against a real case, both should collapse
+// onto a single folder-parameterised module — the `extraction: null` workaround in
+// particular must not live in two places for long.
+//
+// Everything below reaches Orchestrator through this module's `orch`/`pims`, which
+// pin the INDIVIDUAL folder. A corporate instance read through here 404s.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface JobAttachmentRef {
+  ID: string;
+  FullName: string;
+  MimeType: string;
+  Metadata: Record<string, string>;
+}
+
+interface AttachmentCreated {
+  Id: string;
+  Name: string;
+  BlobFileAccess: { Uri: string; Verb: string; RequiresAuth: boolean; Headers: { Keys: string[]; Values: string[] } };
+}
+
+/** Upload a document as an Orchestrator attachment. Two steps: create the record
+ *  to get a pre-signed blob URI, then PUT the bytes straight to it. The blob PUT
+ *  carries only the headers Orchestrator hands back — adding our bearer token to
+ *  it makes the storage service reject the request. */
+export async function uploadCaseAttachment(file: File): Promise<JobAttachmentRef> {
+  const att = await orch<AttachmentCreated>('POST', '/odata/Attachments', { Name: file.name });
+  const { Uri, Verb, Headers: h } = att.BlobFileAccess;
+  const headers: Record<string, string> = {};
+  h.Keys.forEach((k, i) => { headers[k] = h.Values[i]; });
+  const put = await fetch(Uri, { method: Verb || 'PUT', headers, body: file });
+  if (!put.ok) throw new Error(`attachment upload → ${put.status}`);
+  return { ID: att.Id, FullName: att.Name, MimeType: file.type || 'application/octet-stream', Metadata: {} };
+}
+
+/** A fresh pre-signed READ url. Orchestrator mints a new SAS on every GET (~30 min,
+ *  no auth required), so this can go straight into an iframe. Call it late rather
+ *  than caching — a review resumed hours later still needs working pages. */
+export async function attachmentReadUrl(attachmentId: string): Promise<string> {
+  const att = await orch<AttachmentCreated>('GET', `/odata/Attachments(${attachmentId})`);
+  return att?.BlobFileAccess?.Uri ?? '';
+}
+
+// ── Pending extraction ───────────────────────────────────────────────────────
+// An upload starts the case before the application record exists, so there is
+// nothing to hang the instance off yet. Park it here so "Finish later" resumes.
+// Separate key from corporate's: one browser can have both mid-flight.
+
+const PENDING_KEY = 'aof_indiv_pending_extraction';
+
+export interface PendingExtraction {
+  recordId: string;
+  instanceId: string;
+  attachmentId: string;
+  documentName: string;
+}
+
+export function savePendingExtraction(p: PendingExtraction): void {
+  try { localStorage.setItem(PENDING_KEY, JSON.stringify(p)); } catch { /* private mode */ }
+}
+
+/** The parked extraction, optionally scoped to one record. Without the record id
+ *  a second application would pick up the first one's review. */
+export function loadPendingExtraction(recordId?: string): PendingExtraction | null {
+  try {
+    const raw = localStorage.getItem(PENDING_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw) as PendingExtraction;
+    if (recordId && p.recordId !== recordId) return null;
+    return p;
+  } catch { return null; }
+}
+
+export function clearPendingExtraction(): void {
+  try { localStorage.removeItem(PENDING_KEY); } catch { /* ignore */ }
+}
+
+// ── The review gate ──────────────────────────────────────────────────────────
+
+/** Titles the extraction-review task can carry. Orchestrator names an app task
+ *  after the app that serves it, not after the caseplan step, so both spellings
+ *  have to match. */
+const REVIEW_TASK_TITLES = ['Confirm extracted details', 'individualextractionreviewao'];
+
+export interface ExtractionTask {
+  taskId: number;
+  status: string;
+  /** Raw IXP result as handed to the action app — frequently null; see fetchCaseExtraction. */
+  extraction: unknown;
+  documentUri: string;
+  documentName: string;
+  attachmentId: string;
+  applicantName: string;
+}
+
+/** The pending extraction-review task for an instance, if the case has parked it.
+ *  Null while extraction is still running — the caller polls. */
+export async function findExtractionTask(instanceId: string): Promise<ExtractionTask | null> {
+  const r = await orch<{ value: Array<Record<string, unknown>> }>(
+    'GET',
+    `/odata/Tasks/UiPath.Server.Configuration.OData.GetTasksAcrossFolders?$filter=${
+      encodeURIComponent(`CreatorJobKey eq ${instanceId}`)}&$top=20`,
+  );
+  // A freshly created task is Unassigned, not Pending — filtering on Pending
+  // server-side skips exactly the window we care about.
+  const open = new Set(['Unassigned', 'Pending']);
+  const hit = (r.value ?? []).find((t) =>
+    open.has(String(t.Status ?? '')) &&
+    REVIEW_TASK_TITLES.some((n) => String(t.Title ?? '').toLowerCase().includes(n.toLowerCase())));
+  if (!hit) return null;
+
+  const id = Number(hit.Id);
+  const detail = await orch<{ data?: Record<string, unknown>; status?: string }>(
+    'GET', `/tasks/GenericTasks/GetTaskDataById?taskId=${id}`);
+  const d = detail?.data ?? {};
+  return {
+    taskId: id,
+    status: String(detail?.status ?? hit.Status ?? ''),
+    extraction: d.extraction,
+    documentUri: String(d.documentUri ?? ''),
+    documentName: String(d.documentName ?? ''),
+    attachmentId: String(d.attachmentId ?? ''),
+    applicantName: String(d.applicantName ?? ''),
+  };
+}
+
+/** Complete the review from the desk. Mirrors what the Action Center app sends,
+ *  so the case cannot tell which surface the reviewer used. */
+export async function completeExtractionTask(
+  taskId: number,
+  outcome: 'Accept' | 'Reject',
+  payload: { confirmed: unknown; corrections: unknown; notes?: string },
+): Promise<void> {
+  const userId = await currentUserId();
+  await orch('POST', '/odata/Tasks/UiPath.Server.Configuration.OData.AssignTasks', {
+    taskAssignments: [{ TaskId: taskId, UserId: userId }],
+  });
+  await orch('POST', '/tasks/AppTasks/CompleteAppTask', {
+    taskId,
+    action: outcome,
+    data: {
+      confirmed: JSON.stringify(payload.confirmed),
+      corrections: JSON.stringify(payload.corrections),
+      notes: payload.notes ?? '',
+    },
+  });
+}
+
+interface CaseVarsBody { elements?: Array<{ outputs?: Record<string, unknown>; inputs?: Record<string, unknown> }> }
+
+async function caseVariables(instanceId: string): Promise<CaseVarsBody | null> {
+  try { return await pims<CaseVarsBody>(`/api/v1/instances/${instanceId}/variables`); }
+  catch { return null; }
+}
+
+/**
+ * The IXP result, read from the case rather than the task.
+ *
+ * The review task is handed `extraction: null` — the result never reaches the task
+ * input — so a reviewer reading only the task sees nothing. The same result IS in
+ * the case's own element outputs. Unresolved with the product team; this is the
+ * workaround, and it is why the review screen is not simply task-driven.
+ */
+export async function fetchCaseExtraction(instanceId: string): Promise<unknown | null> {
+  const body = await caseVariables(instanceId);
+  // Scan for ANY output carrying an ExtractionResult rather than naming the
+  // variable. The key is whatever the caseplan's IXP node happened to call its
+  // output — `output2` in the corporate plan, `output` in the individual one —
+  // and hardcoding one of them is why an individual read came back empty and the
+  // screen fell through to the illustrative sample. The task's own `extraction`
+  // input is null in both plans, and the plan's declared `extractionResult`
+  // variable is never populated either; the element output is the only real copy.
+  let found: unknown = null;
+  for (const el of body?.elements ?? []) {
+    for (const v of Object.values(el.outputs ?? {})) {
+      const r = (v as { ExtractionResult?: unknown } | null)?.ExtractionResult;
+      if (r) found = r;                       // newest wins: a re-run leaves several
+    }
+  }
+  return found;
+}
+
+
+/** Which document this case read. Asked of the case, not the task: once the review
+ *  is completed GetTaskDataById returns only outputs, and the inputs that named the
+ *  document are gone — but the case keeps it in `aofDocument`. */
+export async function findCaseDocument(instanceId: string): Promise<{ attachmentId: string; documentName: string } | null> {
+  const body = await caseVariables(instanceId);
+  for (const el of body?.elements ?? []) {
+    const d = (el.outputs?.aofDocument ?? el.inputs?.aofDocument) as { ID?: string; FullName?: string } | undefined;
+    if (d?.ID) return { attachmentId: d.ID, documentName: d.FullName ?? '' };
+  }
+  return null;
+}
+
+/** Whether the review task is still open, already done, or unknown. Needed because
+ *  IXP completes ~20s before the task appears: without this the screen decides
+ *  "nothing to confirm" during the gap and settles on the wrong answer. */
+export async function reviewTaskState(instanceId: string): Promise<'open' | 'done' | null> {
+  try {
+    const r = await pims<{ elementExecutions?: ElementExec[] }>(
+      `/api/v1/element-executions/case-instances/${instanceId}`);
+    const el = (r.elementExecutions ?? []).find(
+      (e) => e.elementType === 'UserTask'
+        && REVIEW_TASK_TITLES.some((n) => e.elementName.toLowerCase().includes(n.toLowerCase())),
+    );
+    if (!el) return null;
+    return el.status === 'Completed' ? 'done' : 'open';
+  } catch { return null; }
 }

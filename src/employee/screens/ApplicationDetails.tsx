@@ -4,7 +4,11 @@ import { stateMeta, isCorporate } from '../../onboarding/types';
 import { Brand } from '../../customer/ui';
 import Icon from '../../customer/icons';
 import { toRows, type ReviewField } from '../../customer/ExtractionReview';
-import { fetchCaseExtraction, findCaseDocument, attachmentReadUrl } from '../../onboarding/maestro-corporate';
+// Each module is pinned to its own Orchestrator folder, so the case type picks
+// the set — reading an individual instance through the corporate helpers 404s,
+// and vice versa.
+import * as corp from '../../onboarding/maestro-corporate';
+import * as indiv from '../../onboarding/maestro';
 import { getActiveCountry, kycLabelAuthority } from '../../config/countries';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -29,7 +33,9 @@ const CHANNEL_LABEL: Record<string, string> = {
   self: 'Customer self-service', bulk: 'Bulk upload', single: 'Walk-in / direct',
 };
 const SOURCE_LABEL: Record<string, string> = {
-  rm: 'Relationship manager', branch: 'Branch', 'contact-centre': 'Contact centre', customer: 'Customer',
+  rm: 'Relationship manager', branch: 'Branch', 'contact-centre': 'Contact centre',
+  agent: 'Agent banking', customer: 'Customer self-service', mobile: 'Mobile app',
+  web: 'Internet banking', whatsapp: 'WhatsApp', partner: 'Partner referral', email: 'Email',
 };
 
 const when = (iso?: string) => (iso ? new Date(iso).toLocaleString() : '');
@@ -80,17 +86,18 @@ export default function ApplicationDetails({ c, instanceId, onReviewExtraction, 
   // What the document actually read, as reference. Correcting it is the review
   // screen's job — this is the record of what was captured.
   const [read, setRead] = useState<ReviewField[] | null>(null);
+  const api = corporate ? corp : indiv;
   useEffect(() => {
-    // Corporate only: these read the corporate case through the corporate folder
-    // key, so pointing them at an individual instance is a guaranteed 404. An
-    // individual application has no scanned pack to recover either.
-    if (!instanceId || !corporate) return;
+    // Both types can be read now that the individual module has its own extraction
+    // helpers — this used to bail out for individuals, which is why an individual
+    // record showed its pages with no fields beside them.
+    if (!instanceId) return;
     let alive = true;
-    fetchCaseExtraction(instanceId)
+    api.fetchCaseExtraction(instanceId)
       .then((x) => { if (alive) setRead(toRows(x)); })
       .catch(() => { /* tab shows why it is empty */ });
     return () => { alive = false; };
-  }, [instanceId, corporate]);
+  }, [instanceId, corporate, api]);
 
   // The pages themselves. The read is only meaningful next to what it was read
   // from, so the Document tab shows both — the same pairing as the review screen.
@@ -99,12 +106,12 @@ export default function ApplicationDetails({ c, instanceId, onReviewExtraction, 
     let alive = true;
     (async () => {
       let id = c.documentId;
-      if (!id && instanceId && corporate) id = (await findCaseDocument(instanceId))?.attachmentId;
+      if (!id && instanceId) id = (await api.findCaseDocument(instanceId))?.attachmentId;
       if (!id || !alive) return;
-      try { const u = await attachmentReadUrl(id); if (alive && u) setDocUrl(u); } catch { /* pane degrades */ }
+      try { const u = await api.attachmentReadUrl(id); if (alive && u) setDocUrl(u); } catch { /* pane degrades */ }
     })();
     return () => { alive = false; };
-  }, [c.documentId, instanceId, corporate]);
+  }, [c.documentId, instanceId, corporate, api]);
 
   const readGroups = useMemo(() => {
     const m = new Map<string, ReviewField[]>();

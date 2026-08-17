@@ -1,7 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { attachmentReadUrl, completeExtractionTask, fetchCaseExtraction, findCaseDocument, findExtractionTask, reviewTaskState, corporateMaestroUrl } from '../onboarding/maestro-corporate';
-import type { ExtractionTask } from '../onboarding/maestro-corporate';
+// Both modules expose the same extraction surface, each pinned to its own
+// Orchestrator folder — reading a corporate instance through the individual
+// helpers 404s, so the case type has to pick the set rather than one being a
+// default. Namespace imports keep the two in step: a helper added to one and not
+// the other fails to compile here.
+import * as corp from '../onboarding/maestro-corporate';
+import * as indiv from '../onboarding/maestro';
+// The two ExtractionTask types differ in their one case-specific field
+// (companyName vs applicantName), which this screen never reads. Narrow to what
+// is common so either can drive it.
+type ExtractionTask = Pick<
+  corp.ExtractionTask,
+  'taskId' | 'status' | 'extraction' | 'documentUri' | 'documentName' | 'attachmentId'
+>;
 import type { EntityInfo } from '../onboarding';
+import { rememberedExtraction, rememberExtraction } from '../onboarding/extractionCache';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Extraction review — the desk-side twin of the Action Center app.
@@ -26,7 +39,13 @@ export interface ReviewField {
   group: string;
 }
 
-type Source = 'case' | 'ixp' | 'sample';
+type Source = 'case' | 'ixp' | 'sample' | 'memory';
+
+/** How long to keep saying "reading" before showing the illustrative sample.
+ *  Deliberately generous: a large scanned pack can take well over a minute to
+ *  extract, and a sample shown early is worse than a slow spinner — it puts a
+ *  different applicant's details on screen as though they were read. */
+const FAST_TRIES = 45;          // × 4s ≈ 3 minutes
 
 const HI = 90;
 const MID = 80;
@@ -100,20 +119,25 @@ export function toRows(raw: unknown): ReviewField[] {
  *  wizard agree on what "confirmed" means, rather than each mapping field names
  *  its own way. */
 export function entityFromRows(rows: ReviewField[]): EntityInfo {
-  const inGroup = (re: RegExp) => rows.filter((r) => re.test(r.group));
   const pick = (rs: ReviewField[], re: RegExp) => rs.find((r) => re.test(r.name))?.value?.trim() ?? '';
-  const co = inGroup(/^company/i);
+  // The entity's own fields only. "Company Details" is also the PREFIX of the
+  // nested groups (Directors/Signatories, Beneficial Owners, Other Bank Accounts),
+  // so an unanchored match would pull a beneficial owner's RC number in as the
+  // applicant's.
+  const co = rows.filter((r) => /^company details$/i.test(r.group));
   const dirGroups = [...new Set(rows.filter((r) => /director|signator/i.test(r.group)).map((r) => r.group))];
   return {
-    companyName: pick(co, /company name/i),
-    rcNumber: pick(co, /^rc|registration number/i),
-    tin: pick(co, /^tin$/i),
-    businessType: pick(co, /business type/i),
-    sector: pick(co, /industry|nature of business/i),
+    // Both spellings, because the taxonomy was renamed to match the bank's form
+    // ("Business Name") and older reads still carry the previous label.
+    companyName: pick(co, /business name|company name/i),
+    rcNumber: pick(co, /^rc\b|^registration number/i),
+    tin: pick(co, /^tin$|tax identification/i),
+    businessType: pick(co, /type\/nature of business|business type/i),
+    sector: pick(co, /sector\/industry|industry/i),
     turnover: pick(co, /turnover/i),
-    address: pick(co, /address/i),
-    email: pick(co, /^email$/i),
-    phone: pick(co, /^phone$/i),
+    address: pick(co, /operating business address|registered address|^address$/i),
+    email: pick(co, /^email/i),
+    phone: pick(co, /^phone(\s*number\s*1)?$/i),
     directors: dirGroups.map((g) => {
       const d = rows.filter((r) => r.group === g);
       return {
@@ -132,6 +156,24 @@ export function entityFromRows(rows: ReviewField[]): EntityInfo {
 /** The sample read as review rows, used when the case payload can't be reached.
  *  Confidences mirror what the model actually returned on this form — the two
  *  BVNs really do read poorly, which is the point of having a review step. */
+/** The individual counterpart. A personal application falling back to a company
+ *  read — RC number, TIN, directors, SCUML — is worse than no fallback at all: it
+ *  describes a different applicant entirely. */
+export const INDIVIDUAL_SAMPLE_ROWS: ReviewField[] = [
+  { id: 'i-first', name: 'First Name', value: 'Oluwaseun', confidence: 96, missing: false, group: 'Applicant details' },
+  { id: 'i-other', name: 'Other Name(s)', value: 'Oluwafemi', confidence: 91, missing: false, group: 'Applicant details' },
+  { id: 'i-sur', name: 'Surname', value: 'Dada', confidence: 97, missing: false, group: 'Applicant details' },
+  { id: 'i-dob', name: 'Date of Birth', value: '1992-12-02', confidence: 88, missing: false, group: 'Applicant details' },
+  { id: 'i-mother', name: "Mother's Maiden Name", value: 'Bakare', confidence: 84, missing: false, group: 'Applicant details' },
+  { id: 'i-origin', name: 'State of Origin', value: 'Lagos', confidence: 93, missing: false, group: 'Applicant details' },
+  { id: 'i-lga', name: 'LGA', value: 'Alimosho', confidence: 90, missing: false, group: 'Applicant details' },
+  { id: 'i-bvn', name: 'BVN', value: '22310633412', confidence: 62, missing: false, group: 'Identification' },
+  { id: 'i-nin', name: 'NIN', value: '57029948062', confidence: 59, missing: false, group: 'Identification' },
+  { id: 'i-tin', name: 'Tax Identification Number (TIN)', value: '', confidence: 0, missing: true, group: 'Identification' },
+  { id: 'i-acct', name: 'Purpose of Account', value: 'Savings', confidence: 92, missing: false, group: 'Account' },
+  { id: 'i-branch', name: 'Branch', value: 'Alapere', confidence: 87, missing: false, group: 'Account' },
+];
+
 export const SAMPLE_ROWS: ReviewField[] = [
   { id: 's-company', name: 'Registered Company Name', value: 'George Emore Technical Enterprises Ltd', confidence: 98, missing: false, group: 'Company details' },
   { id: 's-rc', name: 'RC/Registration Number', value: '961813', confidence: 82, missing: false, group: 'Company details' },
@@ -153,8 +195,11 @@ export const SAMPLE_ROWS: ReviewField[] = [
   ]),
 ];
 
-export default function ExtractionReview({ instanceId, attachmentId, documentName, fallback = SAMPLE_ROWS, onAccepted, onClose }: {
+export default function ExtractionReview({ instanceId, corporate = true, attachmentId, documentName, fallback, docKey, onAccepted, onClose }: {
   instanceId: string;
+  /** Which case this instance belongs to. Defaults true so the existing corporate
+   *  call sites keep their behaviour without being touched. */
+  corporate?: boolean;
   /** Shown immediately, so the pages are on screen while the extraction runs
    *  rather than appearing only once it finishes. */
   attachmentId?: string;
@@ -162,12 +207,29 @@ export default function ExtractionReview({ instanceId, attachmentId, documentNam
   /** Rows to show when the case payload is unavailable. Defaults to the sample
    *  read so every entry point degrades the same way. */
   fallback?: ReviewField[];
+  /** Fingerprint of the uploaded file. When this document has been read before,
+   *  its last real result paints at once instead of waiting on IXP. */
+  docKey?: string;
   onAccepted: (rows: ReviewField[]) => void;
   onClose: () => void;
 }) {
+  // Pinned per render from the case type — every call below goes through this.
+  const api = corporate ? corp : indiv;
+  // The sample has to match the KIND of application, not just exist.
+  const sample = fallback ?? (corporate ? SAMPLE_ROWS : INDIVIDUAL_SAMPLE_ROWS);
+  const maestroUrl = corporate ? corp.corporateMaestroUrl : indiv.instanceUrl;
+
+  // A document seen before renders straight away. The live poll below still runs
+  // and overwrites this the moment the case answers, so a stale memory corrects
+  // itself rather than sticking.
+  const remembered = useMemo(
+    () => (docKey ? toRows(rememberedExtraction(docKey, corporate ? 'corporate' : 'individual')) : []),
+    [docKey, corporate],
+  );
+
   const [task, setTask] = useState<ExtractionTask | null>(null);
-  const [rows, setRows] = useState<ReviewField[] | null>(null);
-  const [source, setSource] = useState<Source>('sample');
+  const [rows, setRows] = useState<ReviewField[] | null>(remembered.length ? remembered : null);
+  const [source, setSource] = useState<Source>(remembered.length ? 'memory' : 'sample');
   const [docUrl, setDocUrl] = useState('');
   const [edits, setEdits] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
@@ -199,10 +261,10 @@ export default function ExtractionReview({ instanceId, attachmentId, documentNam
     let alive = true;
     (async () => {
       let id = attachmentId;
-      if (!id) id = (await findCaseDocument(instanceId))?.attachmentId;
+      if (!id) id = (await api.findCaseDocument(instanceId))?.attachmentId;
       if (!id || !alive) return;
       try {
-        const u = await attachmentReadUrl(id);
+        const u = await api.attachmentReadUrl(id);
         if (alive && u) setDocUrl(u);
       } catch { /* pane degrades to its placeholder */ }
     })();
@@ -222,9 +284,9 @@ export default function ExtractionReview({ instanceId, attachmentId, documentNam
         // whole round trip on "is a task parked?" before it can discover the answer
         // is already sitting in the case — which is the spinner you see for nothing.
         const [t, caseExtraction, reviewState] = await Promise.all([
-          findExtractionTask(instanceId),
-          fetchCaseExtraction(instanceId),
-          reviewTaskState(instanceId),
+          api.findExtractionTask(instanceId),
+          api.fetchCaseExtraction(instanceId),
+          api.reviewTaskState(instanceId),
         ]);
         if (!alive) return;
         if (t) {
@@ -234,10 +296,13 @@ export default function ExtractionReview({ instanceId, attachmentId, documentNam
           // outputs, so read it there rather than dropping to the sample.
           const parsed = toRows(t.extraction);
           const rows = parsed.length ? parsed : toRows(caseExtraction);
-          if (rows.length) { setRows(rows); setSource('case'); }
-          else { setRows(fallback); setSource('sample'); }
+          if (rows.length) {
+            setRows(rows); setSource('case');
+            if (docKey) rememberExtraction(docKey, parsed.length ? t.extraction : caseExtraction, corporate ? 'corporate' : 'individual');
+          }
+          else { setRows(sample); setSource('sample'); }
           if (t.attachmentId && !attachmentId) {
-            try { setDocUrl(await attachmentReadUrl(t.attachmentId)); } catch { /* pane degrades */ }
+            try { setDocUrl(await api.attachmentReadUrl(t.attachmentId)); } catch { /* pane degrades */ }
           }
           return;
         }
@@ -255,11 +320,11 @@ export default function ExtractionReview({ instanceId, attachmentId, documentNam
       // column is not empty, but keep asking on a slower beat: the confirm button
       // is gated on the task existing, so if we stopped here the gate could never
       // open and there would be no way through. Clicking used to be the retry.
-      if (tries > 12) {
+      if (tries > FAST_TRIES) {
         // Local flag, not the state: this closure captures the first render's
         // `gaveUp` forever, so reading the state here would re-drop to the sample
         // on every slow tick and wipe any corrections already typed.
-        if (!dropped) { dropped = true; setRows(fallback); setSource('sample'); setGaveUp(true); }
+        if (!dropped) { dropped = true; setRows(sample); setSource('sample'); setGaveUp(true); }
         timer.current = window.setTimeout(tick, 10000);
         return;
       }
@@ -267,7 +332,7 @@ export default function ExtractionReview({ instanceId, attachmentId, documentNam
     };
     tick();
     return () => { alive = false; if (timer.current) window.clearTimeout(timer.current); };
-  }, [instanceId, fallback, attachmentId]);
+  }, [instanceId, sample, attachmentId]);
 
   // Reveal fields in sequence once they land. The data is real; only the pacing
   // is presentation — IXP returns the whole result at once, it does not stream.
@@ -306,12 +371,12 @@ export default function ExtractionReview({ instanceId, attachmentId, documentNam
     // there is nothing to complete.
     let t = task;
     if (!t && !settled) {
-      try { t = await findExtractionTask(instanceId); } catch { t = null; }
+      try { t = await api.findExtractionTask(instanceId); } catch { t = null; }
     }
 
     if (t) {
       try {
-        await completeExtractionTask(t.taskId, 'Accept', {
+        await api.completeExtractionTask(t.taskId, 'Accept', {
           confirmed, corrections: confirmed.filter((c) => c.corrected),
         });
       } catch (e) {
@@ -355,7 +420,7 @@ export default function ExtractionReview({ instanceId, attachmentId, documentNam
           {/* The case is running while this pane is open — a way through to the
               instance itself, for when the read looks wrong and the question is
               what the case actually did. */}
-          <a className="xv-mlink" href={corporateMaestroUrl(instanceId)} target="_blank" rel="noreferrer">
+          <a className="xv-mlink" href={maestroUrl(instanceId)} target="_blank" rel="noreferrer">
             Open in Maestro ↗
           </a>
           <button className="xv-x" onClick={onClose} aria-label="Close">Close</button>
@@ -372,7 +437,9 @@ export default function ExtractionReview({ instanceId, attachmentId, documentNam
         <div className="xv-banner">
           {source === 'sample'
             ? 'Showing a sample read — the live extraction was not available. Values below are illustrative.'
-            : 'Read directly from the document.'}
+            : source === 'memory'
+              ? 'Showing the last read of this same file. The case is reading it again now, and these values are replaced the moment it answers.'
+              : 'Read directly from the document.'}
         </div>
       )}
 
