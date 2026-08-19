@@ -506,7 +506,7 @@ async function caseVariables(instanceId: string): Promise<CaseVarsBody | null> {
  * inferred.
  *
  * "No open task" is NOT the same as "confirmed": IXP finishes writing its result
- * ~20s before the review task is created, and in that window a brand-new case has
+ * ~30s before the review task is created, and in that window a brand-new case has
  * an extraction and no gate — which reads as already-reviewed when it is the
  * opposite. The UserTask element carries the truth throughout.
  *

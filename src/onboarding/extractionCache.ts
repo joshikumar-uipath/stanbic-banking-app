@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // Remembered reads, held in the module — not in browser storage.
 //
-// A real IXP read of a scanned pack takes 20s–2min. That is fine in production
+// A real IXP read of a scanned pack takes 30s–2min. That is fine in production
 // and painful in a demo where the same forms are shown repeatedly. There are two
 // ways to be fast, and only one of them is trustworthy:
 //

@@ -288,7 +288,7 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
     return () => { alive = false; };
   }, [attachmentId, instanceId]);
 
-  // Poll until the case parks the review task. IXP takes ~20s on a 13-page scan,
+  // Poll until the case parks the review task. IXP takes ~30s on a 13-page scan,
   // so this is a real wait, not a staged one.
   useEffect(() => {
     let alive = true;
