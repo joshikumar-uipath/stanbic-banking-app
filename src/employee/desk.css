@@ -254,7 +254,8 @@
 
 /* ── Rows — the worklist ── */
 .dk-rows { border: none; border-top: 1px solid var(--d-line-2); border-bottom: 1px solid var(--d-line-2); border-radius: 0; overflow: hidden; background: transparent; }
-.dk-cols, .dk-row { display: grid; align-items: center; gap: 14px; padding: 0 14px; }
+/* row + header share one gutter; 18px is what separates the two status lanes */
+.dk-cols, .dk-row { display: grid; align-items: center; gap: 18px; padding: 0 14px; }
 .dk-cols { height: 32px; background: transparent; border-bottom: 1px solid var(--d-line-2);
   font-family: var(--d-mono); font-size: 10px; font-weight: 500; letter-spacing: .08em; color: var(--d-ink-4); text-transform: uppercase; }
 .dk-row { position: relative; min-height: 54px; border-bottom: 1px solid var(--d-line-3, #f2f2ec); text-align: left; width: 100%; background: #fff; }
@@ -284,18 +285,30 @@
 /* Column headers for the two status lanes (Maestro stage · Outcome). Aligned to the
    row grid: rows sit 29px in (group border + body border + row pad) and 15px from the
    right, so the header uses the same insets. */
-.dk-colhead { display: grid; align-items: center; gap: 14px; padding: 3px 15px 7px 29px;
-  font-family: var(--d-num); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--d-ink-4); }
+.dk-colhead { display: grid; align-items: center; gap: 18px; padding: 7px 15px 6px 29px;
+  font-family: var(--d-num); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--d-ink-4);
+  /* Now that it sits inside the group body, it needs its own separation from the
+     rows — above the group heading it borrowed the heading's. */
+  border-bottom: 1px solid var(--d-line-2); }
 
 /* Maestro-stage lane — a 5-segment stage bar + status word, with a "live" badge on real
    instances. Amber = parked on a human approval (needs intervention), blue = running
    automated steps, green = completed; "Not started" when there's no Maestro instance. */
-.dk-mcell { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+/* No padding here: with height:100% it inflates the row instead of insetting the
+   content. Fills the row and centres its own two lines, so the chip sits on the
+   row's optical centre whatever the row's height — relying on the grid's
+   align-items only centred the cell as a block, so the moment a neighbouring cell
+   made the row taller the stage rode up against the top edge. */
+.dk-mcell { display: flex; flex-direction: column; justify-content: center; gap: 3px;
+  min-width: 0; height: 100%; }
 .dk-mcell.empty { color: var(--d-ink-3); font-size: 12.5px; font-weight: 500; }
 .dk-mcell.loading .seg { animation: dkPulse 1.2s infinite; }
 .dk-mcell.loading .dk-mlabel { color: var(--d-ink-4); }
-.dk-mbar { display: flex; align-items: center; gap: 3px; }
-.dk-mlive { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px;
+.dk-mtop { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.dk-mbar { display: flex; align-items: center; gap: 3px; flex: 0 0 auto; }
+/* Inline with the status now rather than after the bar, so it loses its
+   margin-left and holds its width instead of being squeezed by the ellipsis. */
+.dk-mlive { display: inline-flex; align-items: center; gap: 3px; flex: 0 0 auto;
   font-family: var(--d-num); font-size: 9px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--d-ink-3); }
 .dk-mlive i { width: 4px; height: 4px; border-radius: 50%; background: var(--d-green); animation: dkPulse 1.6s infinite; }
 .dk-mbar .seg { width: 13px; height: 4px; border-radius: 2px; background: var(--d-line-2); transition: background .2s ease; }
@@ -304,10 +317,29 @@
 .dk-mcell.done .seg { background: var(--d-green); }
 .dk-mcell .seg.on { animation: dkPulse 1.6s infinite; }
 .dk-mcell.done .seg.on { animation: none; }
-.dk-mlabel { font-size: 11px; font-weight: 600; letter-spacing: -.005em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dk-mlabel { display: flex; align-items: center; gap: 7px; font-size: 11px; font-weight: 600;
+  letter-spacing: -.005em; overflow: hidden; white-space: nowrap; }
+/* Its own line now, so it has the full column to itself before it ever clips. */
+.dk-mstatus { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .dk-mcell.await .dk-mlabel { color: var(--d-amber-ink); }
 .dk-mcell.run  .dk-mlabel { color: var(--d-brand); }
 .dk-mcell.done .dk-mlabel { color: var(--d-green-ink); }
+
+/* NB `.dk-mstage` is already taken by CaseDetail's stage strip further down this
+   file (line ~530). Being later, it wins every property it sets — so the chip
+   here is `.dk-mchip`. Do not rename it back. */
+.dk-mchip { font-size: 8.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  padding: 1px 5px; border-radius: 0; white-space: nowrap; flex: 0 0 auto;
+  border: 1px solid transparent; line-height: 1.5; }
+
+/* One colour per stage — see stageClass(). Muted, bordered, and ordered so the
+   set reads as a progression: slate → blue → amber → teal → green. */
+.dk-mchip.s-intake       { background: #eef1f6; color: #465569; border-color: #d3dbe6; }
+.dk-mchip.s-verification { background: #eaf0fd; color: #2f4fa8; border-color: #cbd9f6; }
+.dk-mchip.s-decision     { background: #fdf2dd; color: #8a5a11; border-color: #f0dcae; }
+.dk-mchip.s-activation   { background: #e4f4f1; color: #12705f; border-color: #bfe4dc; }
+.dk-mchip.s-closure      { background: #e9f4ea; color: #2c6b34; border-color: #c6e3c9; }
+.dk-mchip.s-other        { background: var(--d-wash); color: var(--d-ink-3); border-color: var(--d-line-2); }
 
 .dk-dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; background: var(--d-gray-dot); }
 .dk-dot.good { background: var(--d-green); } .dk-dot.warn { background: var(--d-amber); }
@@ -355,6 +387,35 @@
    "Nothing open" placeholder squeezing the list. */
 .dk-split { height: 100%; display: grid; grid-template-columns: minmax(0, 1fr); overflow: hidden; }
 .dk-split.busy { grid-template-columns: minmax(0, 1fr) minmax(400px, 520px); }
+
+/* Desk-list columns (Open an account). Applicant is CAPPED, not flexible: as a
+   `1.2fr` it swallowed every spare pixel on a wide screen — a name and a reference
+   floating in 600px of nothing — while the two status lanes were pushed against
+   each other on the right. Capping it sends the slack to the next-action column,
+   which is free text that actually uses it.
+   170px on the Maestro lane is measured, not guessed: the widest cell (a
+   "Verification" chip beside the 5-segment bar) needs 159.67px. */
+.dk-split { --dk-open-grid: minmax(168px, 300px) minmax(0, 1fr) 170px 130px 84px 20px; }
+/* Panel open. `minmax(168px,300px)` cannot be reused here: CSS grid grows a track
+   to its max BEFORE distributing anything to `fr`, so with only ~266px to share
+   the applicant took all of it and the next-action column resolved to 0px —
+   its text vanished. Pinning applicant to its floor hands the remainder back. */
+.dk-split.busy { --dk-open-grid: 168px minmax(0, 1fr) 170px 130px 84px 20px; }
+
+/* Approvals queue. Same two-width problem as above, so the same treatment: with
+   the decision pane open there is roughly half the width, and a capped customer
+   column would eat the free space before the request column got any. Flags holds
+   up to three tags and wraps, so it is the one that gives ground when narrow. */
+.dk-split { --dk-appr-grid: minmax(170px, 280px) minmax(0, 1fr) 118px 168px 82px 20px; }
+.dk-split.busy { --dk-appr-grid: 170px minmax(0, 1fr) 104px 96px 74px 20px; }
+
+/* Approvals rows only. The maker line sits under the customer name in a 170px
+   column once the decision pane is open, and "Raised by Onboarding Officer"
+   wrapped to a second line — 36px instead of 15px — so those rows stood 9px
+   taller than their neighbours and the queue looked ragged. Scoped to
+   `.dk-approw` because the same `.rf` in the pipeline list carries the record id
+   plus a "Corporate" tag that is MEANT to wrap onto its own line. */
+.dk-approw .who .rf { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dk-split > .p { min-width: 0; overflow: hidden; display: flex; flex-direction: column; }
 .dk-split > .p.r { display: none; }
 .dk-split.busy > .p.r { display: flex; border-left: 1px solid var(--d-line); background: var(--d-surface); }

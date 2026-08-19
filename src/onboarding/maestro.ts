@@ -489,6 +489,54 @@ export function getCachedState(instanceId: string): LiveState | null {
   return lastState.get(instanceId) ?? null;
 }
 
+/**
+ * Resolve the REAL stage (and whether a person is holding it) for instances the
+ * list poller could not name.
+ *
+ * Why this exists: `getStates` is deliberately two calls for the whole list, and
+ * it can only learn a stage from an open Orchestrator task whose Title happens to
+ * be a caseplan step name. Orchestrator titles app-backed tasks after the APP
+ * (`onboardingapprovalappao`), and a case running automated steps has no open task
+ * at all — so most live rows came back `stage: null, awaiting: false` and rendered
+ * as a bare "Running" with an empty bar. Opening the case ran `getState`, which
+ * reads the case's own element executions, and only THEN did the row show its
+ * stage — because `getStates` falls back to `cached?.activeStage`. The stage was
+ * therefore a reward for clicking rather than a property of the list.
+ *
+ * This asks the same authoritative source (`pims_` element executions) for the
+ * rows the cheap path could not answer, one call each. Bounded by `limit` so a
+ * long desk cannot turn one refresh into fifty requests, and it writes through to
+ * `lastState` so the answer is reused rather than re-fetched.
+ */
+export async function backfillStages(
+  instanceIds: string[],
+  limit = 12,
+): Promise<Record<string, { stage: string | null; awaiting: boolean }>> {
+  const out: Record<string, { stage: string | null; awaiting: boolean }> = {};
+  const ids = [...new Set(instanceIds)].slice(0, limit);
+  if (!TOKEN || ids.length === 0) return out;
+  await Promise.all(ids.map(async (id) => {
+    const s = await caseStages(id);
+    if (!s) return;
+    out[id] = { stage: s.active, awaiting: Boolean(s.pending) };
+    const prev = lastState.get(id);
+    if (prev && !prev.done) {
+      // Authoritative, so it CLEARS as well as sets: when the case's own elements
+      // report no in-progress UserTask the approval is genuinely gone, and leaving
+      // a stale id here would strand the row on "Awaiting approval" for ever.
+      lastState.set(id, {
+        ...prev,
+        activeStage: s.active,
+        completedStages: s.completed,
+        pendingTaskId: s.pending?.id ?? null,
+        pendingTitle: s.pending?.title ?? null,
+      });
+    }
+  }));
+  persistCache();
+  return out;
+}
+
 export async function getState(instanceId: string): Promise<LiveState> {
   // Fire all three reads AT ONCE — first paint is gated by the slowest call, not the sum
   // of all three. (The two extra reads are wasted only for an already-completed case.)
@@ -601,13 +649,23 @@ export async function getStates(instanceIds: string[]): Promise<Record<string, L
     // approve button, since we captured the task id). getState refines it on the detail poll.
     if (jobState !== 'Unknown') {
       const idx = stage ? STAGES.indexOf(stage as (typeof STAGES)[number]) : -1;
+      // MERGE, don't replace. This used to write `pendingTaskId: task?.id ?? null`,
+      // which nulled the pending approval every single tick — because the task query
+      // only recognises a caseplan-named title and app-backed approvals are named
+      // after the app. The next tick then computed `awaiting` from that null, so a
+      // parked row flipped "Awaiting approval" → "Running" → "Awaiting approval" as
+      // the richer read (detail pane, or the list backfill) and this one took turns
+      // writing the same cache. Only a finished case, or the authoritative element
+      // read in backfillStages(), may clear it.
+      const prev = cached;
       lastState.set(id, {
+        ...prev,
         jobState,
         done,
         activeStage: done ? null : stage,
-        completedStages: done ? [...STAGES] : idx > 0 ? STAGES.slice(0, idx) : [],
-        pendingTaskId: task?.id ?? null,
-        pendingTitle: task?.title ?? null,
+        completedStages: done ? [...STAGES] : idx > 0 ? STAGES.slice(0, idx) : prev?.completedStages ?? [],
+        pendingTaskId: done ? null : task?.id ?? prev?.pendingTaskId ?? null,
+        pendingTitle: done ? null : task?.title ?? prev?.pendingTitle ?? null,
       });
       touched = true;
     }
@@ -831,7 +889,7 @@ export async function findCaseDocument(instanceId: string): Promise<{ attachment
 }
 
 /** Whether the review task is still open, already done, or unknown. Needed because
- *  IXP completes ~20s before the task appears: without this the screen decides
+ *  IXP completes ~30s before the task appears: without this the screen decides
  *  "nothing to confirm" during the gap and settles on the wrong answer. */
 export async function reviewTaskState(instanceId: string): Promise<'open' | 'done' | null> {
   try {

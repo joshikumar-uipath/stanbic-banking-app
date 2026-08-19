@@ -208,7 +208,10 @@ function Blank({ onNew, onBulk }: { onNew: () => void; onBulk: () => void }) {
   );
 }
 
-const GRID = { gridTemplateColumns: 'minmax(0,1.2fr) minmax(0,1fr) 148px 130px 84px 20px' };
+// Defined in desk.css as `--dk-open-grid`, because the two widths need different
+// column rules and an inline style can't be overridden by a class. See the two
+// declarations there — `.dk-split` (panel closed) and `.dk-split.busy` (open).
+const GRID = { gridTemplateColumns: 'var(--dk-open-grid)' };
 
 // ── Grouping: each bulk upload is a node; loose single captures share one. ──
 type Group = { key: string; kind: 'batch' | 'direct'; title: string; batchId?: string; createdAt: string; rows: OnboardingCase[] };
@@ -250,15 +253,6 @@ function GroupedTable({ groups, active, onPick, isOpen, toggle, mstates }: {
 }) {
   return (
     <div className="dk-groups">
-      {/* Two labelled status lanes: the real Maestro stage, and the business outcome. */}
-      <div className="dk-colhead" style={GRID}>
-        <span>Applicant</span>
-        <span />
-        <span>Maestro stage</span>
-        <span>Outcome</span>
-        <span />
-        <span />
-      </div>
       {groups.map((g) => {
         const open = isOpen(g);
         const s = summarize(g.rows);
@@ -284,6 +278,18 @@ function GroupedTable({ groups, active, onPick, isOpen, toggle, mstates }: {
             </button>
             {open && (
               <div className="dk-group-body">
+                {/* Two labelled status lanes: the real Maestro stage, and the business
+                    outcome. This sat above the group heading until now, which put the
+                    summary chips between a column label and its column. Inside the body
+                    it reads as what it is: the header of the rows directly beneath it. */}
+                <div className="dk-colhead" style={GRID}>
+                  <span>Applicant</span>
+                  <span />
+                  <span>Maestro stage</span>
+                  <span>Outcome</span>
+                  <span />
+                  <span />
+                </div>
                 {/* uid, not id: the display reference repeats across browsers, so two
                     unrelated applications can share it and React drops one. */}
                 {g.rows.map((c) => <Row key={c.uid ?? c.id} c={c} active={active} onPick={onPick} maestro={mstates[c.id]} />)}
