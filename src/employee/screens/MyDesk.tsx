@@ -161,6 +161,13 @@ export default function MyDesk({ cases, onNavigate, onOpenCase, onNewApplication
   // Focus Flow — the desk leads with ONE next best action; "Skip for now" walks
   // the queue instead of dropping the banker into a wall of 40 rows.
   const [focusIdx, setFocusIdx] = useState(0);
+
+  // The two lanes fold, the same way the pipeline's groups do on Open an account.
+  // A banker who has cleared "needs you now" wants the in-flight lane out of the
+  // way — and one who is working the queue wants the opposite.
+  const [lanes, setLanes] = useState({ now: true, flight: true });
+  const anyLaneOpen = lanes.now || lanes.flight;
+  const setAllLanes = (v: boolean) => setLanes({ now: v, flight: v });
   const cur = now.length ? now[Math.min(focusIdx, now.length - 1)] : undefined;
 
   // Live Maestro status for every onboarding record on the desk (shared hook).
@@ -241,21 +248,28 @@ export default function MyDesk({ cases, onNavigate, onOpenCase, onNewApplication
                 Clear filters
               </button>
             )}
+            <button className="dk-btn" style={{ marginLeft: 'auto' }} onClick={() => setAllLanes(!anyLaneOpen)}>
+              <I n={anyLaneOpen ? 'collapse' : 'expand'} s={14} />{anyLaneOpen ? 'Collapse all' : 'Expand all'}
+            </button>
           </div>
 
-          <div className="dk-eyebrow"><i className="no">01</i>Needs you now<span className="ln" /><span className="n">{now.length}</span></div>
-          {now.length ? <Rows items={now} mstates={mstates} /> : narrowed ? (
+          <button className="dk-eyebrow tog" aria-expanded={lanes.now} onClick={() => setLanes((l) => ({ ...l, now: !l.now }))}>
+            <span className="tw"><I n="chevron" s={13} /></span><i className="no">01</i>Needs you now<span className="ln" /><span className="n">{now.length}</span>
+          </button>
+          {lanes.now && (now.length ? <Rows items={now} mstates={mstates} /> : narrowed ? (
             <div className="dk-empty"><b>Nothing here matches</b><span>No work needing you fits the filters you have set.</span></div>
           ) : (
             <div className="dk-empty"><b>Nothing waiting on you</b><span>Every application is either moving or done.</span></div>
-          )}
+          ))}
 
-          <div className="dk-eyebrow"><i className="no">02</i>In flight<span className="ln" /><span className="n">nothing needed from you</span></div>
-          {flight.length ? <Rows items={flight} mstates={mstates} /> : narrowed ? (
+          <button className="dk-eyebrow tog" aria-expanded={lanes.flight} onClick={() => setLanes((l) => ({ ...l, flight: !l.flight }))}>
+            <span className="tw"><I n="chevron" s={13} /></span><i className="no">02</i>In flight<span className="ln" /><span className="n">{lanes.flight ? 'nothing needed from you' : `${flight.length} hidden`}</span>
+          </button>
+          {lanes.flight && (flight.length ? <Rows items={flight} mstates={mstates} /> : narrowed ? (
             <div className="dk-empty"><b>Nothing here matches</b><span>No application in flight fits the filters you have set.</span></div>
           ) : (
             <div className="dk-empty"><b>Nothing in flight</b><span>Start an application and it will track here.</span></div>
-          )}
+          ))}
         </div>
       </div>
     </div>

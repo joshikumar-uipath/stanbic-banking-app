@@ -151,6 +151,10 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
     // Held locally as well as in state: the read finishes in the same call, before
     // a state update from this handler would be readable.
     let createdDraftId: string | null = null;
+    // Also held locally: `extractionInstance` is state, so this handler cannot read
+    // back what it just set, and whether a case started decides whether the review
+    // can open ahead of the read.
+    let startedInstance: string | null = null;
     // Park the document in Orchestrator first, then start the case immediately so
     // the server-side extraction is already running while the RM is still on this
     // screen. The review step opens against that same instance.
@@ -165,6 +169,7 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
             document: att, documentUri: uri,
           });
           setExtractionInstance(id);
+          startedInstance = id;
           // Open the record now so the running case is visible on the desk. A record
           // is named for its business, never for the file it arrived on — the document
           // name belongs to the extraction (and shows in the details popup). This
@@ -182,6 +187,15 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
         } catch { /* review falls back to the local read */ }
       } catch { /* case starts without it */ }
     }
+    // Open the review NOW, not after the read. The screen already renders the
+    // uploaded page with a scan running over it and a skeleton column, and holding
+    // it back until extraction finished meant nobody ever saw the document being
+    // read — the wizard showed a one-line spinner instead. The read carries on
+    // underneath and fills the wizard's own fields for the steps that follow.
+    const started = Boolean(startedInstance);
+    if (started) setReviewing(true);
+
+    const runRead = async () => {
     try {
       // Real UiPath IXP (Document Understanding) read of the scanned AOF.
       const x = await extractAof(f, (note) => setDoc({ name: f.name, phase: 'reading', note }));
@@ -214,9 +228,12 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
       setDoc({ name: f.name, phase: 'done', source: 'sample' });
       await nameDraft(createdDraftId, EXTRACTED_CORP.company);
     }
-    // The RM confirms what was read before the case moves on. Opening this is what
-    // makes the review a step rather than a screen they might never look at.
-    setReviewing(true);
+    };
+
+    // With a live case the review is already up and owns the wait, so the read runs
+    // underneath it. Without one there is nothing to watch, so keep the old order:
+    // finish the read, then open the review against whatever it produced.
+    if (started) { void runRead(); } else { await runRead(); setReviewing(true); }
   };
 
   /** Fold confirmed values back into the form so the rest of the wizard starts
@@ -378,7 +395,11 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
                 <span className="cx-drop-t"><b>Have a completed form? Upload it</b><em>Scan or photo of the account opening form — we’ll read the company and directors.</em></span>
               </label>
             )}
-            {doc?.phase === 'reading' && (
+            {/* No inline "Reading…" card any more: the review screen opens on the
+                upload and shows the page being scanned, so the wait belongs there.
+                This is only reached if the review could not open — no live case —
+                in which case the wizard is genuinely the only thing on screen. */}
+            {doc?.phase === 'reading' && !extractionInstance && (
               <div className="cx-drop reading"><span className="cx-spin" aria-hidden /><span className="cx-drop-t"><b>Reading {doc.name}…</b><em>{doc.note ?? 'Document Understanding is extracting the form.'}</em></span></div>
             )}
             {doc?.phase === 'done' && (

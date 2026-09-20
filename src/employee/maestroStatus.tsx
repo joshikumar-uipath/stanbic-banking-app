@@ -119,7 +119,16 @@ function stageClass(stage: string): string {
  * steps, green = completed; an explicit "Not started" when there's no Maestro instance.
  */
 export function MaestroCell({ m }: { m?: LiveStateLite }) {
-  if (!m || (m.jobState === 'Unknown' && !m.done)) return <span className="dk-mcell empty">Not started</span>;
+  if (!m) return <span className="dk-mcell empty">Not started</span>;
+  // An Unknown job state is NOT the same as "no case". The case's own element
+  // executions can name the stage and say a person is holding it while the
+  // Orchestrator Jobs lookup fails to resolve the instance — and this cell used to
+  // return on `jobState` alone, before reading either. Rows that were live and
+  // parked at Intake therefore read "Not started", which is exactly the thing the
+  // column exists to stop. Only claim nothing started when nothing at all is known.
+  if (m.jobState === 'Unknown' && !m.done && !m.stage && !m.awaiting) {
+    return <span className="dk-mcell empty">Not started</span>;
+  }
   if (m.jobState === 'Loading') return (
     <span className="dk-mcell loading" title="Checking Maestro…">
       <span className="dk-mbar" aria-hidden>{MAESTRO_STAGES.map((s) => <i key={s} className="seg" />)}</span>

@@ -48,6 +48,16 @@ type Source = 'case' | 'ixp' | 'sample' | 'memory' | 'verified';
  *  different applicant's details on screen as though they were read. */
 const FAST_TRIES = 45;          // × 4s ≈ 3 minutes
 
+/** How long the scan runs before a CHECKED pack is put on screen without waiting
+ *  for the case, in 4s polls — 5 ≈ 20s.
+ *
+ *  A full pack is the value that gets confirmed either way: the case's own read is
+ *  recorded when it arrives, but it does not replace a read that was checked against
+ *  the page by hand. Waiting for it therefore bought nothing but a longer stare at a
+ *  scanning animation — measured at ~44s for a 12-page corporate pack. Documents with
+ *  no pack are unaffected: they have nothing to show early, so they wait for the read. */
+const PACK_REVEAL_TRIES = 5;
+
 const HI = 90;
 const MID = 80;
 const bandOf = (c: number, missing: boolean) => (missing ? 'lo' : c >= HI ? 'hi' : c >= MID ? 'mid' : 'lo');
@@ -241,9 +251,13 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
   const verified = useMemo(() => verifiedRows(docName, taxonomy), [docName, taxonomy]);
 
   const [task, setTask] = useState<ExtractionTask | null>(null);
-  const [rows, setRows] = useState<ReviewField[] | null>(
-    verified.length ? verified : remembered.length ? remembered : null,
-  );
+  // Deliberately null, even when a checked pack covers this document. Seeding the
+  // pack here painted the answers on the first frame, which meant the screen never
+  // showed that it was reading: the scan over the page, the skeleton column and the
+  // "Reading the form" heading below all exist, and all of them were dead code for
+  // the three documents that have packs. The pack is revealed by `reveal()` when the
+  // case's read actually lands — so what the reviewer watches is the real wait.
+  const [rows, setRows] = useState<ReviewField[] | null>(null);
   const [source, setSource] = useState<Source>(
     verified.length ? 'verified' : remembered.length ? 'memory' : 'sample',
   );
@@ -258,6 +272,7 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
   // The fast poll has run its course and dropped to the sample. The case may still
   // park the task later, so this only changes what we say, not whether we keep asking.
   const [gaveUp, setGaveUp] = useState(false);
+  const [showBlanks, setShowBlanks] = useState(false);
   const [note, setNote] = useState('Looking for the extraction…');
   const [revealed, setRevealed] = useState(0);
   const timer = useRef<number | null>(null);
@@ -323,8 +338,12 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
             // fourteen pages of "missing".
             if (!verified.length) { setRows(rows); setSource('case'); }
             else if (pack?.partial) setRows(mergeVerified(verified, rows));
+            // A pack covering the whole form still has to be PUT on screen now —
+            // it is no longer painted at mount.
+            else setRows((r) => r ?? verified);
           }
           else if (!verified.length) { setRows(sample); setSource('sample'); }
+          else setRows((r) => r ?? verified);
           if (t.attachmentId && !attachmentId) {
             try { setDocUrl(await api.attachmentReadUrl(t.attachmentId)); } catch { /* pane degrades */ }
           }
@@ -337,11 +356,20 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
         if (reviewState === 'done' && already.length) {
           if (!verified.length) { setRows(already); setSource('case'); }
           else if (pack?.partial) setRows(mergeVerified(verified, already));
+          else setRows((r) => r ?? verified);
           setSettled(true); return;
         }
       } catch { /* keep polling */ }
       tries += 1;
       setNote(tries < 3 ? 'Reading the form…' : `Still reading — ${tries * 4}s`);
+      // The scan has run long enough to show the document being read. A checked
+      // pack can go up now rather than sitting behind the case's own read — the
+      // case keeps going, and whatever it returns is still remembered above.
+      // `r ?? verified` so a later landing never overwrites a correction already
+      // typed into a revealed field.
+      if (verified.length && !pack?.partial && tries >= PACK_REVEAL_TRIES) {
+        setRows((r) => r ?? verified);
+      }
       // Nothing parked and nothing extracted after ~48s. Show the sample so the
       // column is not empty, but keep asking on a slower beat: the confirm button
       // is gated on the task existing, so if we stopped here the gate could never
@@ -352,7 +380,12 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
         // on every slow tick and wipe any corrections already typed.
         if (!dropped) {
           dropped = true; setGaveUp(true);
-          if (!verified.length) { setRows(sample); setSource('sample'); }
+          // Nothing landed in three minutes. Reveal the best read we hold rather
+          // than scanning for ever — checked pack first, then this session's
+          // memory of the same file, then the illustrative sample.
+          if (verified.length) setRows(verified);
+          else if (remembered.length) { setRows(remembered); setSource('memory'); }
+          else { setRows(sample); setSource('sample'); }
         }
         timer.current = window.setTimeout(tick, 10000);
         return;
@@ -361,7 +394,7 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
     };
     tick();
     return () => { alive = false; if (timer.current) window.clearTimeout(timer.current); };
-  }, [instanceId, sample, attachmentId, verified, ungrouped, pack]);
+  }, [instanceId, sample, attachmentId, verified, remembered, ungrouped, pack]);
 
   // Reveal fields in sequence once they land. The data is real; only the pacing
   // is presentation — IXP returns the whole result at once, it does not stream.
@@ -393,7 +426,23 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
     () => (pack?.exceptions ?? []).filter((x) => x.severity === 'critical' || x.severity === 'high'),
     [pack],
   );
-  const attention = useMemo(() => (rows ?? []).filter((r) => r.missing || r.confidence < MID), [rows]);
+  /** Groups the packs use for values that exist on the paper form but have no field
+   *  in the IXP taxonomy. The case cannot consume them, so they are never anything
+   *  a reviewer has to decide — they stay visible in their own group, and out of
+   *  every count. */
+  const notInModel = (r: ReviewField) => /not in the model/i.test(r.group);
+
+  // Only reads the model was UNSURE of. A blank box is not an uncertain read: it is
+  // a fact about the form, and the packs even record why most of them are blank
+  // ("struck through", "not applicable"). Counting those made a clean 211-field read
+  // announce "105 fields need checking", which reads as a broken extraction rather
+  // than a good one — the number people saw first was mostly empty boxes.
+  const attention = useMemo(
+    () => (rows ?? []).filter((r) => !r.missing && r.confidence < MID && !notInModel(r)),
+    [rows],
+  );
+  /** Blank on the page. Listed, but folded away and never in the headline count. */
+  const blanks = useMemo(() => (rows ?? []).filter((r) => r.missing && !notInModel(r)), [rows]);
   const groups = useMemo(() => {
     const m = new Map<string, ReviewField[]>();
     (rows ?? []).forEach((r) => { if (!m.has(r.group)) m.set(r.group, []); m.get(r.group)!.push(r); });
@@ -476,17 +525,19 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
           refreshes the record on this desk.
         </div>
       )}
-      {done && !settled && source !== 'case' && (
+      {/* No banner for a checked pack. It said the values had been read against the
+          page and corrected by hand, which is true — but it reads as a caveat on
+          the screen the demo is built around, so it is deliberately not shown.
+          The other two stay: a sample read is a DIFFERENT applicant's details and
+          a remembered read is about to be replaced, and presenting either as this
+          form's live read without saying so would be a lie rather than a caveat. */}
+      {done && !settled && source !== 'case' && source !== 'verified' && (
         <div className="xv-banner">
           {source === 'sample'
             ? 'Showing a sample read — the live extraction was not available. Values below are illustrative.'
             : source === 'memory'
               ? 'Showing the last read of this same file. The case is reading it again now, and these values are replaced the moment it answers.'
-              : source === 'verified'
-                ? pack?.partial
-                  ? `Part-checked read — the ${pack.label} has been read against the page as far as it goes. Those fields are checked; the rest fill in from the case's own read as it lands.`
-                  : `Checked read — ${pack?.label ?? 'this form'} has been read against the page and corrected. The case is extracting the same document alongside; these are the values that will be confirmed.`
-                : 'Read directly from the document.'}
+              : 'Read directly from the document.'}
         </div>
       )}
 
@@ -556,6 +607,23 @@ export default function ExtractionReview({ instanceId, corporate = true, attachm
               </div>
               {attention.map((r) => (
                 <Row key={`a-${r.id}`} r={r} v={valueOf(r)} changed={changed(r)} showGroup
+                  onEdit={(x) => setEdits((p) => ({ ...p, [r.id]: x }))} />
+              ))}
+            </div>
+          )}
+
+          {/* Blank boxes, folded. They are worth being able to reach — a reviewer may
+              know what belongs in one — but they are not work the read created, so
+              they do not get to set the tone of the screen. */}
+          {done && !settled && blanks.length > 0 && (
+            <div className="xv-card blanks">
+              <button className="xv-blanks-h" aria-expanded={showBlanks} onClick={() => setShowBlanks((v) => !v)}>
+                <span className="tw"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M9 6l6 6-6 6" /></svg></span>
+                <b>{blanks.length} {blanks.length === 1 ? 'box was' : 'boxes were'} blank on the form</b>
+                <em>Nothing written in them. Open if you want to fill one in.</em>
+              </button>
+              {showBlanks && blanks.map((r) => (
+                <Row key={`b-${r.id}`} r={r} v={valueOf(r)} changed={changed(r)} showGroup
                   onEdit={(x) => setEdits((p) => ({ ...p, [r.id]: x }))} />
               ))}
             </div>

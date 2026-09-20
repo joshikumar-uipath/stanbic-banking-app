@@ -237,6 +237,15 @@
 .dk-eyebrow .no { font-style: normal; color: var(--d-gold-ink); font-weight: 600; letter-spacing: 0; }
 .dk-eyebrow .ln { flex: 1; height: 1px; background: var(--d-line); }
 .dk-eyebrow .n { color: var(--d-ink-4); letter-spacing: 0; font-weight: 400; text-transform: none; flex: 0 0 auto; }
+/* Foldable variant — My desk's two lanes. The same rule elsewhere (CaseDetail)
+   is a plain heading, so the button reset is scoped to `.tog` rather than
+   applied to every eyebrow. The whole strip is the hit area: at 10.5px a bare
+   chevron is a poor target, and the rule already spans the column. */
+.dk-eyebrow.tog { width: 100%; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
+.dk-eyebrow.tog:hover { color: var(--d-ink-2); }
+.dk-eyebrow.tog:hover .ln { background: var(--d-line-2); }
+.dk-eyebrow .tw { color: var(--d-ink-4); display: grid; place-items: center; flex: 0 0 auto; transition: transform .18s ease; }
+.dk-eyebrow.tog[aria-expanded="true"] .tw { transform: rotate(90deg); }
 
 .dk-segs { display: flex; background: #ecece7; border-radius: 0; padding: 3px; }
 .dk-segs button { padding: 5px 11px; border-radius: 0; font-size: 12.5px; font-weight: 500; color: var(--d-ink-2); white-space: nowrap; }

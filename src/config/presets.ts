@@ -55,9 +55,11 @@ export const stanbicConfig: TenantConfig = {
     // Ships with the preset, so every surface (desk rail, phone, customer app,
     // KYC link) is branded on a fresh browser without an admin upload first.
     // Admin → Branding still overrides it.
-    // NB: the artwork is white on a solid blue plate — the blue is #0032A1,
-    // i.e. primaryColor. Surfaces that place it on a dark background paint the
-    // area primaryColor so the plate disappears rather than reading as a box.
+    // NB: the artwork is the full wordmark in Stanbic blue on a TRANSPARENT
+    // background (2026-08-20 refresh — it replaced a version that was white on a
+    // solid #0032A1 plate, which needed the surface painted behind it to hide the
+    // plate). Being blue on transparent it belongs on LIGHT surfaces only; a dark
+    // one needs `logoLight` below, or it is blue on navy.
     // Resolved against the app base via asset() — works at "/" (localhost, any route
     // incl. /kyc/:token) AND under the coded-app base path (/<app>/stanbic-logo.png).
     logo: asset('stanbic-logo.png'),
@@ -65,8 +67,11 @@ export const stanbicConfig: TenantConfig = {
     // logo blends in rather than showing its blue plate as a box. The plated
     // `logo` above still serves light surfaces (home launcher).
     logoLight: asset('stanbic-logo-light.png'),
-    // Square shield mark (cropped from the wordmark) for the browser tab and any
-    // compact spot. Without this the tab falls back to an auto-generated initial.
+    // Square shield mark for the browser tab and any compact spot — and it is what
+    // the desk/ops nav rail shows, on the white plate `.dk-mark` paints. Without
+    // this the tab falls back to an auto-generated initial. Refreshed 2026-08-20
+    // from the supplied .ico (256px frame): flat Stanbic blue on transparent,
+    // replacing the older gradient shield on a blue square.
     favicon: asset('stanbic-favicon.png'),
     primaryColor: '#0033A1',
     secondaryColor: '#0091DA',

@@ -616,15 +616,32 @@ export async function getStates(instanceIds: string[]): Promise<Record<string, L
   const out: Record<string, LiveStateLite> = {};
   const ids = [...new Set(instanceIds)];
   if (!TOKEN || ids.length === 0) return out;
-  const keyFilter = ids.map((id) => `Key%20eq%20${id}`).join('%20or%20');
-  const [jr, tr] = await Promise.all([
-    orch<{ value: { Key: string; State: string }[] }>('GET', `/odata/Jobs?%24filter=${keyFilter}&%24select=Key,State`),
+  // Orchestrator REJECTS a long `Key eq … or …` filter: measured on this tenant it
+  // answers 200 up to 20 terms (936 chars) and 400 `Invalid OData query options`
+  // (errorCode 1000) from 25 up. One desk with 28 linked cases was past the limit,
+  // so the WHOLE call failed and every instance fell back to jobState 'Unknown' —
+  // which the desk cell then rendered as "Not started" for cases that were live and
+  // parked on a person. Ask in batches so the query size no longer depends on how
+  // many cases the desk happens to be tracking.
+  const JOB_FILTER_BATCH = 15;
+  const batches: string[][] = [];
+  for (let i = 0; i < ids.length; i += JOB_FILTER_BATCH) batches.push(ids.slice(i, i + JOB_FILTER_BATCH));
+
+  // Settled, not all-or-nothing, and the two reads no longer share a catch: a bad
+  // job batch used to take the task list down with it (`.catch(() => [null, null])`),
+  // losing the approval each row is parked on as well as its job state.
+  const [jobResults, tr] = await Promise.all([
+    Promise.all(batches.map((batch) =>
+      orch<{ value: { Key: string; State: string }[] }>(
+        'GET',
+        `/odata/Jobs?%24filter=${batch.map((id) => `Key%20eq%20${id}`).join('%20or%20')}&%24select=Key,State`,
+      ).catch(() => null))),
     orch<{ value: { Id: number; Title: string; OrganizationUnitId: number; CreatorJobKey: string }[] }>(
       'GET',
       `/odata/Tasks/UiPath.Server.Configuration.OData.GetTasksAcrossFolders?%24filter=Status%20ne%20'Completed'&%24orderby=CreationTime%20desc&%24top=40`,
-    ),
-  ]).catch(() => [null, null] as const);
-  const jobByKey = new Map((jr?.value ?? []).map((j) => [j.Key, j.State]));
+    ).catch(() => null),
+  ]);
+  const jobByKey = new Map(jobResults.flatMap((r) => (r?.value ?? []).map((j) => [j.Key, j.State] as const)));
   const taskByKey = new Map<string, { id: number; title: string; stage: string }>();
   for (const t of tr?.value ?? []) {
     if (t.OrganizationUnitId === FOLDER_ID && STAGE_BY_TASK[t.Title] && !taskByKey.has(t.CreatorJobKey)) {
