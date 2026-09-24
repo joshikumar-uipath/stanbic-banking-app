@@ -180,7 +180,11 @@ export interface ExtractionTask {
   companyName: string;
 }
 
-const REVIEW_TASK_TITLES = ['Confirm extracted details', 'corporateextractionreviewao'];
+// Matched as substrings, case-insensitively. Action Center titles the task after
+// the app that serves it, and the app name carries a deployment suffix (`…ao`
+// here); matching the shared prefix means a rename cannot silently leave
+// "Confirm and continue" disabled on a case that is parked and waiting.
+const REVIEW_TASK_TITLES = ['Confirm extracted details', 'corporateextractionreview'];
 
 /** Find the pending extraction-review task for an instance, if the case has
  *  reached it. Returns null while IXP is still running — the caller polls. */

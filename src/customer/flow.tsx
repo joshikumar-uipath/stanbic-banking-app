@@ -83,7 +83,8 @@ export function Received({ c, onTrack, onKyc, mode = 'self' }: { c: OnboardingCa
   return (
     <>
       <div className="cx-head plain"><div className="cx-topline"><Brand sub="Application received" /></div></div>
-      <div className="cx-body" style={{ textAlign: 'center' }}>
+      <div className="cx-body mid" style={{ textAlign: 'center' }}>
+        <div className="cx-mid">
         <div className="cx-tick"><Icon name="check" size={38} strokeWidth={2.6} /></div>
         <h1 className="cx-h1" style={{ textAlign: 'center' }}>Application received</h1>
         <p className="cx-p" style={{ marginBottom: 18 }}>
@@ -99,6 +100,7 @@ export function Received({ c, onTrack, onKyc, mode = 'self' }: { c: OnboardingCa
               ? <>We&rsquo;ll text {who} the moment the account number is ready, with a link to finish KYC. No need to keep them at the desk.</>
               : <>We&rsquo;ll text you the moment your account number is ready, with a link to finish your KYC.</>}
           </Note>
+        </div>
         </div>
       </div>
       <div className="cx-foot">

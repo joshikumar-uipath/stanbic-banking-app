@@ -127,7 +127,10 @@
   .nav .ic svg { width: 15px; height: 15px; }
   .nav .badge { margin-left: auto; font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 11px; padding: 1px 6px; border-radius: 0; background: rgba(255,255,255,.1); color: var(--on-navy); }
   .nav .badge.hot { background: var(--red); color: #fff; font-weight: 600; }
-  .nav .badge.new { background: var(--sky); color: var(--navy); font-weight: 700; }
+  /* #fff outright, like .hot above and .promo .btn-sky — var(--navy) is derived
+     from the config's primaryColor and this sits on --sky, its secondaryColor,
+     so the count came out a dark tint of its own background. */
+  .nav .badge.new { background: var(--sky); color: #fff; font-weight: 700; }
   /* Links out. The rail is otherwise buttons, so an <a> needs the reset — and the
      arrow marks it as leaving this console before anyone clicks it. */
   a.nav { text-decoration: none; color: var(--on-navy); }
@@ -135,8 +138,11 @@
   .nav .ext { margin-left: auto; display: grid; place-items: center; opacity: .5; flex: 0 0 auto; }
   .nav .ext svg { width: 13px; height: 13px; }
   a.nav:hover .ext { opacity: .95; }
-  .side .foot { padding: 14px 18px; border-top: 1px solid var(--navy-2); color: var(--on-navy-dim); font-size: 13px; cursor: pointer; }
-  .side .foot:hover { color: #fff; }
+  /* The rail foot is gone — the app's own "← Launcher" button sits over this
+     corner and, unlike a link inside this iframe, it resolves the app root
+     correctly under a base path. The rail keeps its bottom padding so the tools
+     list does not run to the edge. */
+  .side { padding-bottom: 52px; }
 
   /* Role switcher — mirrors the branch desk's (src/employee/RoleSwitch.tsx).
      The two tools share a design language because they are one workspace; this
@@ -272,7 +278,10 @@
   .promo .ev div b { display: block; font-family: var(--num); font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 700; color: #fff; letter-spacing: -0.02em; }
   .promo .ev div span { font-size: 11.5px; color: var(--on-navy-dim); }
   .promo .cta { display: flex; gap: 9px; align-items: center; position: relative; z-index: 1; }
-  .promo .btn-sky { background: var(--sky); color: var(--navy); border: none; border-radius: 0; padding: 9px 15px; font-size: 13px; font-weight: 700; }
+  /* Label is #fff outright, not var(--navy): on a palette where the two brand
+     colours are close, the label came out a dark tint of its own background
+     and read as unclickable. White holds on every accent the config can produce. */
+  .promo .btn-sky { background: var(--sky); color: #fff; border: none; border-radius: 0; padding: 9px 15px; font-size: 13px; font-weight: 700; }
   .promo .btn-sky:hover { filter: brightness(0.94); }
   .promo .btn-line { border: 1px solid rgba(255,255,255,.28); border-radius: 0; padding: 9px 15px; font-size: 13px; font-weight: 600; color: #fff; background: transparent; }
   .promo .btn-line:hover { background: rgba(255,255,255,.08); }
@@ -525,7 +534,35 @@
   .toast.on { display: flex; animation: toastIn .2s ease; }
   .empty { text-align: center; color: var(--ink-3); font-size: 13px; padding: 60px 20px; }
 
-  @media (max-width: 1180px) { .shell { grid-template-columns: 1fr; height: auto; } }
+  /* ---------- shrink to icons ----------
+     The rail at 64px: glyph, role chevron, icons, the shrink control. Labels
+     go, headings become hairlines, counts become dots, and the pipeline and
+     upstream blocks — which are numbers — go with them. Every item keeps its
+     label as a tooltip. Mirrors the branch desk's control (desk.css .dk-shrink)
+     so the two rails behave alike. */
+  .shrink { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 10px 18px; border-top: 1px solid var(--navy-2); color: var(--on-navy-dim); font-size: 13px; flex: 0 0 auto; }
+  .shrink:hover { color: #fff; background: var(--navy-2); }
+  .shrink .ic { width: 16px; height: 16px; display: grid; place-items: center; flex: 0 0 auto; transform: rotate(180deg); }
+  .shrink .ic svg { width: 15px; height: 15px; }
+  .shrink .lb { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .side .glyph { display: none; width: 34px; height: 34px; border-radius: 8px; background: #fff; color: var(--navy); place-items: center; font: 700 16px/1 var(--num); margin: 0 auto; }
+  .shell.slim { grid-template-columns: 64px minmax(0, 1fr); }
+  .shell.slim .side .logo { align-items: center; padding: 18px 0 16px; }
+  .shell.slim .side .logo .plate, .shell.slim .side .logo .wm-sub, .shell.slim .role-btn .t,
+  .shell.slim .side h2 .flow, .shell.slim .funnel, .shell.slim .up, .shell.slim .side .sep,
+  .shell.slim .nav .ext, .shell.slim .shrink .lb { display: none; }
+  .shell.slim .side .glyph { display: grid; }
+  .shell.slim .role-btn { padding: 11px 0; justify-content: center; }
+  .shell.slim .roles { left: 8px; right: auto; width: 272px; }
+  .shell.slim .side .scroll { padding: 8px; }
+  .shell.slim .side h2 { font-size: 0; padding: 0; height: 1px; background: var(--navy-2); margin: 10px 8px; }
+  .shell.slim .nav { font-size: 0; justify-content: center; padding: 11px 0; position: relative; gap: 0; }
+  .shell.slim .nav .badge { position: absolute; top: 7px; right: 12px; width: 8px; height: 8px; padding: 0; margin: 0; border-radius: 50%; font-size: 0; background: var(--on-navy-dim); }
+  .shell.slim .nav .badge.hot { background: var(--red); }
+  .shell.slim .nav .badge.new { background: var(--sky); }
+  .shell.slim .shrink { justify-content: center; padding: 11px 0; }
+  .shell.slim .shrink .ic { transform: none; }
+  @media (max-width: 1180px) { .shell, .shell.slim { grid-template-columns: 1fr; height: auto; } }
 </style>
 </head>
 <body>
@@ -534,6 +571,7 @@
   <nav class="side" aria-label="Views">
     <div class="logo">
       <span class="plate"><img class="wordmark" src="/stanbic-logo.png" alt="Stanbic IBTC" /></span>
+      <span class="glyph" id="glyph" aria-hidden="true">S</span>
       <em class="wm-sub">Account Opening · Staging</em>
     </div>
     <!-- Role switcher. Same block as the branch desk: one workspace, two jobs.
@@ -592,7 +630,10 @@
         <span class="ext" aria-label="opens in a new tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-8 8"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></span>
       </a>
     </div>
-    <div class="foot" id="foot">← Launcher</div>
+    <button class="shrink" id="shrink" title="Shrink to icons" aria-label="Shrink to icons" aria-pressed="false">
+      <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 6l6 6-6 6"/><path d="M13 6l6 6-6 6"/></svg></span>
+      <span class="lb">Shrink to icons</span>
+    </button>
   </nav>
 
   <main class="main">
@@ -1711,7 +1752,6 @@ document.addEventListener("click", function (e) {
   const rr = t.closest("[data-rerun]");
   if (rr) { toast("Re-running " + rr.dataset.rerun.toUpperCase() + " check…", "↻"); return; }
   if (t.closest("[data-close]") || t === el("scrim")) { panelOpen = false; render(); return; }
-  if (t.closest("#foot")) { try { window.top.location.href = "/"; } catch (err) { window.location.href = "/"; } return; }
   // Role switcher: toggle on the button, close on any click outside it. Links
   // inside carry target="_top" so they escape the /ops iframe.
   if (t.closest("#role-btn")) {
@@ -2082,6 +2122,40 @@ setInterval(function () {
 })();
 
 render();
+</script>
+<script>
+  // Shrink the rail to its icons. A preference, kept across reloads. The labels
+  // live on as tooltips: the nav buttons are titled from their text once here,
+  // before the text is hidden.
+  (function () {
+    var shell = document.getElementById('shell');
+    var btn = document.getElementById('shrink');
+    if (!shell || !btn) return;
+    var KEY = 'ops_rail_slim';
+    document.querySelectorAll('.side .nav').forEach(function (n) {
+      if (!n.title) n.title = (n.textContent || '').replace(/\s+/g, ' ').replace(/\d+$/, '').trim();
+    });
+    function glyph() {
+      var img = document.querySelector('.side .logo .wordmark');
+      var name = (img && img.alt) || document.title || 'S';
+      document.getElementById('glyph').textContent = name.trim().charAt(0).toUpperCase();
+    }
+    function apply(on) {
+      shell.classList.toggle('slim', on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      btn.title = on ? 'Expand the rail' : 'Shrink to icons';
+      btn.setAttribute('aria-label', btn.title);
+      if (on) glyph();
+    }
+    var saved = false;
+    try { saved = localStorage.getItem(KEY) === '1'; } catch (_) { /* unavailable */ }
+    apply(saved);
+    btn.addEventListener('click', function () {
+      var on = !shell.classList.contains('slim');
+      try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (_) { /* unavailable */ }
+      apply(on);
+    });
+  })();
 </script>
 </body>
 </html>

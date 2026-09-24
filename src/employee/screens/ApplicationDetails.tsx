@@ -10,6 +10,7 @@ import { toRows, type ReviewField } from '../../customer/ExtractionReview';
 import * as corp from '../../onboarding/maestro-corporate';
 import * as indiv from '../../onboarding/maestro';
 import { getActiveCountry, kycLabelAuthority } from '../../config/countries';
+import { maestroConfig } from '../../onboarding/maestro';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Application details — who the applicant is.
@@ -113,6 +114,10 @@ export default function ApplicationDetails({ c, instanceId, onReviewExtraction, 
     return () => { alive = false; };
   }, [c.documentId, instanceId, corporate, api]);
 
+  /** Does this record actually have a form behind it? True if the row names one
+   *  or the pages resolved, so the copy below can never contradict the frame. */
+  const hasDoc = Boolean(c.documentId || c.documentName || docUrl);
+
   const readGroups = useMemo(() => {
     const m = new Map<string, ReviewField[]>();
     (read ?? []).forEach((r) => { if (!m.has(r.group)) m.set(r.group, []); m.get(r.group)!.push(r); });
@@ -127,6 +132,8 @@ export default function ApplicationDetails({ c, instanceId, onReviewExtraction, 
     // record — a scanned form, a payroll row, or someone typing — and a tab bar
     // that changes shape between records reads as though something failed to load.
     { id: 'extraction', label: 'Document' },
+    // Web IQ: what the public web says about this applicant, with sources.
+    { id: 'web', label: 'Web research' },
   ], [corporate, e]);
 
   // A waiting review is the reason the popup was opened, so start there.
@@ -159,6 +166,7 @@ export default function ApplicationDetails({ c, instanceId, onReviewExtraction, 
   // dialog body normally, or the left frame when the Document tab splits it.
   const body = (
     <>
+          {active === 'web' && <WebResearch c={c} corporate={corporate} e={e} />}
           {active === 'who' && (
             <>
               {e && (
@@ -296,8 +304,12 @@ export default function ApplicationDetails({ c, instanceId, onReviewExtraction, 
                 </button>
               )}
 
-              {read === null && instanceId && corporate && <Nothing>Reading what the case extracted…</Nothing>}
-              {read === null && !(instanceId && corporate) && !c.documentId && (
+              {read === null && instanceId && <Nothing>Reading what the case extracted…</Nothing>}
+              {/* `hasDoc`, not c.documentId: the pages in the frame beside this are
+                  resolved from the case as well as the row, and can be present when
+                  that field is empty — which is how a record ended up showing a
+                  scanned form and claiming in the same breath that none was scanned. */}
+              {read === null && !instanceId && !hasDoc && (
                 <Nothing>
                   {c.batchId
                     ? `No form was scanned. This application came in as a row of the ${c.batchId} bulk upload, so the details were taken from that file.`
@@ -308,8 +320,8 @@ export default function ApplicationDetails({ c, instanceId, onReviewExtraction, 
               )}
               {read !== null && !read.length && (
                 <Nothing>
-                  {c.documentName
-                    ? `${c.documentName} was uploaded, but the case has not recorded an extraction for it.`
+                  {hasDoc
+                    ? `${c.documentName || 'A form'} was uploaded, but the case has not recorded an extraction for it.`
                     : c.batchId
                       ? `No form was scanned. This application came in as a row of the ${c.batchId} bulk upload, so the details were taken from that file.`
                       : c.channel === 'self'
@@ -390,7 +402,7 @@ export default function ApplicationDetails({ c, instanceId, onReviewExtraction, 
                 {docUrl
                   ? <iframe className="ad-frame" title="Uploaded form" src={`${docUrl}#view=FitH&toolbar=1`} />
                   : <div className="ad-doc-none">
-                      {read === null && instanceId && corporate ? 'Fetching the uploaded pages…' : 'No document was uploaded for this application.'}
+                      {read === null && instanceId ? 'Fetching the uploaded pages…' : 'No document was uploaded for this application.'}
                     </div>}
               </div>
             </div>
@@ -404,5 +416,42 @@ export default function ApplicationDetails({ c, instanceId, onReviewExtraction, 
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Web research ─────────────────────────────────────────────────────────────
+// Web IQ. A Foundry agent grounded with Bing searches the public web for the
+// applicant and writes a dossier: verdict, findings with whether each one is
+// really this person, the searches run and the sources. It runs on the voice
+// service and is framed here by URL — the same arrangement as the call popup.
+// Nothing in this app calls Azure; it draws an iframe.
+const RESEARCH_HOST = ((import.meta.env.VITE_VOICE_AGENT_URL as string | undefined)
+  || 'https://banking-demo-voice-agent.azurewebsites.net').replace(/\/+$/, '');
+
+function WebResearch({ c, corporate, e }: { c: OnboardingCase; corporate: boolean; e: OnboardingCase['entity'] }) {
+  const url = useMemo(() => {
+    const q = new URLSearchParams({ ref: c.id, name: [c.firstName, c.lastName].filter(Boolean).join(' ') });
+    // Same reason as CallPanel: dossiers are cached per reference on the shared
+    // service, and our reference series overlaps the Microsoft demo's.
+    q.set('folder', maestroConfig().folderKey);
+    if (c.dob) q.set('dob', c.dob);
+    if (c.nationality) q.set('nationality', c.nationality);
+    if (c.city) q.set('city', c.city);
+    if (c.stateOfResidence) q.set('state', c.stateOfResidence);
+    if (c.stateOfOrigin) q.set('stateOfOrigin', c.stateOfOrigin);
+    if (c.employer) q.set('employer', c.employer);
+    if (c.occupation) q.set('occupation', c.occupation);
+    if (corporate && e) {
+      if (e.companyName) q.set('company', e.companyName);
+      if (e.directors.length) q.set('directors', e.directors.map((d) => d.name).join('; '));
+    }
+    return `${RESEARCH_HOST}/research?${q}`;
+  }, [c, corporate, e]);
+  return (
+    <iframe
+      title={`Web research on ${c.firstName ?? ''} ${c.lastName ?? ''}`}
+      src={url}
+      style={{ width: '100%', height: 'calc(min(1000px, 94vh) - 250px)', border: 0, display: 'block' }}
+    />
   );
 }

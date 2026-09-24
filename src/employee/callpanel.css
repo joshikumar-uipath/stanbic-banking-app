@@ -1,0 +1,44 @@
+/* The call popup.
+   The shell — scrim, dialog, brand strip, footer — is the record-details dialog's
+   own (.ad-scrim / .ad.cx in desk.css). Only what is specific to a call lives here.
+
+   The frame holds the REAL call page, not the stripped `?embed=1` engine, so the
+   popup and the same URL in a tab are the same experience. That means the page
+   needs the whole dialog: it lays itself out in two columns once connected, and
+   at engine size it had nowhere to put them. */
+
+/* Wide enough for the page's connected two-column layout without becoming the
+   1380px fact grid, which a single centred call card cannot fill. */
+.ad.cp { max-width: 1040px; }
+
+/* The dialog already caps its own height; the body is the frame's to fill. */
+.cp .cx-body { padding: 0; min-height: 0; }
+.cp-stage { display: flex; flex-direction: column; min-height: 0; }
+
+.cp-engine { flex: 1; width: 100%; min-height: 0; border: 0; display: block; background: transparent; }
+/* Hidden until it says hello, so a frame the host refuses never shows as a
+   broken box. */
+.cp-engine.pending { flex: none; height: 0; }
+.cp-wait { padding: 40px 24px; font-size: 13px; color: rgba(17, 24, 29, .48); }
+
+.cp-blocked { padding: 24px; }
+.cp-blocked p { margin: 0 0 14px; max-width: 52ch; font-size: 13px; line-height: 1.6; color: rgba(17, 24, 29, .68); }
+.cp-blocked b { color: var(--d-ink, #11181d); }
+.cp-open {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--brand-primary, #0033a1); color: #fff; text-decoration: none;
+  font: 600 13px/1 inherit; padding: 11px 14px; border-radius: 6px;
+}
+.cp-open:hover { filter: brightness(1.1); }
+
+/* The host's own policy, shown on request. Folded away by default: it is
+   diagnostic detail, not something an RM needs, but it is the difference
+   between knowing what is permitted and guessing at it. */
+.cp-csp { margin-top: 18px; max-width: 100%; }
+.cp-csp summary { cursor: pointer; font-size: 12px; color: rgba(17, 24, 29, .55); }
+.cp-csp pre {
+  margin: 10px 0 0; padding: 12px; overflow-x: auto;
+  background: #f5f7f9; border: 1px solid var(--d-line-2); border-radius: 6px;
+  font: 11.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: rgba(17, 24, 29, .78); white-space: pre;
+}

@@ -14,10 +14,12 @@ import ApplicationDetails from './ApplicationDetails';
 import ExtractionReview, { entityFromRows, type ReviewField } from '../../customer/ExtractionReview';
 import { loadPendingExtraction, clearPendingExtraction, getCorporateState, getCachedCorporateState, approveCorporate, corporateMaestroUrl } from '../../onboarding/maestro-corporate';
 import { store, stateMeta, fullName, isCorporate, commsFor, CHANNEL_META, MSG_CHANNELS, VALIDATION_KINDS, type OnboardingCase, type ValidationKind, type MsgChannel } from '../../onboarding';
-import { maestroReady, startCase, getState, getCachedState, approve, instanceUrl, actionCenterUrl, getLinkedInstance, linkInstance, unlinkInstance, LINKS_EVENT, STAGES as MAESTRO_STAGES, type LiveState } from '../../onboarding/maestro';
+import { maestroReady, startCase, getState, getCachedState, approve, instanceUrl, actionCenterUrl, getLinkedInstance, linkInstance, unlinkInstance, LINKS_EVENT, STAGES as MAESTRO_STAGES, type LiveState, CALL_PURPOSE_LABEL } from '../../onboarding/maestro';
 import { ChannelIcon } from '../../onboarding/ChannelIcon';
+import { CallIcon } from '../maestroStatus';
 import Kyc from '../../customer/Kyc';
 import { nextBestActions, type Nba } from '../nba';
+import CallPanel, { type CallSubject } from '../CallPanel';
 import { I, Tag, type Tone } from '../ui';
 import { ago } from '../time';
 import { getActiveCountry, kycLabel, kycLabelAuthority } from '../../config/countries';
@@ -49,7 +51,12 @@ const TOPIC_META: Record<string, { label: string; color: string }> = {
 type CaseTab = 'overview' | 'messages' | 'activity';
 
 export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose: () => void }) {
+  /** Which hold the call should chase. The agent's script changes with it, so this
+   *  must come from the case rather than default to documents. */
   const [kyc, setKyc] = useState(false);
+  // false, or which tab of the call popup to open on: the outbound-call form,
+  // or the record's call history.
+  const [calling, setCalling] = useState<false | 'call' | 'calls'>(false);
   const [toast, setToast] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [tab, setTab] = useState<CaseTab>('overview');
@@ -253,7 +260,10 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
     id: 'maestro-blocked',
     title: `Call ${c.firstName || 'the customer'} before approving`,
     why: 'Approve only what you can stand behind. If the reviewer is waiting on something only the customer has, get it first — an approval you have to reverse costs more than the call.',
-    href: c.phone ? `tel:${c.phone}` : undefined,
+    // Was a tel: link, which handed the RM to their phone and lost the outcome.
+    // Now it opens the voice agent in a panel beside the case, so the transcript
+    // and what was agreed come back to the record.
+    opens: 'call',
     kind: 'do',
   }];
 
@@ -265,6 +275,47 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
 
     const base = nextBestActions(c);
     const live: Nba[] = [];
+    // The case is on a call — or waiting for one. Both come straight off the
+    // wait task the case is parked on, so the desk says so before anything else.
+    const callWait = linked && !mstate?.done ? mstate?.callWait ?? null : null;
+    if (callWait?.kind === 'due') {
+      live.push({
+        id: 'call-due',
+        title: `Call ${c.firstName || 'the customer'} about the missing documents`,
+        why: 'Your call is due. The case is parked at Pending customer on "Agent Conversation": the reviewer found documents missing and the customer needs to hear it from a person. The voice agent will verify them, explain what is missing and offer the secure upload link; the case carries on from what is agreed.',
+        kind: 'do',
+        primary: true,
+        opens: 'call',
+      });
+    } else if (callWait?.kind === 'done') {
+      live.push({
+        id: 'agent-called',
+        title: `Review the call — voice agent reached ${c.firstName || 'the customer'}`,
+        why: `The voice agent called ${c.firstName || 'the customer'} when the case left ${callWait.stage ?? 'its stage'} (${CALL_PURPOSE_LABEL[callWait.purpose].toLowerCase()}), and they answered. The recording, transcript and notes are under Previous calls; the case has carried on.`,
+        kind: 'do',
+        primary: true,
+        opens: 'call',
+      });
+    } else if (callWait?.kind === 'missed') {
+      live.push({
+        id: 'agent-missed',
+        // The title is also the button, so it has to be the thing you do.
+        title: `Call ${c.firstName || 'the customer'} — the voice agent got no answer`,
+        why: `The voice agent called ${c.firstName || 'the customer'} when the case left ${callWait.stage ?? 'its stage'} (${CALL_PURPOSE_LABEL[callWait.purpose].toLowerCase()}), and the call rang out. Call them yourself, or let the agent retry; the case waits until someone gets through.`,
+        kind: 'do',
+        primary: true,
+        opens: 'call',
+      });
+    } else if (callWait?.kind === 'agent') {
+      live.push({
+        id: 'agent-calling',
+        title: `Listen in — voice agent calling ${c.firstName || 'the customer'}`,
+        why: `Placed by the voice agent when the case left ${callWait.stage ?? 'its stage'} (${CALL_PURPOSE_LABEL[callWait.purpose].toLowerCase()}). Nothing for you to do: the case continues when the call ends, and the recording lands under Previous calls on this record.`,
+        kind: 'do',
+        primary: true,
+        opens: 'call',
+      });
+    }
     if (linked && mstate?.pendingTaskId && !mstate.done) {
       live.push(...approvalCards(stageNow, mstate.pendingTitle, mstate.pendingTaskId));
     }
@@ -310,7 +361,33 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
   const msgs = commsFor(c);
   const name = fullName(c).trim() || 'Unnamed applicant';
 
+  /** Which hold the call should chase. The agent's script changes with it, so this
+   *  comes off the case rather than defaulting to documents. */
+  // How many calls the case has placed: each visit to Voice Agent (the
+  // automated calls) or Pending customer (the RM's call) is one.
+  const callsMade = (mstate?.secondaries ?? []).filter((x) => x.name === 'Voice Agent' || x.name === 'Pending customer').length;
+
+  const callSubject = (): CallSubject => {
+    // Straight off the case state, which is what the desk badge shows too.
+    // A case parked on one of its own calls opens the popup on THAT call, so the
+    // brief, the steps and the history all match the handset on the row.
+    const cw = mstate?.callWait;
+    const hold: CallSubject['hold'] = cw && cw.kind !== 'due' && cw.purpose !== 'documents' ? cw.purpose
+      : cw?.kind === 'due' ? 'documents'
+      : c.state === 'PENDING_LIVENESS'
+      ? 'liveness'
+      : (c.state === 'EDD_REVIEW' || c.state === 'AWAITING_EXTRACTION' ? 'review' : 'documents');
+    return {
+      reference: c.id,
+      name: [c.firstName, c.lastName].filter(Boolean).join(' ') || 'the customer',
+      dob: c.dob || undefined,
+      phone: c.phone || undefined,
+      hold,
+    };
+  };
+
   const fire = async (a: Nba) => {
+    if (a.opens === 'call') { setCalling('call'); return; }
     if (a.opens === 'kyc') { setKyc(true); return; }
     if (a.opens === 'channels') { setPicker(true); return; }
     if (a.href) { window.location.href = a.href; return; }
@@ -406,6 +483,28 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
         {maestroReady() && !linked && !corporate && (
           <button className="dk-run-maestro" disabled={mbusy} onClick={runMaestro}>{mbusy ? 'Starting…' : '▶ Run this case in Maestro'}</button>
         )}
+
+        {/* The record's calls. Once a case has moved past the stage that placed
+            a call there is no next-best-action for it, so this is the standing
+            way into the call history — the recording and transcript of every
+            call the voice agent made on this application. */}
+        {linked && !corporate && (() => {
+          // While the voice agent is on the line the card turns red and glows,
+          // and its button joins the call rather than opening the history.
+          const onCall = !mstate?.done && mstate?.callWait?.kind === 'agent';
+          return (
+            <div className={`dk-nba dk-calls-card${onCall ? ' live' : ''}`}>
+              <div className="hd"><span className="ic"><CallIcon kind={onCall ? 'agent' : 'done'} /></span><span>Voice agent</span>{onCall && <span className="dk-calls-live">On a call now</span>}</div>
+              <div className="ttl">{onCall
+                ? `Calling ${c.firstName || 'the customer'} — ${CALL_PURPOSE_LABEL[mstate!.callWait!.purpose].toLowerCase()}`
+                : callsMade === 0 ? 'No calls on this case yet' : callsMade === 1 ? '1 call on this case' : `${callsMade} calls on this case`}</div>
+              <p className="why">{onCall
+                ? `The voice agent is speaking to the customer now. ${callsMade > 1 ? `${callsMade - 1} earlier call${callsMade > 2 ? 's' : ''} on this case are in the history.` : 'The recording lands in the call history when it ends.'}`
+                : callsMade ? 'Every call the voice agent has placed for this application, with its recording and transcript.' : 'The case has not reached a stage that places a call.'}</p>
+              <button className="dk-btn" onClick={() => setCalling(onCall ? 'call' : 'calls')}>{onCall ? 'Listen in' : 'Open call history'}</button>
+            </div>
+          );
+        })()}
 
         <div className="dk-tabs" role="tablist">
           {(['overview', 'messages', 'activity'] as const).map((t) => (
@@ -542,6 +641,7 @@ export default function CaseDetail({ c, onClose }: { c: OnboardingCase; onClose:
         />
       )}
       {picker && <ChannelPicker c={c} onCancel={() => setPicker(false)} onSend={sendKyc} />}
+      {calling && <CallPanel subject={callSubject()} tab={calling} onClose={() => setCalling(false)} />}
       {toast && <div className="dk-toast">{toast}</div>}
     </div>
   );
@@ -723,11 +823,25 @@ function MaestroAction({ instanceId, corporate, state }: { instanceId: string; c
       <div className="hd">
         <span className="ic"><I n={done ? 'check' : 'zap'} s={14} w={2.2} /></span>
         <span>Live in Maestro</span>
+        {!done && state?.callWait && (
+          <span className={`dk-mcall-card ${state.callWait.kind}`}>
+            <CallIcon kind={state.callWait.kind} />
+            {state.callWait.kind === 'agent' ? 'Voice agent calling'
+              : state.callWait.kind === 'done' ? 'Voice agent · answered'
+              : state.callWait.kind === 'missed' ? 'Voice agent · no answer'
+              : 'Your call is due'}
+          </span>
+        )}
         <span className={`dk-nba-live ${done ? 'ok' : ''}`}>{done ? 'Completed' : state?.jobState ?? 'starting…'}</span>
       </div>
 
       <div className="ttl">
-        {done ? 'Onboarding case completed' : stage ? `${stage} · ${awaiting ? 'awaiting approval' : 'in progress'}` : 'Case running in Maestro'}
+        {done ? 'Onboarding case completed'
+          : state?.callWait?.kind === 'agent' ? `${stage ?? 'Case'} · voice agent calling`
+          : state?.callWait?.kind === 'due' ? `${stage ?? 'Case'} · your call is due`
+          : state?.callWait?.kind === 'done' ? `${stage ?? 'Case'} · voice agent reached the customer`
+          : state?.callWait?.kind === 'missed' ? `${stage ?? 'Case'} · voice agent got no answer`
+          : stage ? `${stage} · ${awaiting ? 'awaiting approval' : 'in progress'}` : 'Case running in Maestro'}
       </div>
       <p className="why">
         {done
@@ -739,10 +853,32 @@ function MaestroAction({ instanceId, corporate, state }: { instanceId: string; c
               : `The real Maestro case is running the ${stage} stage — automated checks are in flight. The next approval will surface here.`}
       </p>
 
+      {/* Five columns, one per primary stage. A secondary stage the case is in
+          sits UNDER the primary it left from, in its own colour, so "Pending
+          customer" reads as a detour off Intake and "Voice Agent" as a detour
+          off whichever stage sent it. It shows only while the case is inside it. */}
       <div className="dk-mstrip">
         {MAESTRO_STAGES.map((s) => {
-          const st = done || state?.completedStages.includes(s) ? 'done' : stage === s ? 'active' : 'pend';
-          return <span key={s} className={`dk-mstage ${st}`}>{st === 'done' ? '✓ ' : st === 'active' ? '● ' : ''}{s}</span>;
+          // While the case is inside a secondary, the primary it left from keeps
+          // the dot — the case is still "in" Intake while it waits in Pending
+          // customer — and the secondary sits under it with a dot of its own.
+          // Only a secondary the case is INSIDE right now: where it has been is
+          // history the row is not for, so a completed detour drops off when the
+          // case returns to the main flow.
+          const inside = (state?.secondaries ?? []).find((x) => x.status === 'active');
+          const primaryNow = stage && (MAESTRO_STAGES as readonly string[]).includes(stage) ? stage : (inside?.origin ?? stage);
+          const st = done || state?.completedStages.includes(s) ? 'done' : primaryNow === s ? 'active' : 'pend';
+          const under = (state?.secondaries ?? []).filter((x) => x.status === 'active' && (x.origin ?? primaryNow) === s);
+          return (
+            <div className="dk-mcol" key={s}>
+              <span className={`dk-mstage ${st}`}>{st === 'done' ? '✓ ' : st === 'active' ? '● ' : ''}{s}</span>
+              {under.map((x, i) => (
+                <span key={`${x.name}-${i}`} className={`dk-mstage sec ${done ? 'done' : x.status}`} title={`${x.name} — entered from ${s}`}>
+                  {done || x.status === 'done' ? '✓ ' : '● '}{x.name}
+                </span>
+              ))}
+            </div>
+          );
         })}
       </div>
 
@@ -751,7 +887,7 @@ function MaestroAction({ instanceId, corporate, state }: { instanceId: string; c
           Without it "Intake · in progress" can mean anything for an hour. */}
       {!done && (state?.stageTasks?.length ?? 0) > 0 && (
         <div className="dk-steps">
-          <div className="dk-steps-h">In {stage}</div>
+          <div className="dk-steps-h">In {state?.stageTasksStage ?? stage}</div>
           {state!.stageTasks!.map((t, i) => {
             const st = t.status === 'Completed' ? 'done'
               : t.status === 'InProgress' ? 'now'

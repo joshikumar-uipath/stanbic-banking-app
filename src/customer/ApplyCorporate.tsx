@@ -6,7 +6,7 @@
 // metadata (see EntityInfo). Same shared OnboardingStore as the individual flow.
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useState } from 'react';
-import { store, type OnboardingCase } from '../onboarding';
+import { store, CORPORATE_ACCOUNT_TYPE, type OnboardingCase } from '../onboarding';
 import { getActiveCountry } from '../config/countries';
 import { useConfig } from '../config';
 import { Button, Field, Note, Rail, KV, Brand } from './ui';
@@ -179,6 +179,9 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
             phone: '', email: '', bvn: '', nin: '', address: '',
             channel: 'single', source: 'rm', state: 'AWAITING_EXTRACTION',
             documentId: att.ID, documentName: att.FullName,
+            // Written so the record still reads as corporate before the entity is
+            // confirmed — isCorporate() no longer treats the draft state as the marker.
+            accountType: CORPORATE_ACCOUNT_TYPE,
           });
           createdDraftId = draft.id;
           setDraftId(draft.id);
@@ -309,6 +312,8 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
       phone: digits(v.phone || primary.phone), email: (v.email || primary.email).trim(),
       bvn: digits(primary.bvn), nin: '', address: v.address.trim(),
       channel: 'single' as const, source: 'rm' as const,
+      // The corporate marker isCorporate() keys on.
+      accountType: CORPORATE_ACCOUNT_TYPE,
     };
     // An upload already opened a draft record — fill that one in rather than
     // leaving it orphaned beside a second, near-identical row.

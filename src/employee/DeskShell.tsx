@@ -24,6 +24,8 @@ import './desk.css';
 
 export type Dest = 'desk' | 'open-account' | 'approvals' | 'customers' | 'chat' | 'explore' | 'alerts' | 'profile';
 
+const SLIM_KEY = 'dk_rail_slim';
+
 /** Everything the branch captured, newest first, live off the shared store. */
 function useBranchCases(): OnboardingCase[] {
   const [list, setList] = useState<OnboardingCase[]>([]);
@@ -59,6 +61,15 @@ export default function DeskShell({ userName, userEmail, unreadAlerts = 0, onLog
   // null = nothing open; '' = start a new capture; an id = that application.
   const [flow, setFlow] = useState<string | null>(null);
   const cases = useBranchCases();
+  // The rail shrunk to its icons. A preference, not a state: it survives a
+  // reload so a banker who wants the room keeps it.
+  const [slim, setSlim] = useState<boolean>(() => {
+    try { return localStorage.getItem(SLIM_KEY) === '1'; } catch { return false; }
+  });
+  const toggleSlim = () => setSlim((v) => {
+    try { localStorage.setItem(SLIM_KEY, v ? '0' : '1'); } catch { /* unavailable */ }
+    return !v;
+  });
 
   const counts = useMemo(() => ({
     opening: cases.filter((c) => c.state !== 'FULLY_ACTIVATED').length,
@@ -89,7 +100,7 @@ export default function DeskShell({ userName, userEmail, unreadAlerts = 0, onLog
   const mark = brandMark(branding);
 
   return (
-    <div className="dk">
+    <div className={`dk${slim ? ' slim' : ''}`}>
       <nav className="dk-side" aria-label="Main">
         <div className="dk-logo">
           <span className="dk-mark"><img src={mark} alt="" /></span>
@@ -115,8 +126,17 @@ export default function DeskShell({ userName, userEmail, unreadAlerts = 0, onLog
           <Nav d="profile" on={dest} go={go} ic="user" label="Profile" />
         </div>
 
+        {/* Shrink to icons — the same control the other consoles carry, so the
+            rail reads as one platform. Every nav item carries its label as a
+            tooltip, which is what makes the icon-only rail usable. */}
+        <button className="dk-shrink" onClick={toggleSlim} aria-pressed={slim}
+          title={slim ? 'Expand the rail' : 'Shrink to icons'} aria-label={slim ? 'Expand the rail' : 'Shrink to icons'}>
+          <span className="ic"><I n="chevron" s={14} /><I n="chevron" s={14} /></span>
+          <span className="lb">Shrink to icons</span>
+        </button>
+
         <div className="foot">
-          <span className="av">{initial}</span>
+          <span className="av" title={userName || 'Signed in'}>{initial}</span>
           <span className="who">
             <b>{userName || 'Signed in'}</b>
             <span>{userEmail || 'Relationship Manager'}</span>
@@ -146,7 +166,7 @@ export default function DeskShell({ userName, userEmail, unreadAlerts = 0, onLog
 
 function Nav({ d, on, go, ic, label, badge, hot }: { d: Dest; on: Dest; go: (d: Dest) => void; ic: string; label: string; badge?: number; hot?: boolean }) {
   return (
-    <button className="dk-nav" aria-current={on === d} onClick={() => go(d)}>
+    <button className="dk-nav" aria-current={on === d} onClick={() => go(d)} title={label}>
       <span className="ic"><I n={ic} s={15} /></span>
       <span className="lb">{label}</span>
       {badge ? <span className={`badge${hot ? ' hot' : ''}`}>{badge > 99 ? '99+' : badge}</span> : null}

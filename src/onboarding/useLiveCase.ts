@@ -26,7 +26,11 @@ export interface LiveCase {
   live: boolean;
 }
 
-export function useLiveCase(c: Pick<OnboardingCase, 'id' | 'entity' | 'state'>): LiveCase {
+// `accountType` is in the pick because it is what isCorporate now decides on —
+// leaving it out let a corporate record read as individual here and send the
+// panel to the wrong folder. It is optional on the case, so omitting it compiled
+// silently rather than failing.
+export function useLiveCase(c: Pick<OnboardingCase, 'id' | 'entity' | 'state' | 'accountType'>): LiveCase {
   const corporate = isCorporate(c);
   const fetchState = (id: string) => (corporate ? getCorporateState(id) : getState(id));
   const seed = (i: string | null) => (!i ? null : corporate ? getCachedCorporateState(i) : getCachedState(i));

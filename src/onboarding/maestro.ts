@@ -242,9 +242,17 @@ export function maestroConfig() {
   return { token: TOKEN, base: BASE, folderId: FOLDER_ID, folderKey: FOLDER_KEY, releaseKey: RELEASE_KEY, org: ORG, tenant: TENANT };
 }
 
+/** A read that never answers is worse than one that fails: the desk's poll waits
+ *  on the slowest read in the batch, and one hung call held every row on
+ *  "Checking…" for the life of the screen. Bound each call; a timeout throws like
+ *  any other failure and the caller keeps the last good state. */
+const READ_TIMEOUT_MS = 12000;
+const WRITE_TIMEOUT_MS = 30000;
+
 async function orch<T = unknown>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method,
+    signal: AbortSignal.timeout(method === 'GET' ? READ_TIMEOUT_MS : WRITE_TIMEOUT_MS),
     headers: {
       Authorization: `Bearer ${TOKEN}`,
       Accept: 'application/json',
@@ -262,6 +270,7 @@ async function orch<T = unknown>(method: string, path: string, body?: unknown): 
 async function pims<T = unknown>(path: string): Promise<T> {
   const res = await fetch(`${PIMS_BASE}${path}`, {
     headers: { Authorization: `Bearer ${TOKEN}`, Accept: 'application/json', 'x-uipath-folderkey': FOLDER_KEY },
+    signal: AbortSignal.timeout(READ_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`pims ${res.status}`);
   const text = await res.text();
@@ -295,6 +304,10 @@ interface ElementExec {
   /** Which stage this step belongs to — how the flat element list regains its shape. */
   caseStageElementId?: string;
   startedTimeUtc?: string;
+  completedTimeUtc?: string;
+  /** One entry per time the element ran — a secondary stage the case diverts
+   *  into twice has two, each with its own origin. */
+  elementRuns?: { status: string; startedTimeUtc?: string; completedTimeUtc?: string }[];
   /** Action Center deep link for a human step. Carries the task id, which is the
    *  only reliable way to find it — the task is titled after the app, not the step. */
   externalLink?: string;
@@ -302,7 +315,10 @@ interface ElementExec {
 
 /** Steps worth showing. The rest of the element list is plumbing a banker has no
  *  use for — subprocesses, catch events, the guardrail agent. */
-const STEP_TYPES = new Set(['UserTask', 'ServiceTask', 'Task', 'Agent']);
+// Every kind of step a stage can hold. SendTask and ReceiveTask are the
+// connector activities and the waits — most of what a secondary stage like
+// Pending customer is made of — and leaving them out showed one step of eight.
+const STEP_TYPES = new Set(['UserTask', 'ServiceTask', 'SendTask', 'ReceiveTask', 'ScriptTask', 'BusinessRuleTask', 'CallActivity', 'Task', 'Agent']);
 
 /** Finished work above, the live step, then what has not started. Strict start-time
  *  order puts a long-running approval above checks that finished after it began,
@@ -328,7 +344,19 @@ function taskIdFromLink(link: string | undefined): number | null {
   return m ? Number(m[1]) : null;
 }
 
-async function caseStages(instanceId: string): Promise<{ active: string | null; completed: string[]; tasks: StageTask[]; checks: ValidationResult[]; pending: { id: number; title: string } | null } | null> {
+export interface CaseStagesRead {
+  active: string | null;
+  completed: string[];
+  tasks: StageTask[];
+  /** Which stage `tasks` belongs to — a secondary while the case is inside one. */
+  tasksStage: string | null;
+  checks: ValidationResult[];
+  pending: { id: number; title: string } | null;
+  callWait: CallWait | null;
+  secondaries: SecondaryStage[];
+}
+
+async function caseStages(instanceId: string): Promise<CaseStagesRead | null> {
   try {
     const r = await pims<{ elementExecutions?: ElementExec[] }>(`/api/v1/element-executions/case-instances/${instanceId}`);
     const els = r.elementExecutions ?? [];
@@ -338,12 +366,22 @@ async function caseStages(instanceId: string): Promise<{ active: string | null; 
     // FURTHEST reached along the main flow; everything before it counts as done.
     const reachedNames = new Set(stages.filter((e) => e.status !== 'NotStarted').map((e) => e.elementName));
     const reached = STAGES.filter((s) => reachedNames.has(s));
-    const active = reached.length ? reached[reached.length - 1] : null;
-    const idx = active ? STAGES.indexOf(active) : -1;
+    let active: string | null = reached.length ? reached[reached.length - 1] : null;
+    const idx = active ? STAGES.indexOf(active as (typeof STAGES)[number]) : -1;
     const completed = idx > 0 ? STAGES.slice(0, idx) : [];
-    // The steps inside the stage the case is in now, in the order it ran them —
-    // the same detail the corporate pane shows, so the two read alike.
-    const activeStageId = stages.find((e) => e.elementName === active)?.elementId;
+    // Pending customer is a primary stage the main-flow list does not know: a
+    // case parked there for the RM's call read as "Intake" — which is where it
+    // will go back to, but not where it is. It wins while it is open and Intake
+    // is the furthest main-flow stage reached.
+    const pendingCustomer = stages.find((e) => e.elementName === 'Pending customer' && e.status === 'InProgress');
+    if (pendingCustomer && idx <= 0) active = 'Pending customer';
+    // The steps listed are those of the stage the case is actually inside: a
+    // secondary stage while one is open (its runs end on InProgress), else the
+    // active primary. The list is headed with that stage's name.
+    const lastRun = (e: ElementExec) => (e.elementRuns && e.elementRuns.length ? e.elementRuns[e.elementRuns.length - 1].status : e.status);
+    const openSecondary = stages.find((e) => !(STAGES as readonly string[]).includes(e.elementName) && lastRun(e) === 'InProgress');
+    const tasksStage = openSecondary?.elementName ?? active;
+    const activeStageId = stages.find((e) => e.elementName === tasksStage)?.elementId;
     const tasks: StageTask[] = !activeStageId ? [] : els
       .filter((e) => e.caseStageElementId === activeStageId && STEP_TYPES.has(e.elementType))
       .sort(byProgress)
@@ -363,8 +401,60 @@ async function caseStages(instanceId: string): Promise<{ active: string | null; 
       (e) => e.caseStageElementId === activeStageId && e.elementType === 'UserTask' && e.status === 'InProgress',
     );
     const waitingId = taskIdFromLink(waiting?.externalLink);
+    // Is the case on a call? Both waits are ReceiveTasks the plan names for
+    // exactly this, so the name is the contract — the same one the voice
+    // service's watcher keys on.
+    const speaking = els.find((e) => e.elementName === 'Speaking to Customer' && e.status === 'InProgress');
+    const rmCall = els.find((e) => e.elementName === 'Agent Conversation' && e.status === 'InProgress');
+    let callWait: CallWait | null = null;
+    if (speaking) {
+      // The stage it diverted from: the most recently started primary stage
+      // still open beside the secondary — stages stay InProgress once entered.
+      const origin = stages
+        .filter((e) => e.status === 'InProgress' && e.elementName !== 'Voice Agent')
+        .sort((a, b) => String(b.startedTimeUtc ?? '').localeCompare(String(a.startedTimeUtc ?? '')))[0]?.elementName ?? null;
+      callWait = { kind: 'agent', purpose: PURPOSE_BY_STAGE[origin ?? ''] ?? 'screening', stage: origin, since: speaking.startedTimeUtc ?? '' };
+    } else if (rmCall) {
+      callWait = { kind: 'due', purpose: 'documents', stage: 'Pending customer', since: rmCall.startedTimeUtc ?? '' };
+    }
+    // Every secondary stage the case has been into, with the primary it left
+    // from. `elementRuns` is a list of status TRANSITIONS, not visits: a stage
+    // entered twice reads [InProgress, Completed, InProgress, Completed], each
+    // stamped with the time of that transition. So an InProgress entry opens a
+    // visit and the next Completed entry closes it. The origin of a visit is the
+    // primary stage whose most recent entry precedes it — primaries re-enter on
+    // the way back, so their later InProgress entries count too.
+    const isPrimary = (n: string) => (STAGES as readonly string[]).includes(n);
+    const transitions = (e: ElementExec) => (e.elementRuns && e.elementRuns.length
+      ? e.elementRuns.map((r) => ({ status: r.status, at: String(r.startedTimeUtc ?? '') }))
+      : [{ status: e.status, at: String(e.startedTimeUtc ?? '') }])
+      .filter((r) => r.status !== 'NotStarted' && r.at)
+      .sort((a, b) => a.at.localeCompare(b.at));
+    const primaryEntries = stages.filter((e) => isPrimary(e.elementName))
+      .flatMap((e) => transitions(e).filter((r) => r.status === 'InProgress').map((r) => ({ name: e.elementName, at: r.at })))
+      .sort((a, b) => a.at.localeCompare(b.at));
+    const originAt = (at: string): string | null => {
+      let hit: string | null = null;
+      for (const p of primaryEntries) { if (p.at <= at) hit = p.name; }
+      return hit ?? active;
+    };
+    const secondaries: SecondaryStage[] = [];
+    for (const e of stages) {
+      if (isPrimary(e.elementName) || e.status === 'NotStarted') continue;
+      let open: SecondaryStage | null = null;
+      for (const r of transitions(e)) {
+        if (r.status === 'InProgress') {
+          open = { name: e.elementName, origin: originAt(r.at), status: 'active', since: r.at };
+          secondaries.push(open);
+        } else if (open) {
+          open.status = 'done';
+          open = null;
+        }
+      }
+    }
+    secondaries.sort((a, b) => a.since.localeCompare(b.since));
     return {
-      active, completed, tasks, checks,
+      active, completed, tasks, tasksStage, checks, callWait, secondaries,
       pending: waiting && waitingId ? { id: waitingId, title: waiting.elementName } : null,
     };
   } catch {
@@ -404,6 +494,43 @@ export async function startCase(input: CaseInput): Promise<string> {
   const id = r.value?.[0]?.Key;
   if (!id) throw new Error('No instance returned from StartJobs');
   return id;
+}
+
+/**
+ * A call the case is parked on. The case plan has two wait tasks that mean "a
+ * phone call is happening": `Speaking to Customer` in the Voice Agent stage —
+ * the automated calls the voice service places and releases on its own — and
+ * `Agent Conversation` in Pending customer, which is the one the RM places from
+ * the popup. The desk shows ☎ for both and the next best action for the second;
+ * it fires nothing, the service and the case do.
+ */
+export interface CallWait {
+  /** 'agent' — the voice service is on the call now; 'due' — the RM should call;
+   *  'done' — the call ended and was answered; 'missed' — the customer did not answer. */
+  kind: 'agent' | 'due' | 'done' | 'missed';
+  purpose: 'screening' | 'delay' | 'consent' | 'documents';
+  /** The primary stage the case diverted from, which is what decides the purpose. */
+  stage: string | null;
+  since: string;
+}
+
+export const CALL_PURPOSE_LABEL: Record<CallWait['purpose'], string> = {
+  screening: 'Name-collision screening',
+  delay: 'Delay notification',
+  consent: 'Consent / disclosure',
+  documents: 'Missing documents',
+};
+
+/** Which automated call each origin stage asks for — mirrors the voice service. */
+const PURPOSE_BY_STAGE: Record<string, CallWait['purpose']> = { Verification: 'screening', Decision: 'delay', Closure: 'consent' };
+
+/** A secondary stage the case has been into, and the primary stage it left to
+ *  get there — the Live in Maestro card draws it under that column. */
+export interface SecondaryStage {
+  name: string;
+  origin: string | null;
+  status: 'active' | 'done';
+  since: string;
 }
 
 /** One step inside a stage, as the case is actually running it. `human` steps are
@@ -465,8 +592,14 @@ export interface LiveState {
   pendingTitle: string | null;
   /** The steps of the stage the case is in now, in the order it ran them. */
   stageTasks?: StageTask[];
+  /** Which stage those steps belong to — a secondary while the case is inside one. */
+  stageTasksStage?: string | null;
   /** Verification checks as the live case has actually run them. */
   checks?: ValidationResult[];
+  /** The call the case is parked on, if any. */
+  callWait?: CallWait | null;
+  /** Secondary stages entered so far, each under the primary it came from. */
+  secondaries?: SecondaryStage[];
 }
 
 /** Current real state of the case: job status + which stage is awaiting approval. */
@@ -511,25 +644,32 @@ export function getCachedState(instanceId: string): LiveState | null {
 export async function backfillStages(
   instanceIds: string[],
   limit = 12,
-): Promise<Record<string, { stage: string | null; awaiting: boolean }>> {
-  const out: Record<string, { stage: string | null; awaiting: boolean }> = {};
+): Promise<Record<string, { stage: string | null; awaiting: boolean; callWait: CallWait | null }>> {
+  const out: Record<string, { stage: string | null; awaiting: boolean; callWait: CallWait | null }> = {};
   const ids = [...new Set(instanceIds)].slice(0, limit);
   if (!TOKEN || ids.length === 0) return out;
   await Promise.all(ids.map(async (id) => {
     const s = await caseStages(id);
     if (!s) return;
-    out[id] = { stage: s.active, awaiting: Boolean(s.pending) };
+    out[id] = { stage: s.active, awaiting: Boolean(s.pending), callWait: s.callWait };
     const prev = lastState.get(id);
     if (prev && !prev.done) {
       // Authoritative, so it CLEARS as well as sets: when the case's own elements
       // report no in-progress UserTask the approval is genuinely gone, and leaving
       // a stale id here would strand the row on "Awaiting approval" for ever.
+      // The rest of the read goes in too, so opening the case paints its steps,
+      // checks and call straight away rather than after its own first poll.
       lastState.set(id, {
         ...prev,
         activeStage: s.active,
         completedStages: s.completed,
         pendingTaskId: s.pending?.id ?? null,
         pendingTitle: s.pending?.title ?? null,
+        stageTasks: s.tasks,
+        stageTasksStage: s.tasksStage,
+        checks: s.checks,
+        callWait: s.callWait,
+        secondaries: s.secondaries,
       });
     }
   }));
@@ -563,7 +703,7 @@ export async function getState(instanceId: string): Promise<LiveState> {
 
   let result: LiveState;
   if (done) {
-    result = { jobState, done: true, activeStage: null, completedStages: [...STAGES], pendingTaskId: null, pendingTitle: null, stageTasks: [], checks: stages?.checks ?? [] };
+    result = { jobState, done: true, activeStage: null, completedStages: [...STAGES], pendingTaskId: null, pendingTitle: null, stageTasks: [], checks: stages?.checks ?? [], secondaries: stages?.secondaries ?? [] };
   } else {
     // Fallback only. Orchestrator titles an app task after the app that serves it
     // ("onboardingapprovalappao"), not after the caseplan step, so this map misses
@@ -584,7 +724,9 @@ export async function getState(instanceId: string): Promise<LiveState> {
     if (pendingStage) { activeStage = pendingStage; completedStages = completedStages.filter((s) => s !== pendingStage); }
     result = {
       jobState, done: false, activeStage, completedStages,
-      stageTasks: stages?.tasks ?? [], checks: stages?.checks ?? [],
+      stageTasks: stages?.tasks ?? [], stageTasksStage: stages?.tasksStage ?? null, checks: stages?.checks ?? [],
+      callWait: stages?.callWait ?? null,
+      secondaries: stages?.secondaries ?? [],
       // When the elements could be read they are the authority — including when
       // they say nothing is parked. The task query is scoped to the job, not the
       // stage, so an approval still open in an EARLIER stage would otherwise be
@@ -604,6 +746,8 @@ export interface LiveStateLite {
   done: boolean;
   awaiting: boolean;         // parked on a human approval (needs intervention)
   stage: string | null;      // current stage, e.g. "Decision"
+  /** The call the case is parked on, if any — drives the ☎ on the row. */
+  callWait?: CallWait | null;
 }
 
 /**
@@ -655,13 +799,20 @@ export async function getStates(instanceIds: string[]): Promise<Record<string, L
     const task = taskByKey.get(id);
     const awaitStage = task?.stage ?? null;
     const cached = getCachedState(id);
+    // Nobody answered for this instance: the Jobs table has no such key, no open
+    // task points at it, and nothing is cached. That is "could not read", not
+    // "not started" — but it used to be reported as an empty Unknown state, which
+    // the column renders as "Not started" and which REPLACED whatever the row
+    // showed a poll earlier. Say nothing: the hook keeps the last good state, or
+    // "Checking…" until one arrives.
+    if (jobState === 'Unknown' && !task && !cached) continue;
     const stage = awaitStage ?? cached?.activeStage ?? null;
     // The task query can only recognise an approval whose title is a caseplan step
     // name, and Orchestrator titles app tasks after the app — so on its own this
     // reports a case that is parked on a person as merely "running". getState
     // resolves the pending task from the case's own elements and writes it here,
     // so trust that too rather than under-reporting the row.
-    out[id] = { jobState, done, awaiting: Boolean(awaitStage) || Boolean(!done && cached?.pendingTaskId), stage };
+    out[id] = { jobState, done, awaiting: Boolean(awaitStage) || Boolean(!done && cached?.pendingTaskId), stage, callWait: done ? null : cached?.callWait ?? null };
     // Seed the shared per-instance cache so opening this case paints instantly (with its
     // approve button, since we captured the task id). getState refines it on the detail poll.
     if (jobState !== 'Unknown') {
@@ -792,7 +943,9 @@ export function clearPendingExtraction(): void {
 /** Titles the extraction-review task can carry. Orchestrator names an app task
  *  after the app that serves it, not after the caseplan step, so both spellings
  *  have to match. */
-const REVIEW_TASK_TITLES = ['Confirm extracted details', 'individualextractionreviewao'];
+// Matched on the shared prefix: the app name carries a deployment suffix (`…ao`
+// here), and a rename must not silently close the gate.
+const REVIEW_TASK_TITLES = ['Confirm extracted details', 'individualextractionreview'];
 
 export interface ExtractionTask {
   taskId: number;

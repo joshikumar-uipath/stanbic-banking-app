@@ -5,6 +5,21 @@ import './index.css'
 import './skeleton/skeleton.css'
 import App from './App'
 import { detectRoute, WEB_SHELLS } from './skeleton/routes'
+import { setLiveCaseGuard } from './onboarding/store'
+import { getLinkedInstance, getCachedState } from './onboarding/maestro'
+import HomeButton from './skeleton/HomeButton'
+
+// The record's outcome must not run ahead of its Maestro case: "Fully activated"
+// is what the last task of Closure produces, not what a liveness approval
+// produces. Registered here rather than imported inside store.ts, which must not
+// depend on maestro.ts. Unknown case state does not block: the desk polls every
+// linked instance, so the gap is one tick.
+setLiveCaseGuard((recordId) => {
+  const inst = getLinkedInstance(recordId)
+  if (!inst) return false
+  const live = getCachedState(inst)
+  return live ? !live.done : false
+})
 
 // Memorable URLs pick the surface (see ./skeleton/routes). UiPath Coded App
 // hosting serves the root index.html for every path, so detection is
@@ -16,7 +31,15 @@ const route = detectRoute()
 // Full-width surfaces drop the phone bezel (see skeleton.css).
 if (WEB_SHELLS.includes(route)) document.documentElement.setAttribute('data-shell', 'web')
 
-const render = (node: ReactNode) => root.render(<StrictMode>{node}</StrictMode>)
+// Every surface except the launcher gets a way back to it — but not KYC, which
+// is the customer-facing link. A customer finishing their own onboarding should
+// not be offered a route into the bank's internal workspace.
+const render = (node: ReactNode) => root.render(
+  <StrictMode>
+    {node}
+    {route !== 'launcher' && route !== 'kyc' && <HomeButton />}
+  </StrictMode>,
+)
 
 if (route === 'admin') {
   Promise.all([import('./admin/admin.css'), import('./admin/App')]).then(([, mod]) => {
@@ -54,7 +77,9 @@ if (route === 'admin') {
 } else if (route === 'comms') {
   import('./instruments/Comms').then((mod) => render(<mod.default />))
 } else if (route === 'tower') {
-  import('./instruments/Tower').then((mod) => render(<mod.default />))
+  // The control tower as a Fabric / Power BI report — src/instruments/tower/.
+  // Brought over from the Microsoft sibling whole; the chrome is the point.
+  import('./instruments/tower/Report').then((mod) => render(<mod.default />))
 } else if (route === 'cases') {
   import('./instruments/Cases').then((mod) => render(<mod.default />))
 } else if (route === 'faceid-kiosk') {

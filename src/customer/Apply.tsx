@@ -58,6 +58,49 @@ const EMPTY: Vals = {
 const STEPS = ['About you', 'Identity', 'Address', 'Employment', 'Account', 'Review'];
 const LAST = STEPS.length - 1;
 
+// ── Demo fill ────────────────────────────────────────────────────────────────
+// A presenter clicking through an empty form should still arrive at a review
+// screen that reads like a real application. On Continue, any field on the step
+// being left AND the step being entered that is still blank takes a value from
+// one consistent sample applicant, drawn from the active market's own names,
+// streets and identity formats. Anything the presenter typed is kept.
+const SAMPLE: Vals = (() => {
+  const co = CO;
+  const first = co.firstNames[0] ?? 'Adaeze', last = co.lastNames[0] ?? 'Okafor';
+  const street = co.streets[4] ?? co.streets[0] ?? 'Adeola Odeku St';
+  const city = co.cities[0] ?? 'Lagos', state = co.states[0] ?? city;
+  const trunk = co.phoneTrunk ?? '080';
+  const addr = `14 ${street}, ${city}`;
+  return {
+    title: 'Mrs', firstName: first, middleName: 'Chinwe', lastName: last,
+    dob: '1991-04-17', gender: 'Female', maritalStatus: 'Married', motherMaidenName: co.lastNames[3] ?? 'Nwosu',
+    nationality: co.name, stateOfOrigin: co.states[5] ?? state,
+    phone: `${trunk}1234567`, altPhone: `${trunk}9876543`, email: `${first.toLowerCase()}.${last.toLowerCase()}@example.com`,
+    bvn: `${P.numPrefix}4550018`, nin: `${Sc.numPrefix}6780042`,
+    idType: ID_TYPES[0], idNumber: 'A01234567', idExpiry: '2029-06-30', tin: '12345678-0001',
+    address: addr, city, stateOfResidence: state, lga: 'Eti-Osa', yearsAtAddress: '4',
+    employmentStatus: EMPLOYMENT[0], occupation: 'Product manager', employer: co.companies[4] ?? 'MTN Nigeria', incomeBand: INCOME[2], sourceOfFunds: FUNDS[0],
+    accountType: ACCOUNT_TYPES[0], accountPurpose: PURPOSES[0], branch: `${city} main branch`,
+    nokName: `Chukwuemeka ${last}`, nokRelationship: RELATIONSHIPS[0], nokPhone: `${trunk}5512345`, nokAddress: addr,
+  };
+})();
+/** Which fields each step shows, so the fill touches only what the presenter has
+ *  seen or is about to see, never the whole form at once. */
+const STEP_FIELDS: (keyof Vals)[][] = [
+  ['title', 'firstName', 'middleName', 'lastName', 'dob', 'gender', 'maritalStatus', 'motherMaidenName', 'nationality', 'stateOfOrigin', 'phone', 'email'],
+  ['bvn', 'nin', 'idType', 'idNumber', 'idExpiry', 'tin'],
+  ['address', 'altPhone', 'city', 'stateOfResidence', 'lga', 'yearsAtAddress'],
+  ['employmentStatus', 'occupation', 'employer', 'incomeBand', 'sourceOfFunds'],
+  ['accountType', 'accountPurpose', 'branch', 'nokName', 'nokRelationship', 'nokPhone', 'nokAddress'],
+];
+function fillBlanks(vals: Vals, ...steps: number[]): Vals {
+  let out = vals;
+  for (const st of steps) for (const k of STEP_FIELDS[st] ?? []) {
+    if (!out[k].trim()) { if (out === vals) out = { ...vals }; out[k] = SAMPLE[k]; }
+  }
+  return out;
+}
+
 // Illustrative pre-fill, used ONLY when there is no live case to read from (no
 // token, or the case failed to start). The real path reads the applicant's own
 // form through IXP — see onUpload.
@@ -340,9 +383,12 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
   const clearUpload = () => { setV(EMPTY); setDoc(null); setAttachment(null); setExtractionInstance(null); };
 
   const next = async () => {
-    if (step === 1 && (v.bvn || v.nin || v.phone)) {
+    // Demo fill: blanks on the step being left and the one being entered.
+    const filled = fillBlanks(v, step, step + 1);
+    if (filled !== v) setV(filled);
+    if (step === 1 && (filled.bvn || filled.nin || filled.phone)) {
       // Duplicate detection (Step 2 of the guide) — informational for now.
-      setDup(await store.checkDuplicate({ bvn: digits(v.bvn), nin: digits(v.nin), phone: digits(v.phone) }));
+      setDup(await store.checkDuplicate({ bvn: digits(filled.bvn), nin: digits(filled.nin), phone: digits(filled.phone) }));
     }
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
   };

@@ -28,8 +28,9 @@ export interface Nba {
   /** Absent for 'wait'/'done' — there is deliberately nothing to press. */
   run?: () => Promise<string>;   // resolves with the toast to show
   /** Opens a screen or dialog instead of mutating (handled by the caller). */
-  opens?: 'kyc' | 'channels';
-  /** A tel: / mailto: link rather than an action. */
+  opens?: 'kyc' | 'channels' | 'call';
+  /** A mailto: link rather than an action. Calls are not links — they open
+   *  the call panel via `opens`, so the desk keeps the transcript. */
   href?: string;
   /** Another door to the *same* action — rendered beside the primary button, not
    *  under "if that doesn't work". Opening a task in Action Center is not a
@@ -107,7 +108,7 @@ export function nextBestActions(c: OnboardingCase): Nba[] {
           : `If the retry fails too, a mistyped ${label(f.kind)} is the next most likely cause.`,
         kind: 'do',
         primary: f.attempts >= 4,
-        href: c.phone ? `tel:${c.phone}` : undefined,
+        opens: c.phone ? 'call' : undefined,
       });
     }
     out.push({
@@ -206,7 +207,7 @@ export function nextBestActions(c: OnboardingCase): Nba[] {
       id: 'compliance-call',
       title: `Call ${c.firstName || 'the customer'} while it sits`,
       why: 'A hit is often a name collision. Anything the customer can tell you shortens the review.',
-      href: c.phone ? `tel:${c.phone}` : undefined,
+      opens: c.phone ? 'call' : undefined,
       kind: 'do',
     }];
   }
@@ -225,7 +226,7 @@ export function nextBestActions(c: OnboardingCase): Nba[] {
       id: 'rfi-chase',
       title: `Chase ${c.firstName || 'the customer'} for what was requested`,
       why: 'The case is paused waiting on the customer and will sit there until someone asks. A call moves it; waiting does not.',
-      href: c.phone ? `tel:${c.phone}` : undefined,
+      opens: c.phone ? 'call' : undefined,
       kind: 'do',
       primary: true,
     }, {

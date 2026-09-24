@@ -56,6 +56,12 @@
 /* Column mode: a child marked flex:1 takes the leftover height instead of the
    page ending in whitespace (see .cx-faceid). min-height:0 so it can shrink. */
 .cx-body.fill { display: flex; flex-direction: column; min-height: 0; }
+/* Short screens (the confirmation ones) centre their block rather than sitting
+   at the top with a hand's width of nothing between them and the actions.
+   margin-block:auto on the wrapper, not justify-content:center on the body — the
+   centred flex line is unscrollable past its top edge once content does overflow. */
+.cx-body.mid { display: flex; flex-direction: column; }
+.cx-body.mid > .cx-mid { margin-block: auto; width: 100%; }
 /* Bottom padding clears the phone bezel's curve on desktop, and the home
    indicator on a real device. */
 .cx-foot { flex: 0 0 auto; padding: 14px 18px max(env(safe-area-inset-bottom), 28px); background: var(--card); border-top: 1px solid var(--line-2); display: flex; flex-direction: column; gap: 8px;
@@ -77,7 +83,8 @@
 
 /* ── Buttons ── */
 .cx-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
-  padding: 14px 18px; border-radius: 14px; font: 600 15px/1 var(--f-body); letter-spacing: -.01em;
+  padding: 14px 18px; border: 1px solid transparent; border-radius: 14px;
+  font: 600 15px/1 var(--f-body); letter-spacing: -.01em;
   background: var(--blue); color: #fff; transition: background .15s, transform .1s, opacity .15s; }
 .cx-btn:hover { background: var(--blue-2); }
 .cx-btn:active { transform: scale(.99); }

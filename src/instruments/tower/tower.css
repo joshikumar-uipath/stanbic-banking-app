@@ -1,0 +1,594 @@
+/* ─────────────────────────────────────────────────────────────────────────────
+   Control tower — Power BI report styling.
+
+   Kept out of instruments.css because it is a whole surface rather than a few
+   widgets, and because the visual language is deliberately different: the other
+   instruments imitate the bank's own systems, this one imitates a Fabric report.
+
+   The report page follows Power BI's own conventions rather than a dashboard
+   template: visuals are plain white blocks on a quiet page with no shadow and
+   no border until you hover; charts carry a category axis, hairline gridlines
+   and data labels; bars have no runway behind them; one series colour per
+   measure. Neutral chrome reads --brand-primary so the report rebrands with
+   the app. Semantic colours (good / warn / bad) are fixed on purpose — a
+   breached SLA has to look wrong no matter which palette a tenant picked.
+   ───────────────────────────────────────────────────────────────────────────── */
+.inst.pb {
+  /* Fluent's warm-biased neutrals, so the report and the Fabric chrome share a grey. */
+  --pb-ink: #252423;
+  --pb-ink-2: #605e5c;
+  --pb-ink-3: #8a8886;
+  --pb-line: #e1dfdd;
+  --pb-line-2: #edebe9;
+  --pb-surface: #f3f2f1;
+  --pb-canvas: #e4e3e1;
+  --pb-page: #f7f7f6;
+  --pb-card: #fff;
+  --pb-fabric: #0f6cbd;
+  --pb-good: #107c41;
+  --pb-warn: #b45309;
+  --pb-bad: #c4314b;
+  --pb-brand: var(--brand-primary, #012169);
+  --pb-brand-2: var(--brand-secondary, #3f6fd6);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--pb-surface);
+  color: var(--pb-ink);
+  /* Segoe UI where it exists (Windows), Open Sans everywhere else: the same
+     designer, the same humanist proportions, so the report reads as Power BI
+     on a Mac too. */
+  font-family: 'Segoe UI', 'Open Sans', system-ui, -apple-system, sans-serif;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+.pb button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+.pb :focus-visible { outline: 2px solid var(--pb-fabric); outline-offset: 2px; }
+.pb svg text { font-family: inherit; }
+
+/* ── Fabric suite bar ───────────────────────────────────────────────────── */
+/* The dark band with the amber mark is the single most recognisable thing about
+   Power BI on a projector, so it is worth the 40px it costs. */
+.pb-suite {
+  display: flex; align-items: center; gap: 10px; flex: 0 0 auto;
+  height: 44px; padding: 0 12px; background: #201f1e; color: #f3f2f1;
+}
+.pb-waffle { display: inline-flex; padding: 6px; border-radius: 3px; color: #f3f2f1; opacity: .85; }
+.pb-product { display: inline-flex; align-items: center; gap: 8px; }
+.pb-product b { font-size: 14.5px; font-weight: 600; letter-spacing: -.01em; }
+.pb-search {
+  display: flex; align-items: center; gap: 8px; margin-left: 14px;
+  width: min(420px, 34vw); height: 28px; padding: 0 11px; border-radius: 3px;
+  background: rgba(255,255,255,.11); color: rgba(255,255,255,.62); font-size: 12.5px;
+}
+.pb-trial {
+  font-size: 11.5px; font-weight: 600; color: #f2c811;
+  border: 1px solid rgba(242,200,17,.4); border-radius: 3px; padding: 2px 8px; white-space: nowrap;
+}
+.pb-suite-ic { display: inline-flex; padding: 6px; border-radius: 3px; color: #f3f2f1; opacity: .8; }
+.pb-avatar {
+  width: 28px; height: 28px; border-radius: 50%; flex: 0 0 auto;
+  display: grid; place-items: center; margin-left: 4px;
+  background: var(--pb-brand); color: #fff; font-size: 11px; font-weight: 700;
+}
+
+/* ── Shell: nav rail + report ───────────────────────────────────────────── */
+.pb-shell { flex: 1; display: flex; min-height: 0; }
+.pb-main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.pb-rail {
+  flex: 0 0 auto; width: 208px; display: flex; flex-direction: column;
+  background: var(--pb-card); border-right: 1px solid var(--pb-line);
+  padding: 8px 8px 10px; overflow: hidden; transition: width .16s ease;
+}
+.pb-rail.mini { width: 48px; }
+.pb-rail ul { list-style: none; margin: 6px 0 0; padding: 0; }
+.pb-rail-toggle, .pb-rail-i {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  padding: 8px 8px; border-radius: 3px; font-size: 12.5px; color: var(--pb-ink);
+  white-space: nowrap;
+}
+.pb-rail-toggle { color: var(--pb-ink-2); }
+.pb-rail-toggle:hover, .pb-rail-i:hover { background: var(--pb-line-2); }
+.pb-rail-i > svg, .pb-rail-toggle > svg { flex: 0 0 auto; color: var(--pb-ink-2); }
+.pb-rail.mini .pb-rail-toggle span, .pb-rail.mini .pb-rail-i span, .pb-rail.mini .pb-rail-ws span:not(.dot) { display: none; }
+.pb-rail-ws {
+  margin-top: auto; margin-bottom: 34px; display: flex; align-items: center; gap: 10px;
+  padding: 8px; border-top: 1px solid var(--pb-line-2); font-size: 12.5px; font-weight: 600;
+  white-space: nowrap; overflow: hidden;
+}
+.pb-rail-ws .dot {
+  width: 24px; height: 24px; border-radius: 3px; flex: 0 0 auto;
+  display: grid; place-items: center; background: var(--pb-brand); color: #fff; font-size: 11px;
+}
+
+/* ── Workspace header ───────────────────────────────────────────────────── */
+.pb-ws {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 18px; background: var(--pb-card);
+  border-bottom: 1px solid var(--pb-line);
+}
+.pb-crumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--pb-ink-2); min-width: 0; }
+.pb-crumb svg { color: var(--pb-ink-3); flex: 0 0 auto; }
+.pb-crumb b { color: var(--pb-ink); font-weight: 600; }
+.pb-crumb span, .pb-crumb b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pb-ws-tag {
+  font-size: 11px; font-weight: 600; letter-spacing: .01em;
+  color: var(--pb-fabric); background: rgba(15,108,189,.09);
+  border: 1px solid rgba(15,108,189,.2); border-radius: 3px; padding: 2px 7px;
+}
+.pb-rows { font-size: 12px; color: var(--pb-ink-3); white-space: nowrap; }
+.pb-ws-sep { width: 1px; height: 16px; background: var(--pb-line); }
+.pb-fresh { display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--pb-ink-2); white-space: nowrap; }
+.pb-fresh i { width: 6px; height: 6px; border-radius: 50%; background: var(--pb-good); }
+.pb-computed { font-size: 11px; color: var(--pb-ink-3); white-space: nowrap; }
+
+/* ── Command bar ────────────────────────────────────────────────────────── */
+.pb-cmd {
+  display: flex; align-items: center; gap: 4px; flex-wrap: nowrap; overflow: hidden;
+  padding: 5px 14px; background: var(--pb-card);
+  border-bottom: 1px solid var(--pb-line);
+}
+.pb-cmd-grow { flex: 1 1 auto; }
+.pb-cmd-sep { width: 1px; align-self: stretch; margin: 2px 3px; background: var(--pb-line); }
+.pb-cmd-b {
+  display: inline-flex; align-items: center; gap: 7px;
+  font-size: 12.5px; font-weight: 500; color: var(--pb-ink);
+  padding: 6px 11px; border-radius: 3px; white-space: nowrap;
+  transition: background .12s ease;
+}
+.pb-cmd-b:hover:not(:disabled) { background: var(--pb-line-2); }
+.pb-cmd-b:disabled { cursor: default; }
+.pb-cmd-b.ghost { color: var(--pb-ink-2); font-weight: 400; }
+.pb-cmd-b:disabled:not(.primary) { opacity: .62; }
+.pb-cmd-b.primary { background: var(--pb-line-2); color: var(--pb-ink); border: 1px solid var(--pb-line); }
+.pb-cmd-b.on { background: rgba(15,108,189,.1); color: var(--pb-fabric); }
+.pb-cmd-b > span:first-child { display: inline-flex; margin-right: 7px; }
+.pb-cmd-b .spin { animation: pbSpin .8s linear infinite; }
+@keyframes pbSpin { to { transform: rotate(360deg); } }
+.pb-badge {
+  min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px;
+  background: var(--pb-fabric); color: #fff;
+  font-size: 10.5px; font-weight: 700; line-height: 17px; text-align: center;
+}
+.pb-seg { display: inline-flex; flex: 0 0 auto; border: 1px solid var(--pb-line); border-radius: 3px; overflow: hidden; }
+.pb-seg button { font-size: 12.5px; padding: 5px 12px; color: var(--pb-ink-2); white-space: nowrap; }
+.pb-seg button + button { border-left: 1px solid var(--pb-line); }
+.pb-seg button:hover { background: var(--pb-line-2); }
+.pb-seg button[aria-pressed='true'] { background: var(--pb-brand); color: #fff; }
+.pb-sim { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--pb-ink-2); max-width: 34ch; }
+.pb-sim i { width: 7px; height: 7px; border-radius: 50%; background: var(--pb-good); animation: pbPulse 1s ease-in-out infinite; }
+@keyframes pbPulse { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+
+/* ── Lineage band ───────────────────────────────────────────────────────── */
+/* One quiet line of provenance under the commands. It used to be a row of
+   blue-bordered chips, which shouted louder than the report it described. */
+.pb-lin { flex: 0 0 auto; background: var(--pb-card); border-bottom: 1px solid var(--pb-line); }
+.pb-lin-h { display: flex; align-items: center; gap: 8px; width: 100%; padding: 5px 18px; text-align: left; }
+.pb-lin-h > svg { color: var(--pb-ink-3); flex: 0 0 auto; }
+.pb-lin-h b { font-size: 11.5px; font-weight: 600; color: var(--pb-ink-2); white-space: nowrap; }
+.pb-lin-h .sub { font-size: 11.5px; color: var(--pb-ink-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pb-lin:not(.closed) .pb-lin-h .sub { display: none; }
+.pb-lin-caret { color: var(--pb-ink-3); display: inline-flex; padding: 4px; border-radius: 3px; }
+.pb-lin-caret:hover { background: var(--pb-line-2); color: var(--pb-ink); }
+.pb-lin-row { display: flex; align-items: center; gap: 0; margin: 0 0 0 4px; padding: 0; list-style: none; min-width: 0; overflow-x: auto; }
+.pb-lin-row li, .pb-lin-node, .pb-lin-node .tx { flex: 0 0 auto; }
+.pb-lin-row li { display: flex; align-items: center; }
+.pb-lin-node { display: flex; align-items: center; gap: 7px; padding: 2px 0; }
+.pb-lin-node .ic { color: var(--pb-ink-3); display: inline-flex; flex: 0 0 auto; }
+.pb-lin-node .tx { display: flex; align-items: baseline; gap: 6px; }
+.pb-lin-node .tx b { font-size: 11.5px; font-weight: 600; color: var(--pb-ink); white-space: nowrap; }
+.pb-lin-node .tx em { font-style: normal; font-size: 10.5px; color: var(--pb-ink-3); white-space: nowrap; }
+.pb-lin-node .dt { font-size: 10.5px; color: var(--pb-ink-2); border-left: 1px solid var(--pb-line); padding-left: 7px; white-space: nowrap; }
+.pb-lin-arrow { color: var(--pb-ink-3); padding: 0 9px; display: inline-flex; }
+
+/* ── Body layout ────────────────────────────────────────────────────────── */
+.pb-body { flex: 1; display: flex; min-height: 0; }
+/* Power BI renders the report page as a sheet on a grey canvas; that framing is
+   what makes it read as a report rather than as another screen in the app. */
+.pb-canvas { flex: 1; min-width: 0; overflow-y: auto; background: var(--pb-canvas); padding: 16px 18px; }
+.pb-sheet {
+  background: var(--pb-page); border-radius: 2px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.14), 0 0 0 1px rgba(0,0,0,.04);
+  padding: 12px; min-height: 100%; display: flex; flex-direction: column;
+}
+
+/* ── Page tabs (docked bottom) ──────────────────────────────────────────── */
+.pb-tabs {
+  flex: 0 0 auto; display: flex; align-items: stretch; gap: 10px;
+  background: var(--pb-surface); border-top: 1px solid var(--pb-line); padding: 0 12px;
+}
+.pb-tabs-l { display: flex; align-items: stretch; gap: 2px; overflow-x: auto; }
+.pb-tabs button {
+  display: inline-flex; align-items: center; gap: 7px; white-space: nowrap;
+  font-size: 12.5px; font-weight: 500; color: var(--pb-ink-2);
+  padding: 8px 15px; border-top: 2px solid transparent; margin-top: -1px;
+}
+.pb-tabs button:hover { color: var(--pb-ink); background: rgba(0,0,0,.03); }
+.pb-tabs button[aria-selected='true'] {
+  color: var(--pb-ink); border-top-color: var(--pb-brand); font-weight: 600;
+  background: var(--pb-card);
+}
+.pb-tabs .pb-badge { background: var(--pb-bad); }
+.pb-tabs-r { display: inline-flex; align-items: center; font-size: 11.5px; color: var(--pb-ink-3); white-space: nowrap; }
+
+/* ── Filter chips ───────────────────────────────────────────────────────── */
+.pb-chips { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-bottom: 10px; }
+.pb-chips .lb { font-size: 11.5px; color: var(--pb-ink-3); }
+.pb-chips .chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--pb-fabric);
+  background: rgba(15,108,189,.08); border: 1px solid rgba(15,108,189,.22);
+  border-radius: 12px; padding: 3px 9px;
+}
+.pb-chips .chip:hover { background: rgba(15,108,189,.15); }
+.pb-chips .clear { font-size: 12px; color: var(--pb-ink-2); text-decoration: underline; }
+
+/* ── Visual ─────────────────────────────────────────────────────────────── */
+/* A Power BI visual has no border and no shadow; its edge appears on hover,
+   together with the header actions. The white against the page is the card. */
+.pb-vis {
+  background: var(--pb-card); border: 1px solid transparent; border-radius: 2px;
+  display: flex; flex-direction: column; min-width: 0; min-height: 0;
+  transition: border-color .12s ease;
+}
+.pb-vis:hover, .pb-vis:focus-within { border-color: #c8c6c4; }
+.pb-vis-h { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px 4px; }
+.pb-vis-h .t { min-width: 0; flex: 1; }
+.pb-vis-h .t b { display: block; font-size: 13px; font-weight: 600; }
+.pb-vis-h .t em { display: block; font-style: normal; font-size: 11px; color: var(--pb-ink-2); margin-top: 1px; }
+.pb-vis-h .acts { display: flex; gap: 2px; opacity: 0; transition: opacity .12s ease; }
+.pb-vis:hover .pb-vis-h .acts, .pb-vis:focus-within .pb-vis-h .acts { opacity: 1; }
+.pb-vis-h .acts button { padding: 4px; border-radius: 3px; color: var(--pb-ink-2); }
+.pb-vis-h .acts button:hover { background: var(--pb-line-2); color: var(--pb-ink); }
+.pb-vis-h .acts button[aria-pressed='true'] { background: rgba(15,108,189,.12); color: var(--pb-fabric); }
+.pb-vis-b { flex: 1; padding: 6px 14px 12px; min-width: 0; min-height: 0; display: flex; flex-direction: column; justify-content: center; }
+.pb-vis-f { padding: 9px 14px; border-top: 1px solid var(--pb-line-2); font-size: 11.5px; color: var(--pb-ink-3); }
+
+/* Focus mode — the visual fills the surface, everything else recedes. */
+.pb-scrim { position: fixed; inset: 0; background: rgba(37,36,35,.34); z-index: 40; }
+.pb-vis.focus {
+  position: fixed; inset: 56px 56px; z-index: 41; grid-column: auto !important; grid-row: auto !important;
+  border-color: #c8c6c4; box-shadow: 0 24px 60px -18px rgba(0,0,0,.4);
+}
+.pb-vis.focus .pb-vis-h .acts { opacity: 1; }
+.pb-vis.focus .pb-vis-b { overflow: auto; justify-content: flex-start; padding-top: 10px; }
+.pb-vis.focus .pb-sk { height: 100%; min-height: 320px; }
+.pb-vis.focus .pb-stack .bar { height: 40px; }
+
+/* ── Page grids ─────────────────────────────────────────────────────────── */
+/* Fixed row heights are what make a page read as laid out rather than stacked:
+   every visual in a row shares an edge, the way they do on a report canvas. */
+.pb-page { display: grid; gap: 12px; align-items: stretch; }
+.pb-page.ov {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: auto 272px 200px 222px;
+  grid-template-areas:
+    'kpi kpi kpi kpi'
+    'a   a   a   b'
+    'c   c   d   b'
+    'e   e   f   f';
+}
+.pb-page.ov .pb-kpis { grid-area: kpi; }
+.pb-page.ov .pb-vis.a { grid-area: a; } .pb-page.ov .pb-vis.b { grid-area: b; }
+.pb-page.ov .pb-vis.c { grid-area: c; } .pb-page.ov .pb-vis.d { grid-area: d; }
+.pb-page.ov .pb-vis.e { grid-area: e; } .pb-page.ov .pb-vis.f { grid-area: f; }
+.pb-page.ex {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-rows: auto 212px 232px auto;
+  grid-template-areas:
+    'kpi kpi kpi kpi'
+    'a   a   b   b'
+    'c   c   c   d'
+    'e   e   e   e';
+}
+.pb-page.ex .pb-kpis { grid-area: kpi; }
+.pb-page.ex .pb-vis.a { grid-area: a; } .pb-page.ex .pb-vis.b { grid-area: b; }
+.pb-page.ex .pb-vis.c { grid-area: c; } .pb-page.ex .pb-vis.d { grid-area: d; }
+.pb-page.ex .pb-vis.e { grid-area: e; }
+/* Flow: the Sankey takes whatever height the sheet has; the three bar charts
+   under it are its columns, in the same left-to-right order. */
+.pb-page.fl { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: minmax(380px, 1fr) auto; flex: 1; }
+.pb-page.fl .pb-vis.a { grid-column: 1 / -1; }
+.pb-page.fl .pb-vis.a .pb-vis-b { justify-content: flex-start; }
+.pb-page.fl .pb-sk { flex: 1; height: auto; min-height: 300px; }
+
+.pb-page.ch, .pb-page.vf, .pb-page.tm { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.pb-page.ch { grid-template-rows: auto 262px 232px; grid-template-areas: 'kpi kpi kpi kpi' 'a a a b' 'c c d d'; }
+.pb-page.vf { grid-template-rows: auto 246px 240px; grid-template-areas: 'kpi kpi kpi kpi' 'a a b b' 'c c c d'; }
+.pb-page.tm { grid-template-rows: auto 232px 262px 222px; grid-template-areas: 'kpi kpi kpi kpi' 'a a b b' 'c c c c' 'd d e e'; }
+.pb-page.ch .pb-kpis, .pb-page.vf .pb-kpis, .pb-page.tm .pb-kpis { grid-area: kpi; }
+.pb-page.ch .pb-vis.a, .pb-page.vf .pb-vis.a, .pb-page.tm .pb-vis.a { grid-area: a; }
+.pb-page.ch .pb-vis.b, .pb-page.vf .pb-vis.b, .pb-page.tm .pb-vis.b { grid-area: b; }
+.pb-page.ch .pb-vis.c, .pb-page.vf .pb-vis.c, .pb-page.tm .pb-vis.c { grid-area: c; }
+.pb-page.ch .pb-vis.d, .pb-page.vf .pb-vis.d, .pb-page.tm .pb-vis.d { grid-area: d; }
+.pb-page.tm .pb-vis.e { grid-area: e; }
+.pb-kpis.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+/* A channel card: the stat block plus its own colour chip and STP figure. */
+.pb-small .lb i { display: inline-block; width: 8px; height: 8px; border-radius: 1px; margin-right: 6px; vertical-align: 0; }
+.pb-small .sub { display: flex; gap: 14px; margin-top: 6px; font-size: 11.5px; color: var(--pb-ink-2); }
+.pb-small .sub b { color: var(--pb-ink); font-weight: 600; }
+
+@media (max-width: 1180px) {
+  .pb-page.ch, .pb-page.vf, .pb-page.tm { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; grid-template-areas: none; }
+  .pb-page.ch .pb-vis, .pb-page.vf .pb-vis, .pb-page.tm .pb-vis { grid-area: auto !important; grid-column: 1 / -1; }
+  .pb-page.ch .pb-kpis, .pb-page.vf .pb-kpis, .pb-page.tm .pb-kpis { grid-area: auto; grid-column: 1 / -1; }
+  .pb-page.ov, .pb-page.ex { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; grid-template-areas: none; }
+  .pb-page.ov .pb-vis, .pb-page.ex .pb-vis { grid-area: auto !important; grid-column: 1 / -1; }
+  .pb-page.ov .pb-kpis, .pb-page.ex .pb-kpis { grid-area: auto; grid-column: 1 / -1; }
+  .pb-page.fl { grid-template-columns: 1fr; grid-template-rows: none; }
+}
+
+/* ── KPI cards ──────────────────────────────────────────────────────────── */
+/* One white block, four cards divided by hairlines — the multi-row card. */
+.pb-kpis {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--pb-card); border-radius: 2px;
+}
+.pb-kpi { padding: 12px 16px 12px; min-width: 0; border-left: 1px solid var(--pb-line-2); }
+.pb-kpi:first-child, .pb-small:first-child { border-left: 0; }
+.pb-kpi.click { cursor: pointer; transition: background .12s ease; }
+.pb-kpi.click:hover { background: #faf9f8; }
+.pb-kpi.on { box-shadow: inset 0 -2px 0 var(--pb-fabric); background: rgba(15,108,189,.04); }
+.pb-kpi .lb { font-size: 12px; color: var(--pb-ink-2); }
+.pb-kpi .v { font-size: 30px; font-weight: 600; letter-spacing: -.01em; line-height: 1.1; margin-top: 3px; }
+.pb-kpi .v em { font-style: normal; font-size: 15px; font-weight: 600; color: var(--pb-ink-2); margin-left: 2px; }
+.pb-kpi .ref { display: flex; align-items: baseline; gap: 6px; margin-top: 4px; font-size: 11.5px; flex-wrap: wrap; }
+.pb-kpi .dl { font-weight: 600; }
+.pb-kpi .dl i { font-style: normal; font-weight: 500; opacity: .8; }
+.pb-kpi .dl.good { color: var(--pb-good); }
+.pb-kpi .dl.bad { color: var(--pb-bad); }
+.pb-kpi .dl.flat { color: var(--pb-ink-3); font-weight: 400; }
+.pb-kpi .vs { color: var(--pb-ink-3); }
+.pb-spark { height: 24px; margin-top: 8px; }
+.pb-spark svg { display: block; overflow: visible; }
+.pb-spark .ar { fill: var(--pb-brand); opacity: .08; }
+.pb-spark .ln { stroke: var(--pb-brand); stroke-width: 1.5; stroke-linejoin: round; stroke-linecap: round; }
+.pb-spark .pt { fill: var(--pb-brand); }
+.pb-kpi .tg { display: flex; align-items: center; gap: 6px; font-size: 11.5px; margin-top: 8px; color: var(--pb-ink-2); }
+.pb-kpi .tg i { width: 7px; height: 7px; border-radius: 50%; flex: 0 0 auto; }
+.pb-kpi .tg.ok i { background: var(--pb-good); }
+.pb-kpi .tg.under i { background: var(--pb-warn); }
+
+/* Compact stats (Exceptions page) — same block, no sparkline. */
+.pb-kpis.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.pb-small { padding: 12px 16px; min-width: 0; border-left: 1px solid var(--pb-line-2); }
+.pb-small .lb { font-size: 12px; color: var(--pb-ink-2); }
+.pb-small .v { font-size: 26px; font-weight: 600; letter-spacing: -.01em; margin-top: 3px; line-height: 1.1; }
+.pb-small.bad .v { color: var(--pb-bad); }
+.pb-small.warn .v { color: var(--pb-warn); }
+.pb-small .nt { font-size: 11.5px; color: var(--pb-ink-3); margin-top: 3px; }
+
+/* ── Charts drawn in pixel space ────────────────────────────────────────── */
+.pb-chart { display: flex; flex-direction: column; gap: 4px; flex: 1; min-height: 0; }
+.pb-legend { display: flex; gap: 14px; font-size: 11px; color: var(--pb-ink-2); }
+.pb-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.pb-legend .sw { width: 10px; height: 10px; border-radius: 1px; }
+.pb-legend .sw.col { background: var(--pb-brand); }
+.pb-legend .sw.line { width: 14px; height: 2px; background: var(--pb-brand-2); }
+.pb-plot { width: 100%; position: relative; }
+.pb-plot svg { display: block; overflow: visible; }
+.pb-plot .gr { stroke: var(--pb-line-2); stroke-width: 1; }
+.pb-plot .ax { stroke: var(--pb-line); stroke-width: 1; }
+.pb-plot .tk { font-size: 10.5px; fill: var(--pb-ink-2); }
+.pb-plot .dl { font-size: 10.5px; font-weight: 600; fill: var(--pb-ink-2); }
+.pb-plot .col { fill: var(--pb-brand); }
+.pb-plot .col.late { fill: var(--pb-bad); }
+.pb-plot .ln { stroke: var(--pb-brand-2); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.pb-plot .mk { fill: #fff; stroke: var(--pb-brand-2); stroke-width: 2; }
+
+/* ── Gauge ──────────────────────────────────────────────────────────────── */
+.pb-gauge { display: flex; flex-direction: column; align-items: center; }
+.pb-gauge svg { display: block; overflow: visible; }
+.pb-gauge .track { stroke: var(--pb-line-2); }
+.pb-gauge .fill.good { stroke: var(--pb-good); }
+.pb-gauge .fill.warn { stroke: var(--pb-warn); }
+.pb-gauge .fill.brand { stroke: var(--pb-brand); }
+.pb-gauge .tgt { stroke: var(--pb-ink); stroke-width: 2; stroke-linecap: round; }
+.pb-gauge .end { font-size: 10.5px; fill: var(--pb-ink-3); }
+.pb-gauge .val { font-size: 34px; font-weight: 600; fill: var(--pb-ink); letter-spacing: -.01em; }
+.pb-gauge .val .u { font-size: 16px; fill: var(--pb-ink-2); }
+.pb-gauge .sub { font-size: 11px; fill: var(--pb-ink-3); }
+.pb-gauge .cap { font-size: 12px; color: var(--pb-ink-2); margin-top: 4px; }
+.pb-gauge .cap em { font-style: normal; color: var(--pb-ink-3); }
+.pb-mini { display: flex; gap: 10px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--pb-line-2); }
+.pb-mini div { flex: 1; min-width: 0; }
+.pb-mini b { display: block; font-size: 18px; font-weight: 600; letter-spacing: -.01em; }
+.pb-mini span { font-size: 11px; color: var(--pb-ink-2); }
+
+/* ── Funnel ─────────────────────────────────────────────────────────────── */
+.pb-funnel { display: flex; flex-direction: column; gap: 6px; }
+.pb-funnel .fr { display: grid; grid-template-columns: 96px minmax(0, 1fr) 72px; align-items: center; gap: 12px; }
+.pb-funnel .fl { font-size: 12px; color: var(--pb-ink-2); text-align: right; white-space: nowrap; }
+.pb-funnel .fbar { display: flex; justify-content: center; height: 24px; }
+.pb-funnel .fill {
+  display: flex; align-items: center; justify-content: center; background: var(--pb-brand);
+  color: #fff; font-size: 11.5px; font-weight: 600; transition: width .45s cubic-bezier(.22,1,.36,1);
+}
+.pb-funnel .fn b { font-size: 13px; font-weight: 600; }
+.pb-funnel .fn em { display: block; font-style: normal; font-size: 10.5px; color: var(--pb-ink-3); }
+
+/* ── Horizontal bar chart ───────────────────────────────────────────────── */
+.pb-bars { display: flex; flex-direction: column; gap: 4px; }
+.pb-bars .br {
+  display: grid; grid-template-columns: minmax(84px, 30%) minmax(0, 1fr);
+  align-items: center; gap: 10px; padding: 3px 4px; border-radius: 2px; text-align: left;
+  transition: background .1s ease, opacity .12s ease;
+}
+.pb-bars .br:hover:not(.static) { background: #faf9f8; }
+.pb-bars .br.static { cursor: default; }
+.pb-bars .br.dim { opacity: .35; }
+.pb-bars .br.on .nm { color: var(--pb-ink); font-weight: 600; }
+.pb-bars .nm { font-size: 12px; color: var(--pb-ink-2); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pb-bars .tr { display: flex; align-items: center; gap: 6px; height: 18px; border-left: 1px solid var(--pb-line); }
+.pb-bars .tr i { display: block; height: 16px; flex: 0 0 auto; max-width: calc(100% - 34px); transition: width .4s cubic-bezier(.22,1,.36,1); }
+.pb-bars .tr b { font-size: 11.5px; font-weight: 600; color: var(--pb-ink-2); }
+
+/* ── 100% stacked bar ───────────────────────────────────────────────────── */
+.pb-stack .bar { display: flex; gap: 1px; height: 22px; }
+.pb-stack .bar span {
+  display: flex; align-items: center; justify-content: center; min-width: 2px;
+  color: #fff; font-size: 11px; font-weight: 600; transition: filter .1s ease;
+}
+.pb-stack .bar span:hover { filter: brightness(1.12); }
+.pb-stack .key { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; }
+.pb-stack .key span { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--pb-ink-2); }
+.pb-stack .key i { width: 9px; height: 9px; border-radius: 1px; flex: 0 0 auto; }
+.pb-stack .key b { font-weight: 600; color: var(--pb-ink); margin-left: 2px; }
+.pb-stack .key em { font-style: normal; color: var(--pb-ink-3); }
+
+/* ── Upstream services ──────────────────────────────────────────────────── */
+.pb-svc { display: flex; flex-direction: column; }
+.pb-svc .row { display: flex; align-items: center; gap: 10px; padding: 7px 2px; font-size: 12.5px; }
+.pb-svc .row + .row { border-top: 1px solid var(--pb-line-2); }
+.pb-svc .dot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.pb-svc .dot.ok { background: var(--pb-good); }
+.pb-svc .dot.warn { background: var(--pb-warn); }
+.pb-svc .dot.bad { background: var(--pb-bad); }
+.pb-svc .nm { flex: 1; min-width: 0; }
+.pb-svc .st { font-size: 11.5px; color: var(--pb-ink-2); }
+
+/* ── Matrix (queue load) ────────────────────────────────────────────────── */
+.pb-grid { width: 100%; border-collapse: collapse; font-size: 12px; }
+.pb-grid th {
+  text-align: left; font-size: 11px; font-weight: 600; color: var(--pb-ink-2);
+  padding: 4px 8px 6px; border-bottom: 1px solid var(--pb-line); white-space: nowrap;
+}
+.pb-grid td { padding: 7px 8px; border-bottom: 1px solid var(--pb-line-2); vertical-align: middle; }
+.pb-grid tr:last-child td { border-bottom: 0; }
+.pb-grid td b { font-weight: 600; }
+.pb-grid th.num, .pb-grid td.num { text-align: right; }
+.pb-grid td.num { font-weight: 600; }
+.pb-grid .bar { width: 26%; }
+.pb-grid td.bar i { display: block; height: 12px; background: var(--pb-brand); transition: width .4s ease; }
+.pb-grid tr.zero td { color: var(--pb-ink-3); font-weight: 400; }
+.pb-grid tr.zero td b { font-weight: 400; }
+
+/* ── Attention list ─────────────────────────────────────────────────────── */
+.pb-attn { display: flex; flex-direction: column; }
+.pb-attn .it { display: flex; align-items: center; gap: 10px; padding: 7px 6px; text-align: left; border-radius: 2px; width: 100%; }
+.pb-attn .it + .it { border-top: 1px solid var(--pb-line-2); }
+.pb-attn .it.click:hover { background: #faf9f8; }
+.pb-attn .it:disabled { cursor: default; }
+.pb-attn .it.on { background: rgba(15,108,189,.06); box-shadow: inset 2px 0 0 var(--pb-fabric); }
+.pb-attn .ic { width: 22px; height: 22px; display: grid; place-items: center; flex: 0 0 auto; }
+.pb-attn .ic.bad { color: var(--pb-bad); }
+.pb-attn .ic.warn { color: var(--pb-warn); }
+.pb-attn .ic.ok { color: var(--pb-good); }
+.pb-attn .tx { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.pb-attn .tx b { font-size: 12.5px; font-weight: 600; }
+.pb-attn .tx em { font-style: normal; font-size: 11.5px; color: var(--pb-ink-2); }
+.pb-attn .go { color: var(--pb-ink-3); display: inline-flex; }
+
+/* ── Heatmap ────────────────────────────────────────────────────────────── */
+.pb-heat { display: grid; gap: 2px; align-items: stretch; }
+.pb-heat .ch { font-size: 10.5px; color: var(--pb-ink-2); text-align: center; padding-bottom: 2px; }
+.pb-heat .rh { font-size: 11px; color: var(--pb-ink-2); display: flex; align-items: center; }
+.pb-heat .cell { display: block; min-height: 18px; border-radius: 1px; transition: opacity .15s ease; }
+.pb-heat .cell:hover { outline: 1px solid var(--pb-ink); outline-offset: -1px; }
+
+/* ── Split bars ─────────────────────────────────────────────────────────── */
+.pb-split { display: flex; flex-direction: column; gap: 4px; }
+.pb-split .row {
+  display: grid; grid-template-columns: minmax(84px, 28%) minmax(0, 1fr) 40px;
+  align-items: center; gap: 10px; padding: 3px 4px; border-radius: 2px; text-align: left;
+  transition: background .1s ease, opacity .12s ease;
+}
+.pb-split .row:hover:not(.static) { background: #faf9f8; }
+.pb-split .row.static { cursor: default; }
+.pb-split .row.dim { opacity: .35; }
+.pb-split .row.on .nm { color: var(--pb-ink); font-weight: 600; }
+.pb-split .nm { font-size: 12px; color: var(--pb-ink-2); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pb-split .bar { display: flex; gap: 1px; height: 16px; }
+.pb-split .bar i { display: flex; align-items: center; justify-content: center; min-width: 2px; color: #fff; font-size: 10.5px; font-weight: 600; font-style: normal; }
+.pb-split .n { font-size: 11.5px; font-weight: 600; color: var(--pb-ink-2); text-align: right; }
+.pb-split .pb-legend { margin-top: 8px; }
+
+/* ── Matrix cells with a heat tint ──────────────────────────────────────── */
+.pb-grid td.heat { text-align: right; position: relative; }
+.pb-grid td.heat i { position: absolute; inset: 3px 4px; border-radius: 1px; z-index: 0; }
+.pb-grid td.heat span { position: relative; z-index: 1; }
+.pb-grid th.right { text-align: right; }
+
+/* ── Sankey ─────────────────────────────────────────────────────────────── */
+.pb-sk { width: 100%; height: 340px; display: block; overflow: visible; }
+.pb-sk .stage { font-size: 10.5px; font-weight: 600; fill: var(--pb-ink-2); }
+.pb-sk .rb { opacity: .32; transition: opacity .16s ease; cursor: pointer; }
+.pb-sk .rb.hi { opacity: .8; }
+.pb-sk .rb.dim { opacity: .07; }
+.pb-sk .nd { cursor: pointer; transition: opacity .16s ease; }
+.pb-sk .nd:hover { opacity: .82; }
+.pb-sk .nd.sel { stroke: var(--pb-ink); stroke-width: 2; }
+.pb-sk .nd.ndim { opacity: .28; }
+.pb-sk .lb { font-size: 12px; fill: var(--pb-ink-2); }
+.pb-sk .lb .n { font-weight: 600; fill: var(--pb-ink); }
+.pb-sk .lb.mid { font-size: 11px; }
+.pb-sk .ribs { animation: pbGrow .5s cubic-bezier(.22,1,.36,1); transform-origin: left center; }
+@keyframes pbGrow { from { opacity: 0; transform: scaleX(.9); } to { opacity: 1; transform: none; } }
+
+/* ── Data table (the "show as table" view) ──────────────────────────────── */
+.pb-table-wrap { overflow: auto; max-height: 340px; }
+.pb-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.pb-table th {
+  position: sticky; top: 0; z-index: 1; text-align: left; font-weight: 600; color: var(--pb-ink-2);
+  background: #faf9f8; padding: 6px 10px; border-bottom: 1px solid var(--pb-line); white-space: nowrap;
+}
+.pb-table td { padding: 6px 10px; border-bottom: 1px solid var(--pb-line-2); }
+.pb-table th.num, .pb-table td.num { text-align: right; }
+.pb-table tbody tr:hover { background: #faf9f8; }
+.pb-table td.empty { text-align: center; color: var(--pb-ink-3); padding: 18px; }
+
+/* ── Filter pane ────────────────────────────────────────────────────────── */
+.pb-pane {
+  width: 264px; flex: 0 0 264px; display: flex; flex-direction: column;
+  background: var(--pb-card); border-left: 1px solid var(--pb-line);
+}
+.pb-pane-h { display: flex; align-items: center; gap: 8px; padding: 11px 14px 9px; border-bottom: 1px solid var(--pb-line); }
+.pb-pane-h b { font-size: 13.5px; font-weight: 600; }
+.pb-pane-h .lnk { font-size: 11.5px; color: var(--pb-fabric); text-decoration: underline; }
+.pb-pane-h .x { color: var(--pb-ink-2); padding: 3px; border-radius: 3px; display: inline-flex; }
+.pb-pane-h .x:hover { background: var(--pb-line-2); }
+.pb-pane-note { font-size: 11px; color: var(--pb-ink-3); padding: 8px 14px; background: #faf9f8; border-bottom: 1px solid var(--pb-line-2); }
+.pb-pane-b { flex: 1; overflow-y: auto; padding: 4px 0 12px; }
+.pb-pane-f { padding: 9px 14px; border-top: 1px solid var(--pb-line); font-size: 11.5px; color: var(--pb-ink-2); }
+.pb-fg { padding: 10px 14px; border-bottom: 1px solid var(--pb-line-2); }
+.pb-fg-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.pb-fg-h b { font-size: 12px; font-weight: 600; color: var(--pb-ink); }
+.pb-fg-h button { font-size: 11px; color: var(--pb-fabric); text-decoration: underline; }
+.pb-fg label { display: flex; align-items: center; gap: 9px; padding: 5px 5px; border-radius: 3px; cursor: pointer; font-size: 12.5px; }
+.pb-fg label:hover { background: var(--pb-line-2); }
+.pb-fg label.on { background: rgba(15,108,189,.07); }
+.pb-fg label input { accent-color: var(--pb-fabric); width: 14px; height: 14px; flex: 0 0 auto; }
+.pb-fg .nm { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pb-fg .n { font-size: 11.5px; color: var(--pb-ink-3); }
+.pb-fg-none { font-size: 11.5px; color: var(--pb-ink-3); padding: 3px 5px; }
+
+/* ── Odds and ends ──────────────────────────────────────────────────────── */
+.pb-none { font-size: 12px; color: var(--pb-ink-3); padding: 18px 4px; text-align: center; }
+.pb-empty {
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  background: var(--pb-card); border-radius: 2px; padding: 54px 24px; text-align: center;
+}
+.pb-empty b { font-size: 15px; font-weight: 600; }
+.pb-empty span { font-size: 12.5px; color: var(--pb-ink-2); max-width: 46ch; }
+.pb-empty .pb-cmd-b { margin-top: 8px; border: 1px solid rgba(15,108,189,.25); }
+.pb-tip {
+  position: fixed; z-index: 60; transform: translate(12px, -50%); pointer-events: none;
+  background: #252423; color: #fff; font-size: 11.5px; padding: 5px 9px; border-radius: 2px;
+  box-shadow: 0 4px 12px rgba(0,0,0,.28); white-space: nowrap;
+}
+
+/* ── Responsive: the action bar's decorative commands go first ──────────── */
+/* The commands this demo cannot honour go first, and they go early: a laptop
+   at 1500px wide has room for the live ones and no more. */
+@media (max-width: 1720px) { .pb-cmd-b.hide-sm { display: none; } }
+@media (max-width: 1600px) { .pb-cmd-b.hide-md { display: none; } }
+@media (max-width: 1320px) {
+  .pb-rail { width: 48px; }
+  .pb-rail .pb-rail-toggle span, .pb-rail .pb-rail-i span, .pb-rail .pb-rail-ws span:not(.dot) { display: none; }
+  /* The app's "← Launcher" button is fixed to the bottom-left corner, and every
+     surface reserves that corner for it. Once the rail narrows past the button
+     it stops covering the rail and starts covering the first page tab. */
+  .pb-tabs { padding-left: 124px; }
+}
+@media (max-width: 980px) { .pb-rail { display: none; } .pb-search, .pb-trial { display: none; } }

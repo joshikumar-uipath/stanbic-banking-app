@@ -269,11 +269,22 @@ export const fullName = (c: Pick<OnboardingCase, 'firstName' | 'lastName'>) =>
   `${c.firstName} ${c.lastName}`.trim();
 
 /** Whether a case is a business opening. The entity block is the marker, but a
- *  corporate upload opens its draft before the extraction is confirmed — so that
- *  state counts as corporate too, otherwise a draft would file as an individual
- *  until the reviewer accepts it. */
-export const isCorporate = (c: Pick<OnboardingCase, 'entity' | 'state'>) =>
-  Boolean(c.entity) || c.state === 'AWAITING_EXTRACTION';
+ *  `accountType` is the marker that matters: it is the only one that survives a
+ *  reload. `entity` lives in memory alone — there is no Dataverse column for it —
+ *  so a corporate case re-read from Dataverse used to come back classified as an
+ *  individual and vanish from the Corporate filter.
+ *
+ *  AWAITING_EXTRACTION used to count as corporate here, back when only corporate
+ *  uploaded a form and a draft had no other way to say what it was. The individual
+ *  flow now uploads too and opens its draft in exactly that state, so the shortcut
+ *  had begun filing scanned individual applications as corporate — putting them
+ *  under the wrong filter and, worse, sending the desk to the corporate folder for
+ *  their stage, where those instances do not exist. Both flows stamp accountType
+ *  at draft time instead, which is durable and unambiguous. */
+export const CORPORATE_ACCOUNT_TYPE = 'Corporate';
+
+export const isCorporate = (c: Pick<OnboardingCase, 'entity' | 'state' | 'accountType'>) =>
+  c.accountType === CORPORATE_ACCOUNT_TYPE || Boolean(c.entity);
 
 // Fields a caller supplies to open a case; everything else is derived by the store.
 export interface NewCaseInput extends ApplicantDetails {

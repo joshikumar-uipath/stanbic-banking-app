@@ -22,6 +22,7 @@ import TransactionHistory from './screens/TransactionHistory';
 import Digibot from './screens/Digibot';
 import OpenAccountScreen from './screens/OpenAccount';
 import AccountOpeningFlow from '../customer/flow';
+import CallConfirm from './CallConfirm';
 
 const badgeDot: CSSProperties = { position: 'absolute', top: -3, right: -3, background: C.warn, color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 999, minWidth: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 3px', border: `2px solid ${C.card}` };
 
@@ -271,6 +272,9 @@ function Shell() {
         </>
       )}
       {nav.digibotOpen && <Digibot />}
+      {/* The bank-is-calling-you card. Shows itself only while the voice agent
+          has a confirmation pending for this customer. See CallConfirm.tsx. */}
+      <CallConfirm />
     </div>
   );
 }

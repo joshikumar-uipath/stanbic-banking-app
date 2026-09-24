@@ -13,7 +13,38 @@
   background: #ffffff; color: var(--i-ink); font-family: var(--i-num);
 }
 
-/* ── Control row ── */
+/* ── Instance header ──
+   Modelled on the row Maestro puts above its canvas: package name, instance
+   picker, status, then the actions on the right. Sticky, because it is the
+   identity of what you are looking at — it should not scroll away. */
+.cm-inst { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  padding: 11px 22px; background: #fff; border-bottom: 1px solid var(--i-line);
+  position: sticky; top: 0; z-index: 5; }
+.cm-inst-l { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; min-width: 0; }
+.cm-inst-r { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; }
+.cm-inst-pkg { font-size: 12px; font-weight: 600; color: var(--i-ink-2); letter-spacing: -.01em;
+  max-width: 46ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cm-inst-sep { width: 1px; height: 18px; background: var(--i-line); flex: 0 0 auto; }
+.cm-inst-status { display: inline-flex; align-items: center; gap: 7px; }
+.cm-inst-status-l { font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--i-ink-3); }
+.cm-inst-id { font-size: 11.5px; color: var(--i-ink-3); }
+.cm-ghost { font-size: 12.5px; font-weight: 600; color: var(--i-brand); text-decoration: none;
+  padding: 7px 12px; border: 1px solid var(--i-line); border-radius: 7px; background: #fff; }
+.cm-ghost:hover { border-color: var(--i-brand); }
+
+/* ── Body: canvas above, data dock below (Maestro's split) ── */
+.cm-body { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.cm-canvas-wrap { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; }
+/* The note scrolls with the flow rather than sitting under the floating
+   Launcher button, which is where it used to land on a short window. */
+.cm-canvas .cm-note { padding: 18px 0 8px; }
+.cm-canvas-head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  padding: 12px 22px 0; }
+.cm-canvas-title { font-size: 14px; font-weight: 700; letter-spacing: -.015em; color: var(--i-ink); }
+.cm-canvas-legend { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-left: auto; }
+.cm-agent-chip { display: inline-flex; align-items: center; gap: 8px;
+  padding: 4px 10px 4px 5px; border: 1px solid var(--i-line); border-radius: 999px; background: #fff; }
+
 .cm-ctrl { display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   padding: 14px 22px; background: #fff; border-bottom: 1px solid var(--i-line); }
 .cm-ctrl-l { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
@@ -39,8 +70,20 @@
 .cm-ti.gateway{ background: #f3eefb; color: #7a52c4; }
 
 /* ── Canvas ── */
-.cm-canvas { position: relative; flex: 1; overflow-x: auto; overflow-y: hidden; padding: 34px 22px 12px; }
-.cm-flow { display: flex; align-items: flex-start; gap: 0; min-width: min-content; }
+/* Both axes scroll. This was overflow-y:hidden, which clipped everything below
+   the fold — the secondary/exception lanes and the caption under them were
+   unreachable at any window height, because .cm is min-height:100vh so the
+   canvas fills the viewport and the rest simply had nowhere to go. There is no
+   overflow-y:visible option here either: a box with one axis scrolling and the
+   other visible is invalid, and the browser silently promotes visible to auto. */
+.cm-canvas { position: relative; flex: 1; overflow: auto; padding: 34px 22px 12px; }
+/* Centred, but still scrollable when the spine is wider than the window.
+   width:max-content + auto side margins is the combination that does both: the
+   margins centre it while it fits, and collapse to 0 once it overflows, so the
+   first stage stays reachable at scrollLeft 0. justify-content:center on the
+   scroll container would instead push the overflow off the left edge, where it
+   cannot be scrolled back to. */
+.cm-flow { display: flex; align-items: flex-start; gap: 0; width: max-content; margin-inline: auto; }
 
 /* Start node */
 .cm-start { display: flex; flex-direction: column; align-items: center; gap: 10px; padding-top: 34px; flex: 0 0 auto; }
@@ -104,10 +147,12 @@
 
 /* ── Secondary / exception-lane stages ── */
 .cm-branches { margin-top: 30px; padding-top: 22px; border-top: 1px dashed var(--i-line-2); min-width: min-content; }
-.cm-branch-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; padding: 0 2px; }
+.cm-branch-head { display: flex; align-items: baseline; justify-content: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; padding: 0 2px; }
 .cm-branch-eyebrow { font-size: 10.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--i-ink-3); }
 .cm-branch-sub { font-size: 12px; color: var(--i-ink-3); }
-.cm-branch-row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+/* The lanes centre on the same axis as the spine above them. The dashed rule on
+   .cm-branches stays full-width so it still reads as a divider across the canvas. */
+.cm-branch-row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; justify-content: center; }
 .cm-stage.sec { width: 236px; border-style: dashed; }
 .cm-stage.sec.active, .cm-stage.sec.attention { border-style: solid; }
 .cm-branch-route { display: flex; flex-direction: column; gap: 4px; margin: 8px 0 4px; }
@@ -124,7 +169,7 @@
 .cm-agent-t b { display: block; font-size: 13px; font-weight: 700; color: var(--i-ink); }
 .cm-agent-t em { display: block; font-style: normal; font-size: 11px; color: var(--i-ink-3); }
 
-.cm-note { margin: 0; padding: 12px 22px 22px; font-size: 12px; color: var(--i-ink-3); max-width: 90ch; }
+.cm-note { margin: 0 auto; padding: 12px 22px 22px; font-size: 12px; color: var(--i-ink-3); max-width: 90ch; }
 
 /* ── Live bridge to the real Maestro case ── */
 .cm-run { font: inherit; font-size: 12.5px; font-weight: 600; color: #fff; background: var(--i-brand);

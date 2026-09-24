@@ -14,6 +14,14 @@ import { VALIDATION_KINDS, fullName, hasBranch } from './types';
 import { nextApplicationId, setApplicationSeq, kycToken, uid, mockCif, mockAccountNumber } from './ids';
 import { getActiveCountry } from '../config/countries';
 
+/** True when `recordId` is linked to a Maestro case that has NOT finished.
+ *  Injected rather than imported: this module must not depend on maestro.ts.
+ *  Registered once, in main.tsx. */
+let liveCaseUnfinished: ((recordId: string) => boolean) | null = null;
+export function setLiveCaseGuard(fn: (recordId: string) => boolean): void {
+  liveCaseUnfinished = fn;
+}
+
 export interface ListFilter {
   state?: OnboardingState | OnboardingState[];
   channel?: OnboardingCase['channel'];
@@ -311,6 +319,15 @@ class MockOnboardingStore implements OnboardingStore {
   async update(id: string, patch: Partial<OnboardingCase>): Promise<OnboardingCase> {
     const c = this.cases.find((x) => x.id === id);
     if (!c) throw new Error(`Case ${id} not found`);
+    // A record whose case is still running in Maestro cannot be "fully activated":
+    // that is the state the LAST task of Closure produces. Several writers used to
+    // jump straight to it — the FaceID approval and the KYC completion both set it
+    // the moment liveness passed — which put "Fully activated" in the outcome
+    // column beside a live case parked at Decision. The guard lives here rather
+    // than in advance() because those writers call update() directly.
+    if (patch.state === 'FULLY_ACTIVATED' && liveCaseUnfinished?.(id)) {
+      patch = { ...patch, state: c.accountNumber ? 'ACCOUNT_CREATED' : c.state };
+    }
     Object.assign(c, patch, { updatedAt: nowIso() });
     this.save();
     this.share(c);
@@ -498,15 +515,25 @@ function seedDetails(co: SeedCtx, r: SeedRow, n: number): Partial<NewCaseInput> 
   const ci = found >= 0 ? found : n % co.cities.length;
   const idTypes = ['International Passport', "Driver's licence", "Voter's card", 'NIN slip'];
   const employment = r.employer ? 'Employed' : ['Self-employed', 'Business owner', 'Employed'][n % 3];
-  const occupations = ['Teacher', 'Engineer', 'Trader', 'Nurse', 'Accountant', 'Driver', 'Consultant', 'Farmer'];
+  // Split so the job matches how the person is employed — a "Business owner ·
+  // Nurse" reads as two facts about two different people.
+  const salaried = ['Teacher', 'Engineer', 'Nurse', 'Accountant', 'Civil servant', 'Bank officer'];
+  const ownAccount = ['Trader', 'Driver', 'Consultant', 'Farmer', 'Tailor', 'Contractor'];
   const purposes = ['Everyday banking', 'Salary account', 'Savings', 'Business banking'];
   const funds = ['Salary', 'Business income', 'Investments', 'Pension'];
   const cur = co.currency.symbol;
   const incomes = [`Under ${cur}1m`, `${cur}1m – ${cur}5m`, `${cur}5m – ${cur}20m`, `Above ${cur}20m`];
   const year = 1968 + (n * 7) % 32;
   const pad = (x: number) => String(x).padStart(2, '0');
+  // Everything the details popup can show gets a value. A seeded case with
+  // "Not captured" down half the panel reads as a broken record rather than a
+  // demo one: TIN and the alternate phone were never generated at all, and
+  // `employer` only arrived on bulk rows, so every walk-in looked unemployed.
+  const tinBase = 20000000000 + n * 7919;
   return {
     title,
+    tin: `${String(tinBase).slice(0, 11)}-${pad(1 + n % 9)}${pad(1 + (n * 3) % 9)}`,
+    altPhone: `${co.phoneTrunk}${String(3100000 + n * 37).slice(-7)}`,
     dob: `${year}-${pad(1 + (n * 5) % 12)}-${pad(1 + (n * 3) % 28)}`,
     gender,
     maritalStatus: status,
@@ -521,11 +548,23 @@ function seedDetails(co: SeedCtx, r: SeedRow, n: number): Partial<NewCaseInput> 
     lga: `${co.cities[ci]} Central`,
     yearsAtAddress: String(1 + (n % 12)),
     employmentStatus: employment,
-    occupation: occupations[n % occupations.length],
-    incomeBand: incomes[n % incomes.length],
-    sourceOfFunds: r.employer ? 'Salary' : funds[n % funds.length],
+    // Bulk rows carry their batch's employer; everyone else gets one that agrees
+    // with their employment status — self-employed and business owners are named
+    // after their own trade rather than left blank.
+    employer: r.employer
+      ?? (employment === 'Employed' ? co.companies[(n + 1) % co.companies.length]
+        : `${co.lastNames[(n * 5 + 2) % co.lastNames.length]} ${['Ventures', 'Enterprises', 'Trading', 'Services'][n % 4]}`),
+    occupation: employment === 'Employed' ? salaried[n % salaried.length] : ownAccount[n % ownAccount.length],
+    // These three have to agree with the employment status, or the record reads
+    // as randomly generated — which it is, but it should not look it.
+    incomeBand: employment === 'Business owner' ? incomes[2 + (n % 2)] : incomes[n % 3],
+    sourceOfFunds: employment === 'Employed' ? 'Salary'
+      : employment === 'Self-employed' || employment === 'Business owner' ? 'Business income'
+      : funds[n % funds.length],
     accountType: n % 5 === 0 ? 'Current' : 'Savings',
-    accountPurpose: r.employer ? 'Salary account' : purposes[n % purposes.length],
+    accountPurpose: employment === 'Employed' ? 'Salary account'
+      : employment === 'Self-employed' || employment === 'Business owner' ? 'Business banking'
+      : purposes[n % purposes.length],
     // Only where someone actually stood in one — see hasBranch(). A bulk payroll
     // row is loaded centrally, so its batch is the locus, not a branch.
     branch: hasBranch(r.source) && r.channel !== 'bulk' ? `${co.cities[ci]} main branch` : undefined,
@@ -533,6 +572,9 @@ function seedDetails(co: SeedCtx, r: SeedRow, n: number): Partial<NewCaseInput> 
       name: `${co.firstNames[(n + 6) % co.firstNames.length]} ${r.lastName}`,
       relationship: ['Spouse', 'Sibling', 'Parent', 'Child'][n % 4],
       phone: `${co.phoneTrunk}${String(2000000 + n * 811).slice(0, 7)}`,
+      // Same household as the applicant — the common case, and it stops the
+      // next-of-kin block ending on an empty line.
+      address: r.address,
     },
   };
 }

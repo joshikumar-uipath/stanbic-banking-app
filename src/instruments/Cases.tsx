@@ -14,13 +14,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { store, fullName, stateMeta, type OnboardingCase, type OnboardingState, type ValidationKind } from '../onboarding';
 import { InstrumentProvider, TopBar } from './shell';
 import { useBrandVars } from './brand';
-import { maestroReady, startCase, getState, approve, instanceUrl, STAGES as MAESTRO_STAGES, type LiveState } from '../onboarding/maestro';
+import { maestroReady, startCase, getState, approve, instanceUrl, type LiveState } from '../onboarding/maestro';
 import './cases.css';
 
 // ── Task + stage model ───────────────────────────────────────────────────────
 type TaskKind = 'agent' | 'robot' | 'human' | 'app' | 'gateway';
 type Trigger = 'sequential' | 'event';
 type TaskState = 'done' | 'active' | 'pending' | 'attention' | 'waiting';
+
 
 interface TaskDef {
   name: string;
@@ -294,9 +295,15 @@ function CasesInner() {
     <div className="inst cm">
       <TopBar system="Case Management" sub="Account opening" />
 
-      <div className="cm-ctrl">
-        <div className="cm-ctrl-l">
-          <span className="cm-eyebrow">Onboarding case</span>
+      {/* Instance header — the row Maestro puts above the canvas: which case
+          package this is, the instance, its status, and the actions you can take
+          on it. Ours swaps Pause/Cancel (we do not own the job) for Run/Approve. */}
+      <div className="cm-inst">
+        <div className="cm-inst-l">
+          <span className="cm-inst-pkg" title="The deployed case package this mirrors">
+            OnboardingCaseSolution.caseManagement.OnboardingCase
+          </span>
+          <span className="cm-inst-sep" aria-hidden />
           <select className="cm-pick" value={current?.id ?? ''} onChange={(e) => setSel(e.target.value || null)}>
             {!cases.length && <option value="">No cases yet — open one on the desk</option>}
             {cases.length > 0 && !current && <option value="">Select a case…</option>}
@@ -305,44 +312,42 @@ function CasesInner() {
             ))}
           </select>
           {current && (
-            <span className={`cm-badge ${stateMeta(current.state).tone}`}>{stateMeta(current.state).label}</span>
+            <span className="cm-inst-status">
+              <span className="cm-inst-status-l">Status</span>
+              <span className={`cm-badge ${stateMeta(current.state).tone}`}>
+                {run ? (run.state.done ? 'Completed' : run.state.jobState) : stateMeta(current.state).label}
+              </span>
+            </span>
           )}
+          {run && <span className="cm-inst-id mono">instance {run.id.slice(0, 8)}…</span>}
+        </div>
+        <div className="cm-inst-r">
           {maestroReady() && current && !run && (
             <button className="cm-run" disabled={busy} onClick={launch} title="Start a live instance of the real UiPath Maestro case">
               {busy ? 'Starting…' : '▶ Run in Maestro'}
             </button>
           )}
-        </div>
-        <div className="cm-legend">
-          {(['agent', 'robot', 'human', 'app', 'gateway'] as TaskKind[]).map((k) => (
-            <span key={k} className="cm-leg"><span className={`cm-ti ${k}`}><KIcon k={k} s={12} /></span>{KIND_LABEL[k]}</span>
-          ))}
+          {run && !run.state.done && run.state.pendingTaskId && (
+            <button className="cm-run" disabled={busy} onClick={doApprove}>{busy ? '…' : `Approve ${run.state.activeStage ?? ''}`}</button>
+          )}
+          {run && <a className="cm-ghost" href={instanceUrl(run.id)} target="_blank" rel="noreferrer">Open in Maestro ↗</a>}
         </div>
       </div>
 
-      {run && (
-        <div className={`cm-live ${run.state.done ? 'done' : ''}`}>
-          <div className="cm-live-head">
-            <span className="cm-live-dot" />
-            <b>Live in Maestro</b>
-            <span className="cm-live-id">instance {run.id.slice(0, 8)}…</span>
-            <span className={`cm-live-state ${run.state.done ? 'ok' : ''}`}>{run.state.done ? 'Completed' : run.state.jobState}</span>
-          </div>
-          <div className="cm-live-stages">
-            {MAESTRO_STAGES.map((s) => {
-              const st = run.state.done || run.state.completedStages.includes(s) ? 'done' : run.state.activeStage === s ? 'active' : 'pend';
-              return <span key={s} className={`cm-live-stage ${st}`}>{st === 'done' ? '✓ ' : st === 'active' ? '● ' : ''}{s}</span>;
-            })}
-          </div>
-          <div className="cm-live-actions">
-            {!run.state.done && run.state.pendingTaskId && (
-              <button className="cm-run" disabled={busy} onClick={doApprove}>{busy ? '…' : `Approve ${run.state.activeStage ?? ''}`}</button>
-            )}
-            <a className="cm-live-link" href={instanceUrl(run.id)} target="_blank" rel="noreferrer">Open in Maestro ↗</a>
-          </div>
+      <div className="cm-body">
+      <section className="cm-canvas-wrap">
+        <div className="cm-canvas-head">
+          <span className="cm-canvas-title">OnboardingCase</span>
+          <span className="cm-agent-chip">
+            <span className="cm-agent-mark"><KIcon k="agent" s={13} /></span>
+            <span className="cm-agent-t"><b>Case manager</b><em>AI Orchestrator</em></span>
+          </span>
+          <span className="cm-canvas-legend">
+            {(['agent', 'robot', 'human', 'app', 'gateway'] as TaskKind[]).map((k) => (
+              <span key={k} className="cm-leg"><span className={`cm-ti ${k}`}><KIcon k={k} s={11} /></span>{KIND_LABEL[k]}</span>
+            ))}
+          </span>
         </div>
-      )}
-
       <div className="cm-canvas">
         <div className="cm-flow">
           {/* Start node */}
@@ -438,20 +443,16 @@ function CasesInner() {
           </div>
         </div>
 
-        {/* The orchestrating agent, watching over the case */}
-        <div className="cm-agent">
-          <span className="cm-agent-mark"><KIcon k="agent" s={16} /></span>
-          <span className="cm-agent-t"><b>Case manager</b><em>AI Orchestrator</em></span>
-        </div>
+        <p className="cm-note">
+          Mirrors the deployed UiPath Maestro case: the main spine (Intake → Verification → Decision →
+          Activation → Closure) branches to secondary lanes — Compliance escalations, EDD review and
+          Pending customer all loop back to their origin, Declined is terminal. The flow is live off the
+          shared store — the selected case's state lights its stage (spine or lane), and Verification
+          mirrors its real validation results.
+        </p>
       </div>
-
-      <p className="cm-note">
-        Mirrors the deployed UiPath Maestro case: the main spine (Intake → Verification → Decision →
-        Activation → Closure) branches to secondary lanes — Compliance escalations, EDD review and
-        Pending customer all loop back to their origin, Declined is terminal. The flow is live off the
-        shared store — the selected case's state lights its stage (spine or lane), and Verification
-        mirrors its real validation results.
-      </p>
+      </section>
+      </div>
     </div>
   );
 }
