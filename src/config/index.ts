@@ -4,6 +4,8 @@ export { defaultConfig } from './default';
 export { BUILTIN_PRESETS, getPresetById, DEFAULT_PRESET_ID, UIPATH_PRESET_ID, STANBIC_PRESET_ID, stanbicConfig } from './presets';
 export type { BuiltinPreset } from './presets';
 export { migrate } from './migrate';
+export { bankIdentity, activeBank, useBank } from './bank';
+export type { BankIdentity } from './bank';
 export { applyFavicon, generatedFavicon, brandMark } from './favicon';
 export { SCHEMA_VERSION, LOGO_SIZES } from './types';
 export type { LogoSize } from './types';
@@ -44,4 +46,6 @@ export type {
   FeatureFlags,
   OperationsConfig,
   RoutingRule,
+  EmployeeRole,
+  EmployeeAppConfig,
 } from './types';

@@ -6,8 +6,10 @@
 // Finacle ledger as single captures. Most rows go straight through; a realistic
 // fraction hit an exception — which then appears in Operations, at scale.
 // ─────────────────────────────────────────────────────────────────────────────
+import type { DocFacts } from '../integrations/docChecks';
 import { store, mockCif, mockAccountNumber, type ValidationKind, type ValidationStatus } from '../onboarding';
 import { getActiveCountry, kycLabel } from '../config/countries';
+import { findIdentity } from '../fixtures';
 
 const CO = getActiveCountry();
 
@@ -94,11 +96,22 @@ export async function runBulk(rows: BulkRow[], employer: string, batchId: string
 // ─────────────────────────────────────────────────────────────────────────────
 export type DocKind = 'id' | 'address' | 'selfie' | 'other';
 export const DOC_LABEL: Record<DocKind, string> = { id: 'ID document', address: 'Proof of address', selfie: 'Selfie', other: 'Other' };
-export interface ExtractedDoc { file: string; kind: DocKind; confidence: number }
+export interface ExtractedDoc {
+  file: string; kind: DocKind; confidence: number;
+  /** What the document checks read off the file's bytes, when there were bytes
+   *  (src/integrations/docChecks). Its type comes from the content, not the name. */
+  facts?: DocFacts;
+}
 export interface ExtractedApplicant extends BulkRow {
   docs: ExtractedDoc[];
   complete: boolean;
   missing: DocKind[];
+  /** The archive gave no customer folder for these files, so the "name" above
+   *  is just a filename with the document words stripped out. Such a group
+   *  cannot be attributed to anybody and is rejected at intake for the naming
+   *  convention — without this flag it looks like an ordinary customer who
+   *  happens to be missing documents, and the submitter gets the wrong reason. */
+  unattributed?: boolean;
 }
 
 /** File names out of a ZIP's central directory — no decompression, no deps.
@@ -138,6 +151,20 @@ const titleCase = (s: string) => s.replace(/\b\w/g, (c) => c.toUpperCase());
 /** Country-aware fields the IXP "reads off" the documents (deterministic per name). */
 function fieldsFor(first: string, last: string): BulkRow {
   const n = hashName(first + last);
+
+  // If this is one of the fixture personas, read what is actually printed on
+  // their generated documents rather than inventing identifiers. Without this
+  // the "extracted" BVN would not match the BVN on the form the reviewer is
+  // looking at, and duplicate detection — which compares BVNs across a
+  // submission — could never fire on the document channel.
+  const p = findIdentity({ firstName: first, lastName: last });
+  if (p) {
+    return {
+      firstName: first, lastName: last,
+      phone: p.phone, email: p.email, bvn: p.bvn, nin: p.nin, address: p.address,
+    };
+  }
+
   return {
     firstName: first, lastName: last,
     phone: `${CO.phoneTrunk}${String(4000000 + (n % 900000)).slice(-7)}`,
@@ -151,6 +178,10 @@ function fieldsFor(first: string, last: string): BulkRow {
 /** Mock IXP: group a ZIP's files by applicant, classify each, check completeness. */
 export function extractFromZip(entries: string[]): ExtractedApplicant[] {
   const groups = new Map<string, string[]>();
+  // Groups that came from a loose file rather than a customer folder. The
+  // submitter's naming convention is what attributes a document to a person;
+  // without a folder there is nothing to attribute it to.
+  const loose = new Set<string>();
   for (const path of entries) {
     if (path.endsWith('/') || /__MACOSX|\.DS_Store|thumbs\.db/i.test(path)) continue;
     const parts = path.split('/').filter(Boolean);
@@ -159,6 +190,7 @@ export function extractFromZip(entries: string[]): ExtractedApplicant[] {
       ? parts[0]
       : parts[0].replace(/\.[^.]+$/, '').replace(/[-_ ]*(id|passport|nin|bvn|national|card|address|utility|bill|statement|poa|selfie|photo|face|portrait)s?\b/gi, '').replace(/[-_]+/g, ' ').trim();
     if (!key) continue;
+    if (parts.length < 2) loose.add(key);
     (groups.get(key) ?? groups.set(key, []).get(key)!).push(parts[parts.length - 1]);
   }
   const out: ExtractedApplicant[] = [];
@@ -169,7 +201,10 @@ export function extractFromZip(entries: string[]): ExtractedApplicant[] {
     const docs: ExtractedDoc[] = files.map((f) => ({ file: f, kind: classifyDoc(f), confidence: 90 + (hashName(f) % 100) / 10 }));
     const kinds = new Set(docs.map((d) => d.kind));
     const missing = (['id', 'address'] as DocKind[]).filter((k) => !kinds.has(k));
-    out.push({ ...fieldsFor(first, last), docs, complete: missing.length === 0, missing });
+    out.push({
+      ...fieldsFor(first, last), docs, complete: missing.length === 0, missing,
+      unattributed: loose.has(key) || undefined,
+    });
   }
   return out.sort((a, b) => a.firstName.localeCompare(b.firstName));
 }

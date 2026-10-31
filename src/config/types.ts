@@ -46,6 +46,12 @@ export interface Branding {
    *  URL; a square PNG/SVG works best. Empty → the bundled default. Applied to
    *  every surface's <link rel="icon"> by the brand bridges. */
   favicon?: string;
+  /** Formal bank name for document headers ("First Bank of Nigeria Limited").
+   *  Empty → derived from `appName` (see config/bank.ts). */
+  legalName?: string;
+  /** Host used in the customer's KYC link ("kyc.firstbanknigeria.com").
+   *  Empty → derived from `appName`. */
+  kycDomain?: string;
 }
 
 export type LogoSize = 'small' | 'medium' | 'large';
@@ -214,6 +220,22 @@ export interface OperationsConfig {
   routing: RoutingRule[];
 }
 
+// ── Employee app roles ───────────────────────────────────────────────────
+// Who the banker's phone opens as. One app serves the branch and the back
+// office: a Relationship Manager in the field, the two bulk-opening operators
+// (maker and verifier, kept apart by §9.1), and the operations analyst who
+// triages the whole bank's exceptions. The admin picks the role a fresh install
+// starts in and which roles a user may switch between.
+export type EmployeeRole = 'rm' | 'maker' | 'verifier' | 'ops';
+export interface EmployeeAppConfig {
+  /** The role the employee app opens in when the user hasn't picked one. */
+  defaultRole: EmployeeRole;
+  /** Roles offered in the in-app switcher. The default is always included. */
+  roles: EmployeeRole[];
+  /** When false the switcher is hidden and everyone works as the default role. */
+  allowSwitch: boolean;
+}
+
 // ── Top-level ────────────────────────────────────────────────────────────
 export interface TenantConfig {
   schemaVersion: number;
@@ -227,4 +249,6 @@ export interface TenantConfig {
   strings: StringsConfig;
   /** Optional so older saved configs stay valid; migrate.ts backfills the default. */
   operations?: OperationsConfig;
+  /** Optional for the same reason; migrate.ts backfills the default. */
+  employeeApp?: EmployeeAppConfig;
 }

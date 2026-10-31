@@ -144,6 +144,86 @@ export interface CaseEvent {
   payload?: Record<string, unknown>;
 }
 
+// ── Bulk account opening (BRD v1.0) ──────────────────────────────────────────
+/**
+ * Which intake channel a bulk application arrived through. The distinction is
+ * not cosmetic: a `manifest` row was typed by the customer into a structured
+ * form, so nothing was guessed and no one needs to confirm it; a `bundle` row
+ * was read off a scanned AOP by OCR, and the BRD makes an Ops review mandatory
+ * before an account can be created (BR-DOC-10).
+ */
+export type BulkChannel = 'manifest' | 'bundle';
+
+/** Where an OCR-extracted application sits in the maker checkpoint. */
+export type ReviewState = 'awaiting' | 'approved' | 'flagged';
+
+/**
+ * Business verifications the BRD requires on top of the six KYC validations.
+ * Deliberately a SEPARATE list rather than more `ValidationKind`s: that union is
+ * keyed exhaustively by the tower, the Ops workbench and the customer app, and
+ * widening it would renumber and reshape all three for a gap none of them has.
+ */
+export type VerificationKind = 'TIN' | 'CAC' | 'ID_DOC' | 'SANCTIONS' | 'WATCHLIST' | 'ADVERSE_MEDIA';
+
+export const VERIFICATION_KINDS: VerificationKind[] = ['TIN', 'CAC', 'ID_DOC', 'SANCTIONS', 'WATCHLIST', 'ADVERSE_MEDIA'];
+
+export const VERIFICATION_LABEL: Record<VerificationKind, string> = {
+  TIN: 'TIN — FIRS',
+  CAC: 'CAC registry',
+  ID_DOC: 'ID document',
+  SANCTIONS: 'Sanctions',
+  WATCHLIST: 'Internal watchlist',
+  ADVERSE_MEDIA: 'Adverse media',
+};
+
+export interface Verification {
+  kind: VerificationKind;
+  status: ValidationStatus;
+  attempts: number;
+  detail?: string;
+  updatedAt: string;
+}
+
+/** A field whose value does not agree across the sources that carry it. The
+ *  BRD asks for the specific source-pair to be named, not just "mismatch". */
+export interface ReconIssue {
+  field: string;
+  sources: { name: string; value: string }[];
+}
+
+/** The §9.1 decision table's outcomes. `EXCEPTION` on its own could not say
+ *  whether a case goes back to the submitter, to Compliance, or nowhere. */
+export type BulkDecision =
+  | 'straight-through'    // digital channel, everything passed
+  | 'maker-review'        // OCR channel — mandatory review before creation
+  | 'refer-requester'     // reconciliation mismatch, PEP — back to the RM
+  | 'refer-compliance'    // sanctions, watchlist
+  | 'auto-reject'         // identity / registration / document failure
+  | 'terminate'           // confirmed sanctions or watchlist match
+  | 'parked';             // verification service persistently unavailable
+
+export const DECISION_LABEL: Record<BulkDecision, string> = {
+  'straight-through': 'Straight through',
+  'maker-review': 'Awaiting review',
+  'refer-requester': 'Referred to you',
+  'refer-compliance': 'With Compliance',
+  'auto-reject': 'Auto-rejected',
+  terminate: 'Terminated',
+  parked: 'Parked',
+};
+
+/** Where a manifest-channel invitee got to. */
+export type InviteState = 'sent' | 'opened' | 'completed' | 'lapsed';
+
+export interface Invite {
+  state: InviteState;
+  sentAt: string;
+  openedAt?: string;
+  completedAt?: string;
+  nudges: number;
+  lastNudge?: string;
+}
+
 // ── The onboarding case (system-of-record record) ────────────────────────────
 /** A director / signatory on a corporate account. */
 export interface EntityDirector {
@@ -254,6 +334,47 @@ export interface OnboardingCase extends ApplicantDetails {
   accountNumber?: string;     // Finacle account number, once created
   batchId?: string;           // groups rows from one bulk upload
   kycToken?: string;          // tokenised customer completion link
+
+  // ── Bulk account opening. All optional: every one of these is absent on a
+  // single capture, and on bulk rows created before the journey existed.
+  /** Which intake channel this row arrived through. */
+  bulkChannel?: BulkChannel;
+  /** The maker checkpoint. Only OCR-extracted (`bundle`) rows ever carry it. */
+  reviewState?: ReviewState;
+  /** 0..100, what IXP reported for the read as a whole. */
+  extractionConfidence?: number;
+  /** Per-field confidence, so the review can highlight what to look at. */
+  fieldConfidence?: Record<string, number>;
+  /** Business verifications beyond the six KYC validations. */
+  verifications?: Verification[];
+  /** What was read off each uploaded document (type, tamper signals, MRZ, dates,
+   *  fingerprint) — compact facts, judged against the Document rules DMN on every
+   *  read. See src/integrations/docChecks.ts. */
+  documentFacts?: { t: string; at: string; [k: string]: unknown }[];
+  /** A person's decision on documents the rules referred or failed (BR-DOC-07). */
+  documentReview?: { by: string; at: string; decision: 'accepted' | 'new-document-requested'; note?: string };
+  /** Fields that do not agree across sources; empty or absent means they do. */
+  recon?: ReconIssue[];
+  /** The §9.1 outcome and the rule that produced it. */
+  decision?: BulkDecision;
+  decisionReason?: string;
+  /** Post-no-debit at creation. Set by product rule, overridable with a deferral. */
+  pnd?: boolean;
+  deferralRef?: string;
+  /** Who confirmed the extraction, and what they changed (BR-DOC-11). */
+  reviewedBy?: string;
+  reviewedAt?: string;
+  edits?: { field: string; before: string; after: string; at: string; by: string }[];
+  /** The checker who opened the account (four-eyes: never the same as
+   *  `reviewedBy`). Absent on straight-through openings and older records. */
+  openedBy?: string;
+  openedAt?: string;
+  /** Who has this case in Operations. Held on the record so a claim is shared,
+   *  not per-device. `''` means explicitly unassigned (it overrides any older
+   *  per-device claim); absent means nobody has written one to the record. */
+  owner?: string;
+  /** Manifest channel only — the invitation to self-complete. */
+  invite?: Invite;
   /** The uploaded form this record was opened from, as an Orchestrator attachment.
    *  Held on the record because the parked-review slot is cleared on confirm and
    *  the task closes — leaving nowhere else to find the pages afterwards. The id
@@ -308,4 +429,21 @@ export interface NewCaseInput extends ApplicantDetails {
   /** The uploaded form, when the record was opened from one. */
   documentId?: string;
   documentName?: string;
+  /** Bulk intake. */
+  bulkChannel?: BulkChannel;
+  reviewState?: ReviewState;
+  extractionConfidence?: number;
+  fieldConfidence?: Record<string, number>;
+  verifications?: Verification[];
+  /** What was read off each uploaded document (type, tamper signals, MRZ, dates,
+   *  fingerprint) — compact facts, judged against the Document rules DMN on every
+   *  read. See src/integrations/docChecks.ts. */
+  documentFacts?: { t: string; at: string; [k: string]: unknown }[];
+  /** A person's decision on documents the rules referred or failed (BR-DOC-07). */
+  documentReview?: { by: string; at: string; decision: 'accepted' | 'new-document-requested'; note?: string };
+  recon?: ReconIssue[];
+  decision?: BulkDecision;
+  decisionReason?: string;
+  pnd?: boolean;
+  invite?: Invite;
 }

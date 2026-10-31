@@ -30,9 +30,16 @@ const NEW_TAB = { target: '_blank', rel: 'noopener noreferrer' } as const;
 // identically on localhost. e.g. "/employee-web" -> "#employee-web".
 const hashHref = (p: string) => '#' + p.replace(/^\/+/, '');
 
+// The feature guide is static HTML under public/guide/, not a route — so a plain
+// link off the app's base path, never a hash. See public/guide/README.md.
+const GUIDE = import.meta.env.BASE_URL + 'guide/';
+const guideHref = (page = 'index') => GUIDE + page + '.html';
+
 // ── Monoline icon set (Lucide-style) ─────────────────────────────────────────
-type IconName = 'phone' | 'monitor' | 'dashboard' | 'user' | 'link' | 'sliders' | 'activity' | 'landmark' | 'briefcase' | 'message';
+type IconName = 'phone' | 'monitor' | 'dashboard' | 'user' | 'link' | 'sliders' | 'activity' | 'landmark' | 'briefcase' | 'message' | 'book' | 'layers';
 const PATHS: Record<IconName, string> = {
+  layers: 'M12 2 2 7l10 5 10-5-10-5Z M2 17l10 5 10-5 M2 12l10 5 10-5',
+  book: 'M4 4h11a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3V4Z M4 17a3 3 0 0 1 3-3h11',
   message: 'M21 11.5a8.38 8.38 0 0 1-8.5 8.5 9.6 9.6 0 0 1-4-.9L3 20l1.4-3.5A8.38 8.38 0 0 1 3.5 12 8.5 8.5 0 0 1 12 3.5a8.38 8.38 0 0 1 9 8Z',
   phone: 'M15 2H9a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2Z M11 18h2',
   monitor: 'M3 4h18v12H3z M8 20h8 M12 16v4',
@@ -56,24 +63,24 @@ const Chevron = () => (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="ld-chev" aria-hidden="true"><path d="m9 18 6-6-6-6" /></svg>
 );
 
-/** One person you can be. `alts` are the same role on another surface. */
+/** One person you can be. `alts` are the same role on another surface; `guide` is their page in the feature guide. */
 interface Persona {
   key: string; name: string; sub: string; blurb: string; href: string;
-  icon: IconName; alts?: { label: string; href: string }[];
+  icon: IconName; alts?: { label: string; href: string }[]; guide: string;
 }
 
 const [RM, OPS] = ROLES;
 
 const PEOPLE: Persona[] = [
   {
-    key: 'rm', name: RM.name, sub: RM.sub, blurb: RM.blurb, href: RM.href, icon: 'briefcase',
+    key: 'rm', name: RM.name, sub: RM.sub, blurb: RM.blurb, href: RM.href, icon: 'briefcase', guide: 'rm',
     alts: [{ label: 'On web', href: '/employee-web' }, { label: 'On mobile', href: '/employee-mobile' }],
   },
   {
-    key: 'ops', name: OPS.name, sub: OPS.sub, blurb: OPS.blurb, href: OPS.href, icon: 'dashboard',
+    key: 'ops', name: OPS.name, sub: OPS.sub, blurb: OPS.blurb, href: OPS.href, icon: 'dashboard', guide: 'ops',
   },
   {
-    key: 'customer', name: 'Customer', sub: 'Your own banking app', icon: 'user',
+    key: 'customer', name: 'Customer', sub: 'Your own banking app', icon: 'user', guide: 'customer',
     blurb: 'Open an account yourself in minutes, then watch it happen — no branch, no waiting.',
     href: '/customer-mobile',
     alts: [
@@ -86,9 +93,12 @@ const PEOPLE: Persona[] = [
   // reachable directly at /admin (hash: #admin), just not advertised on the launcher.
 ];
 
-interface Tool { key: string; name: string; url: string; desc: string; icon: IconName; accent: string; soon?: boolean }
+// `href` overrides the hash link for a tool that is not a route (the feature guide).
+interface Tool { key: string; name: string; url: string; desc: string; icon: IconName; accent: string; soon?: boolean; href?: string }
 // The bank's own systems, stood in for. Not roles — nobody "is" Kafka.
 const TOOLS: Tool[] = [
+  { key: 'guide', name: 'Feature guide', url: '/guide/', href: guideHref(), icon: 'book', accent: 'var(--brand-secondary, var(--ld-brand))', desc: 'Every feature by persona — customer, relationship manager, operations maker and verifier, operations analyst, management and presenter — as numbered steps with a screenshot of each screen.' },
+  { key: 'walkthrough', name: 'Demo walkthrough', url: '/walkthrough/index.html', href: import.meta.env.BASE_URL + 'walkthrough/index.html', icon: 'book', accent: 'var(--ld-brand)', desc: 'An individual, a corporate and a bulk application played through the real screens, step by step — no clicking needed.' },
   { key: 'kafka', name: 'Mock Kafka console', url: '/kafka', icon: 'activity', accent: DEMO, desc: 'The live event stream across the eight topics.' },
   { key: 'finacle', name: 'Mock Finacle UI', url: '/finacle', icon: 'landmark', accent: SLATE, desc: 'Core banking back office — CIFs and accounts.' },
   { key: 'comms', name: 'Notification service', url: '/comms', icon: 'message', accent: DEMO, desc: 'Every SMS and email the customer receives, per step.' },
@@ -98,7 +108,23 @@ const TOOLS: Tool[] = [
   { key: 'faceid-kiosk', name: 'FaceID kiosk', url: '/faceid-kiosk', icon: 'phone', accent: SLATE, desc: 'The walk-up camera check — live liveness capture.' },
 ];
 
+// The architecture relays: the stack each journey runs on, walked one task at a
+// time. Their own group, because they explain the system rather than stand in
+// for one of the bank's.
+const RELAYS: Tool[] = [
+  { key: 'relay-individual', name: 'Individual account opening', url: '/relay-individual', icon: 'layers', accent: 'var(--ld-brand)', desc: 'One applicant through OnboardingCase — IXP, NIN/BVN, liveness, screening, Finacle — stage by stage.' },
+  { key: 'relay-corporate', name: 'Corporate account opening', url: '/relay-corporate', icon: 'layers', accent: 'var(--ld-brand)', desc: 'One company through CorporateOnboardingCase — CAC, FIRS, every director, UBOs, SCUML and the mandate.' },
+  { key: 'relay-bulk', name: 'Bulk account opening', url: '/relay-bulk', icon: 'layers', accent: 'var(--ld-brand)', desc: 'A batch split into one case per customer, maker review, verifier authorisation and one final sign-off.' },
+];
+
 // index.css sets a global --brand-primary; the front door has no host app to
+/** The demo walkthrough is captured per bank: the Stanbic IBTC capture for a Stanbic
+ *  brand, the FirstBank one otherwise (public/walkthrough/config.js, ?brand=). */
+function walkthroughFor(t: Tool, appName: string): Tool {
+  if (!/stanbic/i.test(appName)) return t;
+  return { ...t, url: '/walkthrough/index.html?brand=stanbic', href: import.meta.env.BASE_URL + 'walkthrough/index.html?brand=stanbic' };
+}
+
 // override it, so push the active branding into the vars this page reads.
 function useBrandVars() {
   const { branding } = useConfig();
@@ -135,6 +161,12 @@ function Front() {
           One workspace. <b>Pick who you are</b> and it opens the tool that role uses — the same system, doing a different job.
         </p>
 
+        <a className="ld-guide" href={guideHref()} {...NEW_TAB}>
+          <b>Feature guide</b>
+          <span>Every persona, every flow, step by step with screenshots — so anyone can run the demo</span>
+          <em>Open →</em>
+        </a>
+
         <div className="ld-group-h" style={{ marginTop: 34 }}><span className="l">Who are you?</span></div>
         <div className="ld-people">
           {PEOPLE.map((p) => (
@@ -148,19 +180,35 @@ function Front() {
                 </span>
                 <Chevron />
               </a>
-              {p.alts && (
-                <div className="ld-alts">
-                  {p.alts.map((a) => <a key={a.href} className="ld-alt" href={hashHref(a.href)} {...NEW_TAB}>{a.label}</a>)}
-                </div>
-              )}
+              <div className="ld-alts">
+                {p.alts?.map((a) => <a key={a.href} className="ld-alt" href={hashHref(a.href)} {...NEW_TAB}>{a.label}</a>)}
+                <a className="ld-alt" href={guideHref(p.guide)} {...NEW_TAB}>Step-by-step guide</a>
+              </div>
             </div>
+          ))}
+        </div>
+
+        <div className="ld-group-h" style={{ marginTop: 34 }}><span className="l">Architecture relays</span><span className="n">the stack, one task at a time</span></div>
+        <div className="ld-panel">
+          {RELAYS.map((t) => (
+            <a className="ld-row" key={t.key} href={hashHref(t.url)} {...NEW_TAB} style={{ ['--a' as string]: t.accent } as CSSProperties}>
+              <span className="ld-ic sm"><Icon name={t.icon} size={19} /></span>
+              <span className="ld-main">
+                <span className="ld-name">{t.name}</span>
+                <span className="ld-desc">{t.desc}</span>
+              </span>
+              <span className="ld-meta">
+                <code className="ld-url">{t.url}</code>
+                <Chevron />
+              </span>
+            </a>
           ))}
         </div>
 
         <div className="ld-group-h" style={{ marginTop: 34 }}><span className="l">Behind the scenes</span><span className="n">for the demo</span></div>
         <div className="ld-panel">
-          {TOOLS.map((t) => (
-            <a className="ld-row" key={t.key} href={hashHref(t.url)} {...NEW_TAB} style={{ ['--a' as string]: t.accent } as CSSProperties}>
+          {TOOLS.map((t) => (t.key === 'walkthrough' ? walkthroughFor(t, branding.appName) : t)).map((t) => (
+            <a className="ld-row" key={t.key} href={t.href ?? hashHref(t.url)} {...NEW_TAB} style={{ ['--a' as string]: t.accent } as CSSProperties}>
               <span className="ld-ic sm"><Icon name={t.icon} size={19} /></span>
               <span className="ld-main">
                 <span className="ld-name">{t.name}</span>

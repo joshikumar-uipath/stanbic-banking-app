@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import { ConversationalAgent } from '@uipath/uipath-typescript/conversational-agent';
 import type { AgentGetResponse } from '@uipath/uipath-typescript/conversational-agent';
 import { useTheme } from '../contexts/ThemeContext';
@@ -7,6 +7,7 @@ import LoopingVideo from './LoopingVideo';
 import { useVideoBlob } from '../utils/useVideoBlob';
 import VideoEl from './VideoEl';
 import { useConfig, LOGO_SIZES } from '../config';
+import { findPrimaryAgent, isPrimaryAgent, PRIMARY_AGENT_LABEL } from '../config/primaryAgent';
 import { branchPulse, customers, money } from '../customersData';
 import { approvalsPulse } from '../approvalsData';
 import { store } from '../onboarding';
@@ -66,9 +67,11 @@ interface Props {
   onOpenCustomers?: () => void;
   onOpenApprovals?: () => void;
   onOpenAccount?: () => void;
+  /** The role's work block (role chip, desk, batches) — rendered above the launchers. */
+  workSlot?: ReactNode;
 }
 
-export default function HomeTab({ conversationalAgent, selectedAgent, onSelectAgent, onStartChat, userName, homeNavPressCount, onNavigateToTasks, onNavigateToExplore, onOpenCustomers, onOpenApprovals, onOpenAccount }: Props) {
+export default function HomeTab({ conversationalAgent, selectedAgent, onSelectAgent, onStartChat, userName, homeNavPressCount, onNavigateToTasks, onNavigateToExplore, onOpenCustomers, onOpenApprovals, onOpenAccount, workSlot }: Props) {
   const { t, tr, theme } = useTheme();
   const { branding, demoContent, homeShowcase } = useConfig();
   const openingPulse = useOpeningPulse();
@@ -343,11 +346,9 @@ export default function HomeTab({ conversationalAgent, selectedAgent, onSelectAg
         return bTime - aTime;
       });
       setAgents(sorted);
-      // Default the home page chat to "All in One Agent" if available
+      // Default the home page chat to the bank's own agent ("Ask Pulse") if available
       if (!selectedAgent && sorted.length > 0) {
-        // "Ask UiPath" agent from Coded Apps / All in One Agent folder
-        const allInOne = sorted.find(a => a.name.trim() === 'Ask UiPath' && a.processKey === 'All.in.One.Agent.agent.Agent');
-        onSelectAgent(allInOne ?? sorted[0]);
+        onSelectAgent(findPrimaryAgent(sorted) ?? sorted[0]);
       }
     });
   }, [conversationalAgent]);
@@ -830,7 +831,7 @@ export default function HomeTab({ conversationalAgent, selectedAgent, onSelectAg
         <div className="flex justify-center pt-4 pb-3">
           <div className="px-5 py-2 rounded-full text-sm font-medium text-white"
             style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.2)' }}>
-            Talking to {activeAgent?.name.trim() === 'Ask UiPath' ? 'Ask UiPath' : activeAgent?.name.replace(/_/g, ' ').split(' ')[0] ?? 'Agent'}
+            Talking to {isPrimaryAgent(activeAgent) ? PRIMARY_AGENT_LABEL : activeAgent?.name.replace(/_/g, ' ').split(' ')[0] ?? 'Agent'}
           </div>
         </div>
         <p className="text-center text-sm mb-6" style={{ color: 'rgba(255,255,255,0.4)' }}>
@@ -1114,6 +1115,8 @@ export default function HomeTab({ conversationalAgent, selectedAgent, onSelectAg
           </div>
         );
       })()}
+
+      {workSlot}
 
       {/* Open an account — assisted capture launcher */}
       {onOpenAccount && (() => {

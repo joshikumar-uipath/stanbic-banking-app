@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Demo walkthrough</title>
+<meta name="description" content="" />
+<link rel="icon" type="image/png" href="" id="favicon" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;500&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./player.css" />
+</head>
+<body>
+<div class="wt" id="wt">
+  <header class="wt-top">
+    <button type="button" class="wt-railbtn" id="railbtn" title="Show or hide the scene list (S)" aria-controls="rail" aria-expanded="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg><span>Scenes</span></button>
+    <a class="wt-brand" id="brand" href="../index.html" title="Back to the launcher"><img id="brand-img" src="" alt="" /><span><b id="brand-t">Demo walkthrough</b></span></a>
+    <nav class="wt-prog" id="prog" aria-label="Scenes in this flow"></nav>
+    <span class="wt-count num" id="count"></span>
+  </header>
+  <div class="wt-body">
+    <nav class="wt-rail" id="rail" aria-label="Scenes"></nav>
+    <aside class="wt-flows">
+      <label for="flow">Flow</label>
+      <select id="flow"></select>
+    </aside>
+    <main class="wt-stage" id="stage">
+      <div class="wt-win">
+        <div class="wt-bar">
+          <span class="wt-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="wt-app" id="app"></span>
+          <span class="wt-url num" id="url"></span>
+        </div>
+        <div class="wt-screen" id="screen">
+          <img id="imgA" alt="" />
+          <img id="imgB" alt="" />
+          <video id="vid" muted playsinline preload="auto"></video>
+          <div class="wt-ring" id="ring"></div>
+          <div class="wt-typed" id="typed"></div>
+          <div class="wt-ripple" id="ripple"></div>
+          <svg class="wt-cursor" id="cursor" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3l14 8-6.5 1.6L9.6 19z" fill="#0b1220" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>
+          <div class="wt-title" id="title"><span id="titleAct"></span><b id="titleText"></b><small id="titleWho"></small></div>
+        </div>
+      </div>
+    </main>
+    <aside class="wt-side">
+      <div class="wt-ctl">
+        <div class="wt-row">
+          <button type="button" id="prev" title="Back (←)">‹ Back</button>
+          <button type="button" class="pri" id="play" title="Play or pause (P)">Play</button>
+          <button type="button" id="next" title="Next (→ or space)">Next ›</button>
+        </div>
+        <details class="wt-more">
+          <summary>More controls</summary>
+          <div class="wt-more-b">
+            <div class="wt-row2">
+              <button type="button" id="restartscene" title="Play this scene again from its first step">↺ Restart scene</button>
+              <button type="button" id="restartall" title="Go back to scene 1">⟲ Start over</button>
+            </div>
+            <div class="wt-row2">
+              <button type="button" id="skipscreen" title="Skip to the next screen (Shift + →)">Next screen ⇥</button>
+              <button type="button" id="skipscene" title="Skip to the next scene">Next scene »</button>
+            </div>
+            <span class="wt-ver" role="group" aria-label="Version"><button type="button" data-v="short" title="Key moments only — routine form filling is skipped">Short version</button><button type="button" data-v="full" title="Every click and every field">Every step</button></span>
+            <span class="wt-sp" role="group" aria-label="Speed"><button type="button" data-sp="0.7">Slow</button><button type="button" data-sp="1" class="on">Normal</button><button type="button" data-sp="1.6">Fast</button></span>
+            <p class="wt-keys">→ next · Shift+→ next screen · ← back · P play · S scenes</p>
+          </div>
+        </details>
+      </div>
+      <section class="wt-cap" aria-live="polite">
+        <span class="wt-chip" id="persona"></span>
+        <b class="wt-scene" id="scene"></b>
+        <span class="wt-step num" id="step"></span>
+        <p id="caption"></p>
+      </section>
+    </aside>
+  </div>
+</div>
+<script src="./config.js"></script>
+<script src="./player.js"></script>
+</body>
+</html>

@@ -4,7 +4,7 @@
 // Apple guideline 5.1.1(i) requires non-account features (chat) to be reachable
 // without login. The flow is now:
 //
-//   Welcome  ──"Check out Aura's Magic"──▶  GuestChat (Ask UiPath)
+//   Welcome  ──"Check out Aura's Magic"──▶  GuestChat (Ask Pulse)
 //   GuestChat ──"Sign in"──▶ Login (preserved in App.tsx, untouched)
 //
 // This screen is a CLONE of the visual layout of the login screen in App.tsx
@@ -38,7 +38,7 @@ export default function WelcomeScreen({ onContinue }: Props) {
           <img
             src={branding.logo}
             alt={branding.appName}
-            style={{ ...LOGO_SIZES[branding.logoSize ?? 'large'], objectFit: 'contain' }}
+            style={{ ...LOGO_SIZES[branding.logoSize === 'small' ? 'small' : 'medium'], objectFit: 'contain' }}
           />
         </div>
       )}
@@ -111,7 +111,7 @@ export default function WelcomeScreen({ onContinue }: Props) {
             style={{
               fontFamily: "'Poppins', Arial, sans-serif",
               fontWeight: 600,
-              fontSize: 52,
+              fontSize: 36,
               color: theme === 'light' ? '#182126' : '#ffffff',
               letterSpacing: -1,
               lineHeight: 1,
@@ -133,19 +133,19 @@ export default function WelcomeScreen({ onContinue }: Props) {
         {/* Primary CTA — sends users into the guest chat experience. */}
         <button
           onClick={onContinue}
-          className="w-full py-4 rounded-2xl text-white text-base flex items-center justify-center gap-2.5 active:scale-95 transition-transform"
+          className="w-full py-3.5 rounded-2xl text-white text-[15px] flex items-center justify-center gap-2.5 active:scale-95 transition-transform"
           style={{
             fontFamily: "'Poppins', Arial, sans-serif",
             fontWeight: 600,
             background: 'var(--brand-primary)',
-            boxShadow: '0 0 30px rgba(var(--brand-primary-rgb),0.45)',
+            boxShadow: '0 0 20px rgba(var(--brand-primary-rgb),0.3)',
             letterSpacing: -0.3,
           }}
         >
           Ask {branding.appName} Anything
           <svg
-            width="16"
-            height="16"
+            width="15"
+            height="15"
             viewBox="0 0 24 24"
             fill="none"
             stroke="currentColor"

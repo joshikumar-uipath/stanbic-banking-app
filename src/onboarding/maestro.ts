@@ -786,10 +786,15 @@ export async function getStates(instanceIds: string[]): Promise<Record<string, L
     ).catch(() => null),
   ]);
   const jobByKey = new Map(jobResults.flatMap((r) => (r?.value ?? []).map((j) => [j.Key, j.State] as const)));
-  const taskByKey = new Map<string, { id: number; title: string; stage: string }>();
+  // Any open task this case created means it is waiting on a person. The stage
+  // comes from the title only where the title is a caseplan step name; stage
+  // approvals are now titled after their app ("App"), which names no stage, so
+  // those take the stage from the cache. Matching on the title map alone dropped
+  // every such row to "Running".
+  const taskByKey = new Map<string, { id: number; title: string; stage: string | null }>();
   for (const t of tr?.value ?? []) {
-    if (t.OrganizationUnitId === FOLDER_ID && STAGE_BY_TASK[t.Title] && !taskByKey.has(t.CreatorJobKey)) {
-      taskByKey.set(t.CreatorJobKey, { id: t.Id, title: t.Title, stage: STAGE_BY_TASK[t.Title] });
+    if (t.OrganizationUnitId === FOLDER_ID && t.CreatorJobKey && !taskByKey.has(t.CreatorJobKey)) {
+      taskByKey.set(t.CreatorJobKey, { id: t.Id, title: t.Title, stage: STAGE_BY_TASK[t.Title] ?? null });
     }
   }
   let touched = false;
@@ -812,7 +817,7 @@ export async function getStates(instanceIds: string[]): Promise<Record<string, L
     // reports a case that is parked on a person as merely "running". getState
     // resolves the pending task from the case's own elements and writes it here,
     // so trust that too rather than under-reporting the row.
-    out[id] = { jobState, done, awaiting: Boolean(awaitStage) || Boolean(!done && cached?.pendingTaskId), stage, callWait: done ? null : cached?.callWait ?? null };
+    out[id] = { jobState, done, awaiting: !done && (Boolean(task) || Boolean(cached?.pendingTaskId)), stage, callWait: done ? null : cached?.callWait ?? null };
     // Seed the shared per-instance cache so opening this case paints instantly (with its
     // approve button, since we captured the task id). getState refines it on the detail poll.
     if (jobState !== 'Unknown') {
@@ -833,7 +838,9 @@ export async function getStates(instanceIds: string[]): Promise<Record<string, L
         activeStage: done ? null : stage,
         completedStages: done ? [...STAGES] : idx > 0 ? STAGES.slice(0, idx) : prev?.completedStages ?? [],
         pendingTaskId: done ? null : task?.id ?? prev?.pendingTaskId ?? null,
-        pendingTitle: done ? null : task?.title ?? prev?.pendingTitle ?? null,
+        // An app-titled task ("App") says nothing about the step; keep the step
+        // name the element read cached, which is what the desk shows.
+        pendingTitle: done ? null : (task?.stage ? task.title : prev?.pendingTitle ?? task?.title) ?? null,
       });
       touched = true;
     }
@@ -946,6 +953,26 @@ export function clearPendingExtraction(): void {
 // Matched on the shared prefix: the app name carries a deployment suffix (`…ao`
 // here), and a rename must not silently close the gate.
 const REVIEW_TASK_TITLES = ['Confirm extracted details', 'individualextractionreview'];
+/** Title match that ignores spacing, case and punctuation. Orchestrator titles an
+ *  app task after the app's DISPLAY name, and that changed from
+ *  "individualextractionreviewao" to "Individual Extraction Review" — a plain
+ *  substring test stopped matching, the review never found its task, and the
+ *  confirm button stayed disabled while the task sat open in Action Center. */
+const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+const isReviewTitle = (title: unknown) => REVIEW_TASK_TITLES.some((n) => squash(String(title ?? '')).includes(squash(n)));
+
+/**
+ * Is this pending step the EXTRACTION REVIEW rather than a stage approval? For
+ * either case type: the step is "Confirm extracted details" in both case plans,
+ * and its task is titled "Individual/Corporate Extraction Review" (or the old app
+ * names). The desk must answer it with the review screen — Accept plus the
+ * confirmed fields — never with a stage Approve, which completes the task with no
+ * data and leaves the record unnamed.
+ */
+export function isReviewStep(name: string | null | undefined): boolean {
+  const n = squash(String(name ?? ''));
+  return Boolean(n) && (n.includes('confirmextracteddetails') || n.includes('extractionreview'));
+}
 
 export interface ExtractionTask {
   taskId: number;
@@ -971,7 +998,7 @@ export async function findExtractionTask(instanceId: string): Promise<Extraction
   const open = new Set(['Unassigned', 'Pending']);
   const hit = (r.value ?? []).find((t) =>
     open.has(String(t.Status ?? '')) &&
-    REVIEW_TASK_TITLES.some((n) => String(t.Title ?? '').toLowerCase().includes(n.toLowerCase())));
+    isReviewTitle(t.Title));
   if (!hit) return null;
 
   const id = Number(hit.Id);
@@ -1067,7 +1094,7 @@ export async function reviewTaskState(instanceId: string): Promise<'open' | 'don
       `/api/v1/element-executions/case-instances/${instanceId}`);
     const el = (r.elementExecutions ?? []).find(
       (e) => e.elementType === 'UserTask'
-        && REVIEW_TASK_TITLES.some((n) => e.elementName.toLowerCase().includes(n.toLowerCase())),
+        && isReviewTitle(e.elementName),
     );
     if (!el) return null;
     return el.status === 'Completed' ? 'done' : 'open';

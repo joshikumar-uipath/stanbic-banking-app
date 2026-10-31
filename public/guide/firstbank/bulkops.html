@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bulk operations guide — Account opening</title>
+<script>(function () {
+  var here = "firstbank", want = "stanbic";
+  try {
+    var q = new URLSearchParams(location.search).get("bank");
+    if (q) want = q;
+    else {
+      var s = JSON.parse(localStorage.getItem("zara_local_profiles_v1") || "null");
+      var p = s && s.profiles && s.profiles.find(function (x) { return x.id === s.activeId; });
+      var n = (p && p.config && p.config.branding && p.config.branding.appName) || "";
+      if (/first\s*bank|\bfbn\b/i.test(n)) want = "firstbank";
+    }
+  } catch (e) {}
+  if (want !== here && (want === "stanbic" || want === "firstbank")) {
+    var f = location.pathname.split("/").pop() || "index.html";
+    location.replace((here === "stanbic" ? "firstbank/" : "../") + f + location.hash);
+  }
+})();</script>
+<meta name="description" content="For a bundle of scanned forms the BRD makes a person look before an account is created. The maker compares what was read with the form and approves, corrects or flags it; a different person, the verifier, then authorises the accounts, with PND by rule. Anything that cannot be reconciled becomes a managed exception with the full evidence pack." />
+<link rel="icon" href="./favicon.svg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="../guide.css" />
+<style>:root { --brand: #003B65; --brand-rgb: 0, 59, 101; --accent: #F0BD2D; --accent-rgb: 240, 189, 45; --accent-ink: #003B65; }</style>
+</head>
+<body>
+<header class="g-top">
+  <div class="g-top-in">
+    <a class="g-brand" href="./index.html"><img src="./logo.svg" alt="FirstBank" /><span><b>Feature guide</b><em>Account opening POC</em></span></a>
+    <a class="g-back" href="../../">← Launcher</a>
+  </div>
+  <nav class="g-tabs" aria-label="Personas"><div class="g-tabs-in"><a href="./index.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h11a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3V4Z"/><path d="M4 17a3 3 0 0 1 3-3h11"/></svg><span>Overview</span></a><a href="./brd.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>BRD coverage</span></a><a href="./customer.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><path d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/></svg><span>Customer</span></a><a href="./rm.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18v13H3z"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/></svg><span>Relationship manager</span></a><a href="./bulkops.html" class="on" aria-current=page><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M2 16l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg><span>Bulk operations</span></a><a href="./ops.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v7H4z"/><path d="M14 4h6v4h-6z"/><path d="M14 12h6v8h-6z"/><path d="M4 15h6v5H4z"/></svg><span>Operations analyst</span></a><a href="./management.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v7H4z"/><path d="M14 4h6v4h-6z"/><path d="M14 12h6v8h-6z"/><path d="M4 15h6v5H4z"/></svg><span>Management</span></a><a href="./presenter.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18v12H3z"/><path d="M8 20h8"/><path d="M12 16v4"/><path d="M10 7.5v5l4.5-2.5z"/></svg><span>Presenter and admin</span></a></div></nav>
+</header>
+
+<main class="g-wrap">
+  <section class="g-hero">
+    <span class="g-hero-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M2 16l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg></span>
+    <div class="g-hero-t">
+      <p class="g-eyebrow">Persona guide · 3 flows · 10 steps</p>
+      <h1>Bulk operations</h1>
+      <p class="g-who">Operations maker and verifier on a bulk batch · Employee desk → Batches</p>
+      <p class="g-intro">For a bundle of scanned forms the BRD makes a person look before an account is created. The maker compares what was read with the form and approves, corrects or flags it; a different person, the verifier, then authorises the accounts, with PND by rule. Anything that cannot be reconciled becomes a managed exception with the full evidence pack.</p>
+    </div>
+    <a class="g-open lg" href="http://localhost:5180/#employee-web" target="_blank" rel="noopener"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open Employee desk → Batches</a>
+  </section>
+  <section class="g-before"><p class="h">Before you start</p><ul><li>Submit a bundle first (Relationship manager → “Submit a bulk batch”), so there is something to review.</li><li>Open Batches and use “Acting as” at the top right: Relationship Manager · Maker · Verifier. Each persona only sees its own screens — §9.1 keeps maker and checker apart.</li><li>Everything on these screens is local to the browser, apart from the Maestro cases the first 8 rows start when processed.</li></ul></section>
+  <div class="g-grid">
+    <aside class="g-toc"><p class="h">Flows on this page</p><ol><li><a href="#review"><span class="n">01</span><span class="t">Maker: review what was read off the form</span><span class="c">6</span></a></li><li><a href="#authorise"><span class="n">02</span><span class="t">Verifier: authorise the accounts</span><span class="c">2</span></a></li><li><a href="#exception"><span class="n">03</span><span class="t">Requester: dispose of an exception</span><span class="c">2</span></a></li></ol><button type="button" class="g-print" onclick="window.print()">Print or save as PDF</button></aside>
+    <div class="g-main"><section class="g-flow" id="review">
+  <div class="g-flow-h">
+    <span class="g-flow-no">01</span>
+    <div class="g-flow-t">
+      <h2>Maker: review what was read off the form</h2>
+      <p class="g-meta"><span>3 min</span><span>Sample · The AOP batch you submitted</span><span>6 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#employee-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">OCR is not 100% accurate, so each OCR-read application passes a brief human checkpoint (BR-DOC-10). The maker sees the form, the read, the reconciliation and the verifications together.</p>
+  <ol class="g-steps"><li class="g-step" id="review-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Switch to Maker</p>
+    <p class="g-step-b">In Batches click Maker under “Acting as”.</p>
+    <p class="g-see"><b>You should see</b>“Extraction review · 5 waiting”, lowest confidence first, with lenses All / Low confidence / Reconciliation / Aged over 24h and “Review next →”.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/b-queue.jpg" data-cap="Bulk operations · Maker: review what was read off the form · step 1: Switch to Maker"><img loading="lazy" src="./shots/b-queue.jpg" alt="Screenshot: Switch to Maker" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="review-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Open one</p>
+    <p class="g-step-b">Click Review on the first row.</p>
+    <p class="g-see"><b>You should see</b>The AOP on the left with unsure boxes highlighted, and on the right “What was read off the form” with a confidence per field.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/b-review.jpg" data-cap="Bulk operations · Maker: review what was read off the form · step 2: Open one"><img loading="lazy" src="./shots/b-review.jpg" alt="Screenshot: Open one" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="review-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Reconciliation</p>
+    <p class="g-step-b">Look at the green banner.</p>
+    <p class="g-see"><b>You should see</b>“Every source agrees — name and date of birth match across the form, NIBSS and NIMC.” A disagreement is named here.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/b-review-recon.jpg" data-cap="Bulk operations · Maker: review what was read off the form · step 3: Reconciliation"><img loading="lazy" src="./shots/b-review-recon.jpg" alt="Screenshot: Reconciliation" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="review-4">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">4</span>Verification outcomes</p>
+    <p class="g-step-b">Scroll down.</p>
+    <p class="g-see"><b>You should see</b>TIN – FIRS, CAC registry, ID document, sanctions, internal watchlist, adverse media, NIN and BVN — already run in parallel. Every field you change is logged with your name, the time and the value before.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/b-review-verif.jpg" data-cap="Bulk operations · Maker: review what was read off the form · step 4: Verification outcomes"><img loading="lazy" src="./shots/b-review-verif.jpg" alt="Screenshot: Verification outcomes" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="review-5">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">5</span>Or flag it</p>
+    <p class="g-step-b">Click “Flag as exception”.</p>
+    <p class="g-see"><b>You should see</b>A bar at the bottom: “What is the concern? It travels with the case.” with “Raise the exception” (enabled once you type) and Cancel.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/b-flag.jpg" data-cap="Bulk operations · Maker: review what was read off the form · step 5: Or flag it"><img loading="lazy" src="./shots/b-flag.jpg" alt="Screenshot: Or flag it" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="review-6">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">6</span>Approve</p>
+    <p class="g-step-b">Click “Approve and take the next →” until the queue is empty.</p>
+    <p class="g-see"><b>You should see</b>“Queue is clear. Everything on this batch has been confirmed and is with the verifier.”</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/b-approve.jpg" data-cap="Bulk operations · Maker: review what was read off the form · step 6: Approve"><img loading="lazy" src="./shots/b-approve.jpg" alt="Screenshot: Approve" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="authorise">
+  <div class="g-flow-h">
+    <span class="g-flow-no">02</span>
+    <div class="g-flow-t">
+      <h2>Verifier: authorise the accounts</h2>
+      <p class="g-meta"><span>1 min</span><span>Sample · The same batch</span><span>2 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#employee-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">A different person creates the accounts. Business accounts open on PND by rule (§9.2), and the verifier can lift it only against a recorded deferral.</p>
+  <ol class="g-steps"><li class="g-step" id="authorise-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Switch to Verifier</p>
+    <p class="g-step-b">Click Verifier under “Acting as”.</p>
+    <p class="g-see"><b>You should see</b>“Authorise account opening · 5 ready”, each with product and “PND on”, and on the right “Business accounts open on PND”, “Open operative instead — overrides the PND rule” with a deferral reference, and the maker trail.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/b-authorise.jpg" data-cap="Bulk operations · Verifier: authorise the accounts · step 1: Switch to Verifier"><img loading="lazy" src="./shots/b-authorise.jpg" alt="Screenshot: Switch to Verifier" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="authorise-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Create the accounts</p>
+    <p class="g-step-b">Click “Create 5 accounts →”.</p>
+    <p class="g-see"><b>You should see</b>“Nothing is waiting on you.” The accounts are created in the mock Finacle and the RM sees the numbers on the batch.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/b-created.jpg" data-cap="Bulk operations · Verifier: authorise the accounts · step 2: Create the accounts"><img loading="lazy" src="./shots/b-created.jpg" alt="Screenshot: Create the accounts" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="exception">
+  <div class="g-flow-h">
+    <span class="g-flow-no">03</span>
+    <div class="g-flow-t">
+      <h2>Requester: dispose of an exception</h2>
+      <p class="g-meta"><span>1 min</span><span>Sample · The parked row on the batch</span><span>2 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#employee-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">An exception carries its full evidence pack, so whoever receives it does not repeat any verification — and cannot close it without a reason.</p>
+  <ol class="g-steps"><li class="g-step" id="exception-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Open the exception</p>
+    <p class="g-step-b">As Relationship Manager, open Batch and click “Parked →” on the red row (or the Exceptions tab).</p>
+    <p class="g-see"><b>You should see</b>“What triggered this” (here a verification service persistently unavailable), who it is routed to, and every check with its result, time and evidence.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/b-exception.jpg" data-cap="Bulk operations · Requester: dispose of an exception · step 1: Open the exception"><img loading="lazy" src="./shots/b-exception.jpg" alt="Screenshot: Open the exception" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step noshot" id="exception-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Decide</p>
+    <p class="g-step-b">Pick a “Reason code” and write a “Supporting note”, then “Resolve and resume the case”, “Send to Compliance” or “Return to the customer”.</p>
+    <p class="g-see"><b>You should see</b>The buttons stay disabled until both are filled: “A disposition without a reason and a note is not accepted — every decision has to be reconstructable.”</p>
+  </div>
+  
+</li></ol>
+</section><nav class="g-pager"><a href="./rm.html"><em>Previous</em>Relationship manager</a><a class="nx" href="./ops.html"><em>Next</em>Operations analyst</a></nav></div>
+  </div>
+</main>
+<div class="g-lb" id="lb" hidden>
+  <button type="button" class="g-lb-x" aria-label="Close">✕</button>
+  <button type="button" class="g-lb-p" aria-label="Previous screenshot">‹</button>
+  <figure><img alt="" /><figcaption></figcaption></figure>
+  <button type="button" class="g-lb-n" aria-label="Next screenshot">›</button>
+</div>
+<script src="../guide.js"></script>
+</body>
+</html>

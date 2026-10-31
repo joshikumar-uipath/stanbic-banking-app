@@ -3,6 +3,7 @@ import { C, FONT_HEAD, FONT_BODY } from '../theme';
 import Icon from '../icons';
 import { useNav, type ScreenRoute } from '../nav';
 import { Card } from '../components';
+import { useBank } from '../../config';
 import { depositAccounts, mpesa, recipients, money, fmt, CURRENCY, type Account } from '../data';
 
 type Step = 'form' | 'review' | 'success';
@@ -39,7 +40,8 @@ export default function TransferFlow({ route }: { route: ScreenRoute }) {
   const [note, setNote] = useState('');
   const amt = parseFloat(amount || '0') || 0;
   const fee = action === 'sendmoney' || action === 'pesalink' ? Math.min(Math.max(amt * 0.01, 0), 110) : 0;
-  const ref = `Stanbic IBTC${Math.floor(Math.random() * 1e9).toString(36).toUpperCase().padStart(7, '0')}`;
+  const bank = useBank();
+  const ref = `${bank.slug.toUpperCase()}${Math.floor(Math.random() * 1e9).toString(36).toUpperCase().padStart(7, '0')}`;
   const canContinue = amt > 0 && (recipient || to.trim().length > 0);
 
   const back = () => { if (step === 'review') setStep('form'); else nav.pop(); };

@@ -3,7 +3,7 @@
 //
 // Apple App Store guideline 5.1.1(i) requires that apps don't gate non-account
 // functionality behind a login. This component fulfils that by exposing the
-// "Ask UiPath" agent (chat) to anyone who opens the app, with no sign-in flow
+// "Ask Pulse" agent (chat) to anyone who opens the app, with no sign-in flow
 // in the way.
 //
 // Important: this is a SEPARATE component from ChatView/MainApp on purpose.
@@ -39,6 +39,7 @@ import type {
 } from '@uipath/uipath-typescript/conversational-agent';
 import { useTheme } from '../contexts/ThemeContext';
 import { useConfig } from '../config';
+import { findPrimaryAgent, PRIMARY_AGENT_LABEL } from '../config/primaryAgent';
 import LoopingVideo from './LoopingVideo';
 import VideoEl from './VideoEl';
 
@@ -157,7 +158,7 @@ export default function GuestChat({ onSignIn, onDecline }: Props) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // ── Step 1: discover the "Ask UiPath" agent ───────────────────────────────
+  // ── Step 1: discover the "Ask Pulse" agent ────────────────────────────────
   // Logic mirrors HomeTab so the guest experience matches the logged-in one.
   useEffect(() => {
     let cancelled = false;
@@ -182,12 +183,9 @@ export default function GuestChat({ onSignIn, onDecline }: Props) {
           const bT = b.createdTime ? new Date(b.createdTime).getTime() : 0;
           return bT - aT;
         });
-        const askUiPath =
-          sorted.find((a) => a.name.trim() === 'Ask UiPath' && a.processKey === 'All.in.One.Agent.agent.Agent') ??
-          sorted[0] ??
-          null;
-        setAgent(askUiPath);
-        if (!askUiPath) setAgentError('No agents available right now. Please try again later.');
+        const askPulse = findPrimaryAgent(sorted) ?? sorted[0] ?? null;
+        setAgent(askPulse);
+        if (!askPulse) setAgentError('No agents available right now. Please try again later.');
       })
       .catch(() => {
         if (!cancelled) setAgentError('Could not reach UiPath. Please check your connection.');
@@ -549,7 +547,7 @@ export default function GuestChat({ onSignIn, onDecline }: Props) {
   }
 
   // ── Voice mode (full-screen) ─────────────────────────────────────────────
-  // Identical to ChatView's voice mode: "Talking to Ask UiPath" pill, mic-orb
+  // Identical to ChatView's voice mode: "Talking to Ask Pulse" pill, mic-orb
   // video, live transcript, and Cancel / Mic toggle / Submit buttons.
   if (isListening) {
     const finishAndSend = () => {
@@ -572,7 +570,7 @@ export default function GuestChat({ onSignIn, onDecline }: Props) {
       <div className="flex flex-col h-full" style={{ background: '#000' }}>
         <div className="flex items-center justify-center pt-4 pb-3">
           <div className="px-5 py-2 rounded-full text-sm font-medium text-white" style={{ background: 'rgba(255,255,255,0.12)', border: '1px solid rgba(255,255,255,0.22)' }}>
-            Talking to Ask UiPath
+            Talking to {PRIMARY_AGENT_LABEL}
           </div>
         </div>
         <p className="text-center text-sm mb-6" style={{ color: 'rgba(255,255,255,0.45)' }}>Go ahead, I'm listening...</p>

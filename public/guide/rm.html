@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Relationship manager guide — Account opening</title>
+<script>(function () {
+  var here = "stanbic", want = "stanbic";
+  try {
+    var q = new URLSearchParams(location.search).get("bank");
+    if (q) want = q;
+    else {
+      var s = JSON.parse(localStorage.getItem("zara_local_profiles_v1") || "null");
+      var p = s && s.profiles && s.profiles.find(function (x) { return x.id === s.activeId; });
+      var n = (p && p.config && p.config.branding && p.config.branding.appName) || "";
+      if (/first\s*bank|\bfbn\b/i.test(n)) want = "firstbank";
+    }
+  } catch (e) {}
+  if (want !== here && (want === "stanbic" || want === "firstbank")) {
+    var f = location.pathname.split("/").pop() || "index.html";
+    location.replace((here === "stanbic" ? "firstbank/" : "../") + f + location.hash);
+  }
+})();</script>
+<meta name="description" content="The RM’s workspace: a desk that ranks what needs them, a directory of every application however it arrived, a case view that says the next best action and where the case really is in Maestro, assisted capture for walk-ins and companies, bulk submissions for payroll drives, approvals within their authority and their book of clients — with the UiPath agents one click away." />
+<link rel="icon" href="../stanbic-favicon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./guide.css" />
+
+</head>
+<body>
+<header class="g-top">
+  <div class="g-top-in">
+    <a class="g-brand" href="./index.html"><img src="../stanbic-logo.png" alt="Stanbic IBTC" /><span><b>Feature guide</b><em>Account opening POC</em></span></a>
+    <a class="g-back" href="../">← Launcher</a>
+  </div>
+  <nav class="g-tabs" aria-label="Personas"><div class="g-tabs-in"><a href="./index.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h11a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3V4Z"/><path d="M4 17a3 3 0 0 1 3-3h11"/></svg><span>Overview</span></a><a href="./brd.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>BRD coverage</span></a><a href="./customer.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><path d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/></svg><span>Customer</span></a><a href="./rm.html" class="on" aria-current=page><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18v13H3z"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/></svg><span>Relationship manager</span></a><a href="./bulkops.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M2 16l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg><span>Bulk operations</span></a><a href="./ops.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v7H4z"/><path d="M14 4h6v4h-6z"/><path d="M14 12h6v8h-6z"/><path d="M4 15h6v5H4z"/></svg><span>Operations analyst</span></a><a href="./management.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v7H4z"/><path d="M14 4h6v4h-6z"/><path d="M14 12h6v8h-6z"/><path d="M4 15h6v5H4z"/></svg><span>Management</span></a><a href="./presenter.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18v12H3z"/><path d="M8 20h8"/><path d="M12 16v4"/><path d="M10 7.5v5l4.5-2.5z"/></svg><span>Presenter and admin</span></a></div></nav>
+</header>
+
+<main class="g-wrap">
+  <section class="g-hero">
+    <span class="g-hero-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18v13H3z"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/></svg></span>
+    <div class="g-hero-t">
+      <p class="g-eyebrow">Persona guide · 13 flows · 41 steps</p>
+      <h1>Relationship manager</h1>
+      <p class="g-who">A relationship manager on the branch desk · Employee desk</p>
+      <p class="g-intro">The RM’s workspace: a desk that ranks what needs them, a directory of every application however it arrived, a case view that says the next best action and where the case really is in Maestro, assisted capture for walk-ins and companies, bulk submissions for payroll drives, approvals within their authority and their book of clients — with the UiPath agents one click away.</p>
+    </div>
+    <a class="g-open lg" href="http://localhost:5180/#employee-web" target="_blank" rel="noopener"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open Employee desk</a>
+  </section>
+  <section class="g-before"><p class="h">Before you start</p><ul><li>Open the launcher and click “On web” on the Relationship Manager card (localhost:5180/#employee-web).</li><li>You are signed in automatically with the demo token. If you sign out, sign back in with the demo login demo / demo.</li><li>The desk shows every record on the shared tenant, so you will see other people’s test applications too.</li><li>Buttons that act on the real tenant: “Submit application”, uploading a form, “▶ Run this case in Maestro”, “Approve … &amp; advance”, “Confirm and continue” and Batches’ “Process N applications”. Voice agent panels are the real voice service — do not press its call controls.</li></ul></section>
+  <div class="g-grid">
+    <aside class="g-toc"><p class="h">Flows on this page</p><ol><li><a href="#desk"><span class="n">01</span><span class="t">Start the day on My desk</span><span class="c">2</span></a></li><li><a href="#directory"><span class="n">02</span><span class="t">Find any application</span><span class="c">2</span></a></li><li><a href="#case"><span class="n">03</span><span class="t">Work a case: next best action and the live Maestro card</span><span class="c">4</span></a></li><li><a href="#details"><span class="n">04</span><span class="t">See everything captured, and a web search</span><span class="c">3</span></a></li><li><a href="#voice"><span class="n">05</span><span class="t">Listen to the voice agent’s calls</span><span class="c">2</span></a></li><li><a href="#kyclink"><span class="n">06</span><span class="t">Re-send the KYC link, and run an unrun case</span><span class="c">3</span></a></li><li><a href="#capture"><span class="n">07</span><span class="t">Capture an application with a customer</span><span class="c">4</span></a></li><li><a href="#batch"><span class="n">08</span><span class="t">Submit a bulk batch (AOP bundle)</span><span class="c">8</span></a></li><li><a href="#invites"><span class="n">09</span><span class="t">Invite a payroll list (Excel manifest)</span><span class="c">3</span></a></li><li><a href="#approvals"><span class="n">10</span><span class="t">Approve within your authority</span><span class="c">3</span></a></li><li><a href="#clients"><span class="n">11</span><span class="t">Look after your clients</span><span class="c">2</span></a></li><li><a href="#assistant"><span class="n">12</span><span class="t">Chat, agents, alerts and profile</span><span class="c">4</span></a></li><li><a href="#mobile"><span class="n">13</span><span class="t">The desk on the RM’s phone</span><span class="c">1</span></a></li></ol><button type="button" class="g-print" onclick="window.print()">Print or save as PDF</button></aside>
+    <div class="g-main"><section class="g-flow" id="desk">
+  <div class="g-flow-h">
+    <span class="g-flow-no">01</span>
+    <div class="g-flow-t">
+      <h2>Start the day on My desk</h2>
+      <p class="g-meta"><span>1 min</span><span>Sample · Blessing Eze (AO-2026-000107) at the top</span><span>2 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#employee-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">An RM should not have to hunt for work. The desk ranks everything that needs them and shows each case’s live Maestro stage, so they can tell a customer where it is.</p>
+  <ol class="g-steps"><li class="g-step" id="desk-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Your next move</p>
+    <p class="g-step-b">The card at the top is the single most urgent item, with “Open AO-2026-…” and “Skip for now →”.</p>
+    <p class="g-see"><b>You should see</b>“Your next move · 1 of 62”, why it needs you, and the stat tiles: Needs you, Breaching SLA, In flight, Straight through.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-desk.jpg" data-cap="Relationship manager · Start the day on My desk · step 1: Your next move"><img loading="lazy" src="./shots/r-desk.jpg" alt="Screenshot: Your next move" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="desk-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Work the lanes</p>
+    <p class="g-step-b">Scroll to “My desk”. Filter by All / Needs attention / In flight / Done, by source (Bulk / Single) and by type (Corporate / Individual).</p>
+    <p class="g-see"><b>You should see</b>“01 Needs you now” with Who · What · Maestro stage · Status · When. Rows marked LIVE are real Maestro instances. Click a row to open the case.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-desk-lanes.jpg" data-cap="Relationship manager · Start the day on My desk · step 2: Work the lanes"><img loading="lazy" src="./shots/r-desk-lanes.jpg" alt="Screenshot: Work the lanes" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="directory">
+  <div class="g-flow-h">
+    <span class="g-flow-no">02</span>
+    <div class="g-flow-t">
+      <h2>Find any application</h2>
+      <p class="g-meta"><span>1 min</span><span>Sample · Any</span><span>2 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#employee-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">Finding a customer should not require knowing how they came in. “Open an account” is the directory of every application; batches are one group each.</p>
+  <ol class="g-steps"><li class="g-step" id="directory-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Open the directory</p>
+    <p class="g-step-b">Click “Open an account” in the rail.</p>
+    <p class="g-see"><b>You should see</b>Stats (In progress, Awaiting KYC, Exceptions, Straight through), “Walk-in / direct” and one collapsible group per batch, and “N batches in flight · N need a person — Open in Batches →”.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-opening.jpg" data-cap="Relationship manager · Find any application · step 1: Open the directory"><img loading="lazy" src="./shots/r-opening.jpg" alt="Screenshot: Open the directory" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step noshot" id="directory-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Search</p>
+    <p class="g-step-b">Type a name or reference in “Search name or reference”, or use the top search “Search customers, applications, references”.</p>
+    <p class="g-see"><b>You should see</b>The list narrows as you type.</p>
+  </div>
+  
+</li></ol>
+</section><section class="g-flow" id="case">
+  <div class="g-flow-h">
+    <span class="g-flow-no">03</span>
+    <div class="g-flow-t">
+      <h2>Work a case: next best action and the live Maestro card</h2>
+      <p class="g-meta"><span>2 min</span><span>Sample · Blessing Eze · AO-2026-000107 (live, exception)</span><span>4 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#employee-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">The case says what to do next and shows where it really sits in Maestro, so the RM acts on the truth rather than on a status someone typed.</p>
+  <ol class="g-steps"><li class="g-step" id="case-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Open the case</p>
+    <p class="g-step-b">In “Open an account”, search “Blessing” and click Blessing Eze.</p>
+    <p class="g-see"><b>You should see</b>The right pane: “Next best action · Approve Activation &amp; advance” with “Open in Action Center ↗”, and under it “If that doesn’t work”.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-case.jpg" data-cap="Relationship manager · Work a case: next best action and the live Maestro card · step 1: Open the case"><img loading="lazy" src="./shots/r-case.jpg" alt="Screenshot: Open the case" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="case-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Read the live card</p>
+    <p class="g-step-b">Scroll to “Live in Maestro”.</p>
+    <p class="g-see"><b>You should see</b>The stage strip (Intake → Verification → Decision → Activation → Closure), “In Activation” with each task and which one “needs a person”, and “Open in Maestro ↗”. Pressing “Approve Activation &amp; advance” completes the real Action Center task — only do it on purpose.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-case-live.jpg" data-cap="Relationship manager · Work a case: next best action and the live Maestro card · step 2: Read the live card"><img loading="lazy" src="./shots/r-case-live.jpg" alt="Screenshot: Read the live card" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="case-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Messages</p>
+    <p class="g-step-b">Click the Messages tab.</p>
+    <p class="g-see"><b>You should see</b>Every SMS and WhatsApp the customer received for this case, with delivery status.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-case-messages.jpg" data-cap="Relationship manager · Work a case: next best action and the live Maestro card · step 3: Messages"><img loading="lazy" src="./shots/r-case-messages.jpg" alt="Screenshot: Messages" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="case-4">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">4</span>Activity</p>
+    <p class="g-step-b">Click the Activity tab.</p>
+    <p class="g-see"><b>You should see</b>The timeline: received, BVN verified, NIN timed out, routed to Operations.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-case-activity.jpg" data-cap="Relationship manager · Work a case: next best action and the live Maestro card · step 4: Activity"><img loading="lazy" src="./shots/r-case-activity.jpg" alt="Screenshot: Activity" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="details">
+  <div class="g-flow-h">
+    <span class="g-flow-no">04</span>
+    <div class="g-flow-t">
+      <h2>See everything captured, and a web search</h2>
+      <p class="g-meta"><span>1 min</span><span>Sample · Blessing Eze · AO-2026-000107</span><span>3 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#employee-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">All the application data in one place, plus an adverse-media search done before anyone approves.</p>
+  <ol class="g-steps"><li class="g-step" id="details-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Open the details</p>
+    <p class="g-step-b">On the case, click Details.</p>
+    <p class="g-see"><b>You should see</b>Tabs Applicant · Employment &amp; account · Document · Web research. Applicant shows personal data, identification and contact.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-details.jpg" data-cap="Relationship manager · See everything captured, and a web search · step 1: Open the details"><img loading="lazy" src="./shots/r-details.jpg" alt="Screenshot: Open the details" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="details-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>The document</p>
+    <p class="g-step-b">Click Document.</p>
+    <p class="g-see"><b>You should see</b>The uploaded form, fetched from Orchestrator (“Fetching the uploaded pages…” while it loads).</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-details-doc.jpg" data-cap="Relationship manager · See everything captured, and a web search · step 2: The document"><img loading="lazy" src="./shots/r-details-doc.jpg" alt="Screenshot: The document" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="details-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Web research</p>
+    <p class="g-step-b">Click Web research.</p>
+    <p class="g-see"><b>You should see</b>“No adverse media that can be tied to this applicant”, the findings it ruled out and the searches it ran.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-details-web.jpg" data-cap="Relationship manager · See everything captured, and a web search · step 3: Web research"><img loading="lazy" src="./shots/r-details-web.jpg" alt="Screenshot: Web research" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="voice">
+  <div class="g-flow-h">
+    <span class="g-flow-no">05</span>
+    <div class="g-flow-t">
+      <h2>Listen to the voice agent’s calls</h2>
+      <p class="g-meta"><span>1 min</span><span>Sample · Blessing Eze · AO-2026-000107</span><span>2 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#employee-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">When the case needs the customer — name-collision screening, a delay, missing documents — the voice agent calls them and the RM can hear exactly what was said.</p>
+  <ol class="g-steps"><li class="g-step" id="voice-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Open the voice agent</p>
+    <p class="g-step-b">On the case, under “Voice agent”, click “Open call history” (or “Listen in” while a call is live).</p>
+    <p class="g-see"><b>You should see</b>Previous calls on the left (name-collision screening, fraud check callback, missing documents) and the selected call’s purpose, duration, recording and session.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-voice.jpg" data-cap="Relationship manager · Listen to the voice agent’s calls · step 1: Open the voice agent"><img loading="lazy" src="./shots/r-voice.jpg" alt="Screenshot: Open the voice agent" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step noshot" id="voice-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Close it</p>
+    <p class="g-step-b">Click Close. Do not press the call controls inside the panel: it is the real voice service.</p>
+    <p class="g-see"><b>You should see</b>You are back on the case.</p>
+  </div>
+  
+</li></ol>
+</section><section class="g-flow" id="kyclink">
+  <div class="g-flow-h">
+    <span class="g-flow-no">06</span>
+    <div class="g-flow-t">
+      <h2>Re-send the KYC link, and run an unrun case</h2>
+      <p class="g-meta"><span>1 min</span><span>Sample · Tunde Abubakar · AO-2026-000105 (pending documents)</span><span>3 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#employee-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">An account that is open but missing documents only needs the customer to finish KYC; the RM nudges them on the channel they use.</p>
+  <ol class="g-steps"><li class="g-step" id="kyclink-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Open the case</p>
+    <p class="g-step-b">Search “Tunde Abubakar” and open him.</p>
+    <p class="g-see"><b>You should see</b>“Re-send the KYC link” as the next best action, the account number with the LIVE tag, and every check verified. This case has never run in Maestro, so it also offers “▶ Run this case in Maestro” — that starts a real case.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-case-105.jpg" data-cap="Relationship manager · Re-send the KYC link, and run an unrun case · step 1: Open the case"><img loading="lazy" src="./shots/r-case-105.jpg" alt="Screenshot: Open the case" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="kyclink-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Pick the channels</p>
+    <p class="g-step-b">Click “Re-send the KYC link”.</p>
+    <p class="g-see"><b>You should see</b>“Send the KYC link” with SMS, WhatsApp and Email. Click “Send link · 2 channels” to record it on the case. Nothing is actually sent in the POC.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-kyc-link.jpg" data-cap="Relationship manager · Re-send the KYC link, and run an unrun case · step 2: Pick the channels"><img loading="lazy" src="./shots/r-kyc-link.jpg" alt="Screenshot: Pick the channels" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="kyclink-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>A case at Activation</p>
+    <p class="g-step-b">Open Aisha Effiong (AO-2026-000104).</p>
+    <p class="g-see"><b>You should see</b>A live case parked at Activation: the next best action is the Activation approval, and the card lists the activation tasks.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-case-activation.jpg" data-cap="Relationship manager · Re-send the KYC link, and run an unrun case · step 3: A case at Activation"><img loading="lazy" src="./shots/r-case-activation.jpg" alt="Screenshot: A case at Activation" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="capture">
+  <div class="g-flow-h">
+    <span class="g-flow-no">07</span>
+    <div class="g-flow-t">
+      <h2>Capture an application with a customer</h2>
+      <p class="g-meta"><span>3 min</span><span>Sample · New application</span><span>4 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#employee-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">Walk-ins and phone customers get the same guided capture as self-service, and the RM can open a company account too.</p>
+  <ol class="g-steps"><li class="g-step" id="capture-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Start</p>
+    <p class="g-step-b">Click “New application” (My desk or Open an account).</p>
+    <p class="g-see"><b>You should see</b>The capture overlay with “Individual | Corporate”, “Customer details” and the upload box. The six individual steps are the customer’s (see the customer guide).</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-capture.jpg" data-cap="Relationship manager · Capture an application with a customer · step 1: Start"><img loading="lazy" src="./shots/r-capture.jpg" alt="Screenshot: Start" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="capture-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>A company instead</p>
+    <p class="g-step-b">Click Corporate.</p>
+    <p class="g-see"><b>You should see</b>“Business details”: company name, RC number, TIN, category, sector, turnover, address, email and phone. Continue stays disabled until there is a company name.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-corp-1.jpg" data-cap="Relationship manager · Capture an application with a customer · step 2: A company instead"><img loading="lazy" src="./shots/r-corp-1.jpg" alt="Screenshot: A company instead" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="capture-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Directors &amp; signatories</p>
+    <p class="g-step-b">Enter a company name and click Continue.</p>
+    <p class="g-see"><b>You should see</b>“Everyone who signs on the account. Each is verified with NIBSS in the background.” and “Add another director”.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-corp-2.jpg" data-cap="Relationship manager · Capture an application with a customer · step 3: Directors &amp; signatories"><img loading="lazy" src="./shots/r-corp-2.jpg" alt="Screenshot: Directors &amp; signatories" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="capture-4">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">4</span>Check the details</p>
+    <p class="g-step-b">Click Continue.</p>
+    <p class="g-see"><b>You should see</b>The company and director summary and the signatories’ consent. “Submit application” starts the corporate case in Maestro; press Esc to leave without submitting.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-corp-3.jpg" data-cap="Relationship manager · Capture an application with a customer · step 4: Check the details"><img loading="lazy" src="./shots/r-corp-3.jpg" alt="Screenshot: Check the details" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="batch">
+  <div class="g-flow-h">
+    <span class="g-flow-no">08</span>
+    <div class="g-flow-t">
+      <h2>Submit a bulk batch (AOP bundle)</h2>
+      <p class="g-meta"><span>4 min</span><span>Sample · “Load a sample bundle”</span><span>8 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#employee-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">Business Name and Sole Trader drives arrive as piles of filled forms. One submission checks them all, rejects what is incomplete with a reason, and processes the rest in parallel.</p>
+  <ol class="g-steps"><li class="g-step" id="batch-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>New submission</p>
+    <p class="g-step-b">Click Batches in the rail (or “Bulk upload” in Open an account).</p>
+    <p class="g-see"><b>You should see</b>Two channels: “Excel manifest” (structured at intake, no review needed) and “AOP bundle” (OCR extraction, ops review before creation).</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-batch-new.jpg" data-cap="Relationship manager · Submit a bulk batch (AOP bundle) · step 1: New submission"><img loading="lazy" src="./shots/r-batch-new.jpg" alt="Screenshot: New submission" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="batch-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Load the bundle</p>
+    <p class="g-step-b">Choose “AOP bundle”, click “Load a sample bundle” (or “Choose .zip”), set the batch name, segment and branch.</p>
+    <p class="g-see"><b>You should see</b>One row per customer with the documents found and Complete or “Missing …”.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-batch-bundle.jpg" data-cap="Relationship manager · Submit a bulk batch (AOP bundle) · step 2: Load the bundle"><img loading="lazy" src="./shots/r-batch-bundle.jpg" alt="Screenshot: Load the bundle" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="batch-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Look at a document</p>
+    <p class="g-step-b">Click View on a row.</p>
+    <p class="g-see"><b>You should see</b>The document reader with a tab per document. For the sample bundle it says so: “Sample bundle — no file behind this entry.” A real .zip shows the real pages.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-batch-doc.jpg" data-cap="Relationship manager · Submit a bulk batch (AOP bundle) · step 3: Look at a document"><img loading="lazy" src="./shots/r-batch-doc.jpg" alt="Screenshot: Look at a document" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="batch-4">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">4</span>Validate</p>
+    <p class="g-step-b">Click “Validate customers →”.</p>
+    <p class="g-see"><b>You should see</b>“Intake validation”: 9 submitted, 9 identified, 6 accepted, 3 rejected at intake — each with the reason (utility bill too old, no proof of address, no ID).</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-batch-intake.jpg" data-cap="Relationship manager · Submit a bulk batch (AOP bundle) · step 4: Validate"><img loading="lazy" src="./shots/r-batch-intake.jpg" alt="Screenshot: Validate" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="batch-5">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">5</span>Process</p>
+    <p class="g-step-b">Click “Process 6 applications →”. In live use the first 8 rows each start a real OnboardingCase.</p>
+    <p class="g-see"><b>You should see</b>The batch monitor: Verifying, Awaiting review, With authoriser, Exceptions, Auto-rejected, Accounts open, and the verification services (TIN, CAC, ID document, sanctions, watchlist, adverse media). These screenshots ran without live orchestration, which the monitor says.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-batch-monitor.jpg" data-cap="Relationship manager · Submit a bulk batch (AOP bundle) · step 5: Process"><img loading="lazy" src="./shots/r-batch-monitor.jpg" alt="Screenshot: Process" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="batch-6">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">6</span>One customer</p>
+    <p class="g-step-b">Click a customer’s name.</p>
+    <p class="g-see"><b>You should see</b>The customer sheet: Case (the same case view as the desk), Documents and Extraction, with Prev / Next.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-batch-sheet.jpg" data-cap="Relationship manager · Submit a bulk batch (AOP bundle) · step 6: One customer"><img loading="lazy" src="./shots/r-batch-sheet.jpg" alt="Screenshot: One customer" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="batch-7">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">7</span>What was read</p>
+    <p class="g-step-b">Click Extraction.</p>
+    <p class="g-see"><b>You should see</b>“Every source agrees”, each field with its confidence, and the verifications.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-batch-sheet-extract.jpg" data-cap="Relationship manager · Submit a bulk batch (AOP bundle) · step 7: What was read"><img loading="lazy" src="./shots/r-batch-sheet-extract.jpg" alt="Screenshot: What was read" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="batch-8">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">8</span>The batch completes</p>
+    <p class="g-step-b">After the maker and verifier have done their part (see the bulk operations guide), open Batch again.</p>
+    <p class="g-see"><b>You should see</b>5 accounts open with their numbers, 1 parked as an exception.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-batch-complete.jpg" data-cap="Relationship manager · Submit a bulk batch (AOP bundle) · step 8: The batch completes"><img loading="lazy" src="./shots/r-batch-complete.jpg" alt="Screenshot: The batch completes" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="invites">
+  <div class="g-flow-h">
+    <span class="g-flow-no">09</span>
+    <div class="g-flow-t">
+      <h2>Invite a payroll list (Excel manifest)</h2>
+      <p class="g-meta"><span>2 min</span><span>Sample · “Load a sample manifest”</span><span>3 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#employee-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">For an employer drive the manifest is the control list: only the people the organisation named are onboarded, and each fills the form themselves.</p>
+  <ol class="g-steps"><li class="g-step" id="invites-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Load the manifest</p>
+    <p class="g-step-b">In New submission choose “Excel manifest” and click “Load a sample manifest” (or “Upload .csv”).</p>
+    <p class="g-see"><b>You should see</b>Reference, first and last name, BVN, NIN, phone and email for 12 people.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-manifest.jpg" data-cap="Relationship manager · Invite a payroll list (Excel manifest) · step 1: Load the manifest"><img loading="lazy" src="./shots/r-manifest.jpg" alt="Screenshot: Load the manifest" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="invites-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Validate</p>
+    <p class="g-step-b">Click “Validate 12 rows →”.</p>
+    <p class="g-see"><b>You should see</b>12 submitted, 12 accepted, “Every row passed intake. Nothing to send back.”</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-manifest-intake.jpg" data-cap="Relationship manager · Invite a payroll list (Excel manifest) · step 2: Validate"><img loading="lazy" src="./shots/r-manifest-intake.jpg" alt="Screenshot: Validate" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="invites-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Watch who finishes</p>
+    <p class="g-step-b">Click “Process 12 applications →”, then Invitations.</p>
+    <p class="g-see"><b>You should see</b>Invited 12 · Opened the link · Completed · No response, the funnel, and each person with where they got to. “Re-send the link to all” and “Send by WhatsApp” nudge the rest (nothing is sent in the POC).</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-invites.jpg" data-cap="Relationship manager · Invite a payroll list (Excel manifest) · step 3: Watch who finishes"><img loading="lazy" src="./shots/r-invites.jpg" alt="Screenshot: Watch who finishes" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="approvals">
+  <div class="g-flow-h">
+    <span class="g-flow-no">10</span>
+    <div class="g-flow-t">
+      <h2>Approve within your authority</h2>
+      <p class="g-meta"><span>1 min</span><span>Sample · Meridian Trading Ltd. · International payment release</span><span>3 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#employee-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">Maker–checker for requests beyond account opening, with the authority limit and a mandatory reason on every decision.</p>
+  <ol class="g-steps"><li class="g-step" id="approvals-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Open Approvals</p>
+    <p class="g-step-b">Click Approvals in the rail.</p>
+    <p class="g-see"><b>You should see</b>Pending you, value awaiting, breaching SLA and dual approval, and the requests with their amounts.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-approvals.jpg" data-cap="Relationship manager · Approve within your authority · step 1: Open Approvals"><img loading="lazy" src="./shots/r-approvals.jpg" alt="Screenshot: Open Approvals" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="approvals-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Open a request</p>
+    <p class="g-step-b">Click Meridian Trading Ltd. — International payment release.</p>
+    <p class="g-see"><b>You should see</b>“Within your approval authority”, the maker’s justification, the checks and the recommendation.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-approval-open.jpg" data-cap="Relationship manager · Approve within your authority · step 2: Open a request"><img loading="lazy" src="./shots/r-approval-open.jpg" alt="Screenshot: Open a request" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="approvals-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Approve with a reason</p>
+    <p class="g-step-b">Click Approve, pick a reason and click “Confirm approval”.</p>
+    <p class="g-see"><b>You should see</b>Reason chips: Within policy &amp; limits, Relationship value / retention, Affordability / collateral adequate, Service recovery, Documented exception. Approvals are mock data in the POC.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-approval-reason.jpg" data-cap="Relationship manager · Approve within your authority · step 3: Approve with a reason"><img loading="lazy" src="./shots/r-approval-reason.jpg" alt="Screenshot: Approve with a reason" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="clients">
+  <div class="g-flow-h">
+    <span class="g-flow-no">11</span>
+    <div class="g-flow-t">
+      <h2>Look after your clients</h2>
+      <p class="g-meta"><span>1 min</span><span>Sample · Adaeze Balogun</span><span>2 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#employee-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">The branch book with the next best action per relationship, so the RM talks to the right client about the right thing.</p>
+  <ol class="g-steps"><li class="g-step" id="clients-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Open Clients</p>
+    <p class="g-step-b">Click Clients in the rail.</p>
+    <p class="g-see"><b>You should see</b>Relationships, at-risk, next best actions and KYC due, and the book with segment and KYC state.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-clients.jpg" data-cap="Relationship manager · Look after your clients · step 1: Open Clients"><img loading="lazy" src="./shots/r-clients.jpg" alt="Screenshot: Open Clients" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="clients-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Customer 360</p>
+    <p class="g-step-b">Click Adaeze Balogun.</p>
+    <p class="g-see"><b>You should see</b>Relationship value, products and suggested actions (“Move idle cash to Money Market Fund”) with Propose, Assign to RM and Dismiss. The actions show a confirmation only.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-client-360.jpg" data-cap="Relationship manager · Look after your clients · step 2: Customer 360"><img loading="lazy" src="./shots/r-client-360.jpg" alt="Screenshot: Customer 360" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="assistant">
+  <div class="g-flow-h">
+    <span class="g-flow-no">12</span>
+    <div class="g-flow-t">
+      <h2>Chat, agents, alerts and profile</h2>
+      <p class="g-meta"><span>2 min</span><span>Sample · Signed-in user</span><span>4 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#employee-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">The UiPath agents and tasks behind the desk, in the same rail.</p>
+  <ol class="g-steps"><li class="g-step" id="assistant-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Chat</p>
+    <p class="g-step-b">Click Chat under Assistant.</p>
+    <p class="g-see"><b>You should see</b>“Your conversation” with past conversations with the UiPath agents. A new message calls a live conversational agent.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-chat.jpg" data-cap="Relationship manager · Chat, agents, alerts and profile · step 1: Chat"><img loading="lazy" src="./shots/r-chat.jpg" alt="Screenshot: Chat" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="assistant-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Explore agents</p>
+    <p class="g-step-b">Click “Explore agents”.</p>
+    <p class="g-see"><b>You should see</b>Agents, RPA Workflow, Maestro, Case Management, Delegate and Tasks. “Run Now”, “Assign to me” and Approve / Reject inside act on the real tenant.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-explore.jpg" data-cap="Relationship manager · Chat, agents, alerts and profile · step 2: Explore agents"><img loading="lazy" src="./shots/r-explore.jpg" alt="Screenshot: Explore agents" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="assistant-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Alerts</p>
+    <p class="g-step-b">Click Alerts.</p>
+    <p class="g-see"><b>You should see</b>Agent alerts with “Review Now” and Dismiss.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-alerts.jpg" data-cap="Relationship manager · Chat, agents, alerts and profile · step 3: Alerts"><img loading="lazy" src="./shots/r-alerts.jpg" alt="Screenshot: Alerts" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="assistant-4">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">4</span>Profile</p>
+    <p class="g-step-b">Click Profile.</p>
+    <p class="g-see"><b>You should see</b>Notifications, appearance, language, the app version, “Sign out” and “Delete account” (which only clears this browser).</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-profile.jpg" data-cap="Relationship manager · Chat, agents, alerts and profile · step 4: Profile"><img loading="lazy" src="./shots/r-profile.jpg" alt="Screenshot: Profile" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="mobile">
+  <div class="g-flow-h">
+    <span class="g-flow-no">13</span>
+    <div class="g-flow-t">
+      <h2>The desk on the RM’s phone</h2>
+      <p class="g-meta"><span>1 min</span><span>Sample · Signed-in user</span><span>1 step</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#employee-mobile" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">An RM in the field has the same app on their phone.</p>
+  <ol class="g-steps"><li class="g-step" id="mobile-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Open the phone view</p>
+    <p class="g-step-b">From the launcher click “On mobile” on the Relationship Manager card.</p>
+    <p class="g-see"><b>You should see</b>A phone frame with the assistant home (“Hello, how can I help you today?”), recently active agents and the bottom bar Home · Chat · Explore · Alerts · Profile. Open an account, Approvals and Customers are cards on Home; Batches, My desk and the case view are desk-only.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/r-mobile.jpg" data-cap="Relationship manager · The desk on the RM’s phone · step 1: Open the phone view"><img loading="lazy" src="./shots/r-mobile.jpg" alt="Screenshot: Open the phone view" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><nav class="g-pager"><a href="./customer.html"><em>Previous</em>Customer</a><a class="nx" href="./bulkops.html"><em>Next</em>Bulk operations</a></nav></div>
+  </div>
+</main>
+<div class="g-lb" id="lb" hidden>
+  <button type="button" class="g-lb-x" aria-label="Close">✕</button>
+  <button type="button" class="g-lb-p" aria-label="Previous screenshot">‹</button>
+  <figure><img alt="" /><figcaption></figcaption></figure>
+  <button type="button" class="g-lb-n" aria-label="Next screenshot">›</button>
+</div>
+<script src="./guide.js"></script>
+</body>
+</html>

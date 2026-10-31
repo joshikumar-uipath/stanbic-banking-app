@@ -32,3 +32,11 @@ ios/App/build/
 **/.DS_Store
 *.log
 out/
+
+# feature guide build cache
+public/guide/__pycache__/
+public/guide/capture/png/
+stanbic-leftovers/
+
+# Walkthrough capture: the generated fake camera (python3 make-camera.py), 37 MB
+public/walkthrough/capture/fake-camera.y4m

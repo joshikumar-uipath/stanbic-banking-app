@@ -13,7 +13,7 @@ type ExtractionTask = Pick<
   corp.ExtractionTask,
   'taskId' | 'status' | 'extraction' | 'documentUri' | 'documentName' | 'attachmentId'
 >;
-import type { EntityInfo } from '../onboarding';
+import type { EntityInfo, NewCaseInput } from '../onboarding';
 import { packSkeleton, rememberedExtraction, rememberExtraction } from '../onboarding/extractionCache';
 import { mergeVerified, verifiedPack, verifiedRows } from '../onboarding/verifiedReads';
 
@@ -124,6 +124,71 @@ export function toRows(raw: unknown, ungrouped = 'Company details'): ReviewField
     });
   });
   return out;
+}
+
+/** Confirmed rows → the individual applicant's own record fields: their name,
+ *  identity numbers and contact details. Shared so the wizard and the desk write
+ *  the same thing onto the record the moment a read is confirmed — until then an
+ *  uploaded application is only a placeholder name ("Individual application").
+ *
+ *  Scoped by GROUP first: the taxonomy repeats Surname, First Name and Date of
+ *  Birth under Next of Kin, and a name-only search would name the record after
+ *  the applicant's next of kin. Only non-empty values are returned, so a patch
+ *  built from this never blanks what is already on the record. */
+export function personFromRows(rows: ReviewField[]): Partial<NewCaseInput> {
+  const inGroup = (re: RegExp) => rows.filter((r) => re.test(r.group));
+  const APPLICANT = inGroup(/applicant|personal/i);
+  const CONTACT = inGroup(/contact/i);
+  const ID = inGroup(/identification|account setup/i);
+  const val = (rs: ReviewField[], re: RegExp) => rs.find((r) => re.test(r.name))?.value?.trim() ?? '';
+  const digits = (x: string) => x.replace(/\D/g, '');
+  // A form date is written dd/mm/yyyy; the record keeps yyyy-mm-dd.
+  const asDate = (raw: string) => {
+    const t = raw.trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(t)) return t;
+    const m = t.match(/^(\d{1,2})[/\-. ](\d{1,2})[/\-. ](\d{4})$/);
+    if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
+    const d = t.match(/^(\d{2})(\d{2})(\d{4})$/);
+    return d ? `${d[3]}-${d[2]}-${d[1]}` : '';
+  };
+
+  // Discrete name boxes win; failing that, split a one-line name.
+  let firstName = val(APPLICANT, /first name|given name/i);
+  let lastName = val(APPLICANT, /surname|last name|family name/i);
+  if (!firstName && !lastName) {
+    const full = val(APPLICANT, /full name|applicant name|^name$/i);
+    if (/,/.test(full)) {
+      const [surname, rest] = full.split(',').map((x) => x.trim());
+      firstName = (rest ?? '').split(/\s+/)[0] ?? ''; lastName = surname;
+    } else if (full) {
+      const parts = full.split(/\s+/).filter(Boolean);
+      firstName = parts[0] ?? ''; lastName = parts.slice(1).join(' ');
+    }
+  }
+  const address = [val(CONTACT, /house number|house no/i), val(CONTACT, /street name/i)]
+    .filter(Boolean).join(' ') || val(CONTACT, /address/i);
+
+  const out: Record<string, string> = {
+    firstName, lastName,
+    middleName: val(APPLICANT, /other name|middle name/i),
+    dob: asDate(val(APPLICANT, /date of birth/i)),
+    motherMaidenName: val(APPLICANT, /maiden/i),
+    nationality: val(APPLICANT, /nationality/i),
+    stateOfOrigin: val(APPLICANT, /state of origin/i),
+    tin: val(APPLICANT, /\bTIN\b/i),
+    bvn: digits(val(ID, /\bBVN\b/i)),
+    nin: digits(val(ID, /\bNIN\b/i)),
+    idNumber: val(ID, /id number/i),
+    idExpiry: asDate(val(ID, /expiry/i)),
+    phone: digits(val(CONTACT, /phone number 1|^phone/i)),
+    altPhone: digits(val(CONTACT, /phone number 2|alternate/i)),
+    email: val(CONTACT, /^email/i),
+    address,
+    city: val(CONTACT, /city|town/i),
+    stateOfResidence: val(CONTACT, /^state$/i),
+    lga: val(CONTACT, /\bLGA\b|local govt/i),
+  };
+  return Object.fromEntries(Object.entries(out).filter(([, x]) => x)) as Partial<NewCaseInput>;
 }
 
 /** Confirmed rows → the entity block a record stores. Shared so the desk and the

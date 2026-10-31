@@ -1,0 +1,71 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 645 >>
+stream
+BT
+/F1 16 Tf
+1 0 0 1 56 780 Tm
+(Electricity Bill - proof of address) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 760 Tm
+(DEMO DATA - not a real customer. Replace when Stanbic supplies the real document.) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 728 Tm
+(Account holder     Amina Umeh) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 708 Tm
+(Service address    9 Awolowo Rd, Lagos, Lagos State) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 688 Tm
+(Bill date          05/09/2026) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 668 Tm
+(Billing period     August 2026) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 648 Tm
+(Amount due         NGN 18,420.00) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 616 Tm
+(Within the three-month currency window.) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000937 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1007
+%%EOF

@@ -1,11 +1,11 @@
 // Scripted assistant ("Aura Assistant" / digibot-style). No AI backend, no login
 // — keyword-matched canned responses, quick-reply chips, service cards, a guided
-// card-block flow, FAQs, feedback, and deep-links into the app. Localised (Stanbic IBTC).
+// card-block flow, FAQs, feedback, and deep-links into the app. Localised to the bank of the loaded theme.
 import { useEffect, useRef, useState } from 'react';
 import { C, FONT_HEAD, FONT_BODY } from '../theme';
 import Icon from '../icons';
 import { useNav } from '../nav';
-import { useConfig } from '../../config';
+import { useConfig, activeBank } from '../../config';
 import { customer, depositAccounts, cards, mpesa, money, supportPhone } from '../data';
 
 interface Action { label: string; do: string } // do: an intent, or "nav:<kind>[:<param>]"
@@ -52,7 +52,7 @@ function respond(intent: string): Block[] {
       return [{ text: 'Which card would you like to block?', cards: cards.map((c) => ({ label: `${c.name} ···· ${c.last4}`, do: 'blockdone' })) }];
     case 'blockdone':
       return [{
-        text: `Done — your card has been blocked and a replacement is on its way (3–5 business days). Reference Stanbic IBTC${Math.floor(Math.random() * 1e6).toString(36).toUpperCase()}.`,
+        text: `Done — your card has been blocked and a replacement is on its way (3–5 business days). Reference ${activeBank().slug.toUpperCase()}${Math.floor(Math.random() * 1e6).toString(36).toUpperCase()}.`,
         feedback: true, replies: [{ label: 'Anything else', do: 'menu' }],
       }];
     case 'pin':

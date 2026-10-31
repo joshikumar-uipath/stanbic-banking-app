@@ -1,0 +1,366 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Customer guide — Account opening</title>
+<script>(function () {
+  var here = "stanbic", want = "stanbic";
+  try {
+    var q = new URLSearchParams(location.search).get("bank");
+    if (q) want = q;
+    else {
+      var s = JSON.parse(localStorage.getItem("zara_local_profiles_v1") || "null");
+      var p = s && s.profiles && s.profiles.find(function (x) { return x.id === s.activeId; });
+      var n = (p && p.config && p.config.branding && p.config.branding.appName) || "";
+      if (/first\s*bank|\bfbn\b/i.test(n)) want = "firstbank";
+    }
+  } catch (e) {}
+  if (want !== here && (want === "stanbic" || want === "firstbank")) {
+    var f = location.pathname.split("/").pop() || "index.html";
+    location.replace((here === "stanbic" ? "firstbank/" : "../") + f + location.hash);
+  }
+})();</script>
+<meta name="description" content="The customer opens an account from inside the Stanbic IBTC app they already bank with: six plain steps with their BVN and NIN, or a photo of a filled form that the case reads for them. The account opens while the checks run; they finish KYC — documents, a selfie and a signature — from a link whenever suits them, and follow every step on their status screen." />
+<link rel="icon" href="../stanbic-favicon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./guide.css" />
+
+</head>
+<body>
+<header class="g-top">
+  <div class="g-top-in">
+    <a class="g-brand" href="./index.html"><img src="../stanbic-logo.png" alt="Stanbic IBTC" /><span><b>Feature guide</b><em>Account opening POC</em></span></a>
+    <a class="g-back" href="../">← Launcher</a>
+  </div>
+  <nav class="g-tabs" aria-label="Personas"><div class="g-tabs-in"><a href="./index.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h11a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3V4Z"/><path d="M4 17a3 3 0 0 1 3-3h11"/></svg><span>Overview</span></a><a href="./brd.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>BRD coverage</span></a><a href="./customer.html" class="on" aria-current=page><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><path d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/></svg><span>Customer</span></a><a href="./rm.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18v13H3z"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/></svg><span>Relationship manager</span></a><a href="./bulkops.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M2 16l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg><span>Bulk operations</span></a><a href="./ops.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v7H4z"/><path d="M14 4h6v4h-6z"/><path d="M14 12h6v8h-6z"/><path d="M4 15h6v5H4z"/></svg><span>Operations analyst</span></a><a href="./management.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v7H4z"/><path d="M14 4h6v4h-6z"/><path d="M14 12h6v8h-6z"/><path d="M4 15h6v5H4z"/></svg><span>Management</span></a><a href="./presenter.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18v12H3z"/><path d="M8 20h8"/><path d="M12 16v4"/><path d="M10 7.5v5l4.5-2.5z"/></svg><span>Presenter and admin</span></a></div></nav>
+</header>
+
+<main class="g-wrap">
+  <section class="g-hero">
+    <span class="g-hero-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><path d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/></svg></span>
+    <div class="g-hero-t">
+      <p class="g-eyebrow">Persona guide · 7 flows · 32 steps</p>
+      <h1>Customer</h1>
+      <p class="g-who">Adaeze Okafor, the signed-in customer in the banking app · Customer banking app</p>
+      <p class="g-intro">The customer opens an account from inside the Stanbic IBTC app they already bank with: six plain steps with their BVN and NIN, or a photo of a filled form that the case reads for them. The account opens while the checks run; they finish KYC — documents, a selfie and a signature — from a link whenever suits them, and follow every step on their status screen.</p>
+    </div>
+    <a class="g-open lg" href="http://localhost:5180/#customer-web" target="_blank" rel="noopener"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open Customer banking app</a>
+  </section>
+  <section class="g-before"><p class="h">Before you start</p><ul><li>Open the launcher and click “On web” on the Customer card (or go to localhost:5180/#customer-web). “Customer” itself opens the phone view.</li><li>There is no sign-in: the app opens as Adaeze Okafor.</li><li>Demo autofill is on: leave any field empty and press Continue, and it fills with sample values.</li><li>“Submit application” and uploading a form start a real Maestro case on the staging tenant. Do it when you mean to.</li></ul></section>
+  <div class="g-grid">
+    <aside class="g-toc"><p class="h">Flows on this page</p><ol><li><a href="#tour"><span class="n">01</span><span class="t">Look around the banking app</span><span class="c">6</span></a></li><li><a href="#apply"><span class="n">02</span><span class="t">Open an account in six steps</span><span class="c">8</span></a></li><li><a href="#upload"><span class="n">03</span><span class="t">Upload a completed form instead of typing</span><span class="c">4</span></a></li><li><a href="#track"><span class="n">04</span><span class="t">Track the application</span><span class="c">3</span></a></li><li><a href="#kyc"><span class="n">05</span><span class="t">Finish KYC from the link</span><span class="c">5</span></a></li><li><a href="#assistant"><span class="n">06</span><span class="t">Ask the assistant, read notifications</span><span class="c">3</span></a></li><li><a href="#phone"><span class="n">07</span><span class="t">The same app on a phone</span><span class="c">3</span></a></li></ol><button type="button" class="g-print" onclick="window.print()">Print or save as PDF</button></aside>
+    <div class="g-main"><section class="g-flow" id="tour">
+  <div class="g-flow-h">
+    <span class="g-flow-no">01</span>
+    <div class="g-flow-t">
+      <h2>Look around the banking app</h2>
+      <p class="g-meta"><span>2 min</span><span>Sample · Adaeze Okafor</span><span>6 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#customer-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">Account opening is not a separate portal. It sits inside the everyday app, next to balances, payments and investments, which is where a customer would look for it.</p>
+  <ol class="g-steps"><li class="g-step" id="tour-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Start on Home</p>
+    <p class="g-step-b">The top bar holds Home, Pay &amp; transfer, Open an account, Wealth and More, with the bell and the assistant on the right.</p>
+    <p class="g-see"><b>You should see</b>“Good afternoon, Adaeze”, a total balance of NGN 915,900.50, quick actions (Send, Pay, Top up, Scan) and her accounts and card.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-home.jpg" data-cap="Customer · Look around the banking app · step 1: Start on Home"><img loading="lazy" src="./shots/c-home.jpg" alt="Screenshot: Start on Home" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="tour-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Open Pay &amp; transfer</p>
+    <p class="g-step-b">Click “Pay &amp; transfer”.</p>
+    <p class="g-see"><b>You should see</b>Nine payment types (Send Money, NIP Transfer, Scan &amp; Pay, Pay Bill…) and recent recipients.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-pay.jpg" data-cap="Customer · Look around the banking app · step 2: Open Pay &amp; transfer"><img loading="lazy" src="./shots/c-pay.jpg" alt="Screenshot: Open Pay &amp; transfer" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="tour-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Send money</p>
+    <p class="g-step-b">Click “Send Money”, enter a phone number and an amount, and click Continue.</p>
+    <p class="g-see"><b>You should see</b>A review with the fee and total, and the line “This is a demo — no real money moves.”</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-transfer-review.jpg" data-cap="Customer · Look around the banking app · step 3: Send money"><img loading="lazy" src="./shots/c-transfer-review.jpg" alt="Screenshot: Send money" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="tour-4">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">4</span>Confirm</p>
+    <p class="g-step-b">Click “Confirm &amp; Send”.</p>
+    <p class="g-see"><b>You should see</b>“NGN 25,000.00 sent” with a reference, and Share, Copy ref and Receipt.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-transfer-done.jpg" data-cap="Customer · Look around the banking app · step 4: Confirm"><img loading="lazy" src="./shots/c-transfer-done.jpg" alt="Screenshot: Confirm" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="tour-5">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">5</span>Wealth and More</p>
+    <p class="g-step-b">Click Wealth for funds, protection and pension; click More for settings and the Apply section.</p>
+    <p class="g-see"><b>You should see</b>Invest / Protect / Retire / Money in/out tabs and the Stanbic IBTC funds with their returns.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-wealth.jpg" data-cap="Customer · Look around the banking app · step 5: Wealth and More"><img loading="lazy" src="./shots/c-wealth.jpg" alt="Screenshot: Wealth and More" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="tour-6">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">6</span>Settings and services</p>
+    <p class="g-step-b">On More, Quick Access and App &amp; Security hold the everyday settings.</p>
+    <p class="g-see"><b>You should see</b>Under Apply, “Open Account” is a placeholder; the real journey is the “Open an account” tab.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-more.jpg" data-cap="Customer · Look around the banking app · step 6: Settings and services"><img loading="lazy" src="./shots/c-more.jpg" alt="Screenshot: Settings and services" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="apply">
+  <div class="g-flow-h">
+    <span class="g-flow-no">02</span>
+    <div class="g-flow-t">
+      <h2>Open an account in six steps</h2>
+      <p class="g-meta"><span>3 min</span><span>Sample · New application</span><span>8 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#customer-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">An account in about five minutes, starting from the two numbers every Nigerian customer has — BVN and NIN. Verification runs in the background, so the customer never waits on a queue.</p>
+  <ol class="g-steps"><li class="g-step" id="apply-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Open the tab</p>
+    <p class="g-step-b">Click “Open an account” in the top bar.</p>
+    <p class="g-see"><b>You should see</b>“A bank account in about five minutes.” and three promises: open in about five minutes, verified with NIMC &amp; NIBSS, finish KYC whenever.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-open.jpg" data-cap="Customer · Open an account in six steps · step 1: Open the tab"><img loading="lazy" src="./shots/c-open.jpg" alt="Screenshot: Open the tab" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="apply-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Step 1 · About you</p>
+    <p class="g-step-b">Click “Open an account”. Enter your name exactly as on your NIN, date of birth, gender, marital status, mother’s maiden name, nationality, phone and email — or leave them for autofill.</p>
+    <p class="g-see"><b>You should see</b>“Let’s start with you”, Step 1 of 6, and the upload box “Have a completed form? Upload it” at the top.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-wiz-1.jpg" data-cap="Customer · Open an account in six steps · step 2: Step 1 · About you"><img loading="lazy" src="./shots/c-wiz-1.jpg" alt="Screenshot: Step 1 · About you" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="apply-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Step 2 · Your identity</p>
+    <p class="g-step-b">Click Continue. BVN, NIN, means of identification, ID number and expiry, and TIN (optional for a personal account).</p>
+    <p class="g-see"><b>You should see</b>“We verify these with NIBSS and NIMC in the background. You won’t wait for it.” If the details match an existing customer, a note says so.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-wiz-2.jpg" data-cap="Customer · Open an account in six steps · step 3: Step 2 · Your identity"><img loading="lazy" src="./shots/c-wiz-2.jpg" alt="Screenshot: Step 2 · Your identity" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="apply-4">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">4</span>Step 3 · Where do you live?</p>
+    <p class="g-step-b">Click Continue. Address, city, state, LGA, years at the address, alternate phone.</p>
+    <p class="g-see"><b>You should see</b>“You can send proof of address later — it won’t hold up your account.”</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-wiz-3.jpg" data-cap="Customer · Open an account in six steps · step 4: Step 3 · Where do you live?"><img loading="lazy" src="./shots/c-wiz-3.jpg" alt="Screenshot: Step 3 · Where do you live?" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="apply-5">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">5</span>Step 4 · What do you do?</p>
+    <p class="g-step-b">Click Continue. Employment status, occupation, employer, annual income and source of funds.</p>
+    <p class="g-see"><b>You should see</b>“This sets the limits on your account, and we are required to ask.”</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-wiz-4.jpg" data-cap="Customer · Open an account in six steps · step 5: Step 4 · What do you do?"><img loading="lazy" src="./shots/c-wiz-4.jpg" alt="Screenshot: Step 4 · What do you do?" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="apply-6">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">6</span>Step 5 · Your new account</p>
+    <p class="g-step-b">Click Continue. Account type (Savings, Current or Domiciliary), purpose, preferred branch and next of kin.</p>
+    <p class="g-see"><b>You should see</b>Savings · Everyday banking · Lagos main branch, and the next-of-kin block.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-wiz-5.jpg" data-cap="Customer · Open an account in six steps · step 6: Step 5 · Your new account"><img loading="lazy" src="./shots/c-wiz-5.jpg" alt="Screenshot: Step 5 · Your new account" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="apply-7">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">7</span>Step 6 · Check your details</p>
+    <p class="g-step-b">Click Continue. Read the summary and tick the consent.</p>
+    <p class="g-see"><b>You should see</b>Name, phone, email, BVN, NIN, address, date of birth, identification, employment, account and next of kin in one list.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-wiz-6.jpg" data-cap="Customer · Open an account in six steps · step 7: Step 6 · Check your details"><img loading="lazy" src="./shots/c-wiz-6.jpg" alt="Screenshot: Step 6 · Check your details" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="apply-8">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">8</span>Submit</p>
+    <p class="g-step-b">Click “Submit application”. In live use this starts the OnboardingCase in Maestro.</p>
+    <p class="g-see"><b>You should see</b>“Application received”, your reference (AO-2026-…) and “We’ll text you the moment your account number is ready”. Buttons: “Track my application” and “Finish KYC now”.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-received.jpg" data-cap="Customer · Open an account in six steps · step 8: Submit"><img loading="lazy" src="./shots/c-received.jpg" alt="Screenshot: Submit" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="upload">
+  <div class="g-flow-h">
+    <span class="g-flow-no">03</span>
+    <div class="g-flow-t">
+      <h2>Upload a completed form instead of typing</h2>
+      <p class="g-meta"><span>2 min</span><span>Sample · fixtures/documents/adaeze-okafor/account-opening-form.pdf</span><span>4 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#customer-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">Many customers already have a filled paper form. The case reads it with IXP while they are still on the screen, and they only check the fields the model was unsure of.</p>
+  <ol class="g-steps"><li class="g-step" id="upload-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Choose the form</p>
+    <p class="g-step-b">On step 1, click “Have a completed form? Upload it” and choose a PDF or photo of the account opening form. Sample forms are in the repo under fixtures/documents/.</p>
+    <p class="g-see"><b>You should see</b>The upload starts the case straight away, so extraction runs while you wait.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-upload.jpg" data-cap="Customer · Upload a completed form instead of typing · step 1: Choose the form"><img loading="lazy" src="./shots/c-upload.jpg" alt="Screenshot: Choose the form" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="upload-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Watch it read</p>
+    <p class="g-step-b">The review takes over the screen: “Extraction review · Reading the form”, the document on the right.</p>
+    <p class="g-see"><b>You should see</b>“The case is running the extraction. You can close this and come back — it keeps going.” “Confirm and continue” stays disabled until the case has parked the review task.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-review-reading.jpg" data-cap="Customer · Upload a completed form instead of typing · step 2: Watch it read"><img loading="lazy" src="./shots/c-review-reading.jpg" alt="Screenshot: Watch it read" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="upload-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Check what was read</p>
+    <p class="g-step-b">On a live case the fields arrive in about 30 seconds. In these screenshots the upload was sandboxed, so after three minutes the screen shows its own labelled sample.</p>
+    <p class="g-see"><b>You should see</b>“Showing a sample read — the live extraction was not available. Values below are illustrative.” Unsure fields sit at the top under “2 fields need checking”, each with its confidence.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-review.jpg" data-cap="Customer · Upload a completed form instead of typing · step 3: Check what was read"><img loading="lazy" src="./shots/c-review.jpg" alt="Screenshot: Check what was read" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="upload-4">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">4</span>Correct and confirm</p>
+    <p class="g-step-b">Scroll the field groups, correct anything wrong, then click “Confirm and continue”. In live use this completes the Action Center task and the case moves on; the wizard fills in from what you confirmed.</p>
+    <p class="g-see"><b>You should see</b>Every field shows its confidence (96%, 87%…); blank boxes on the form are listed separately.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-review-fields.jpg" data-cap="Customer · Upload a completed form instead of typing · step 4: Correct and confirm"><img loading="lazy" src="./shots/c-review-fields.jpg" alt="Screenshot: Correct and confirm" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="track">
+  <div class="g-flow-h">
+    <span class="g-flow-no">04</span>
+    <div class="g-flow-t">
+      <h2>Track the application</h2>
+      <p class="g-meta"><span>1 min</span><span>Sample · The application you just submitted</span><span>3 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#customer-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">The customer can see where the application is and which checks have passed, without phoning the branch.</p>
+  <ol class="g-steps"><li class="g-step" id="track-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Open the status</p>
+    <p class="g-step-b">Click “Track my application” on the received screen.</p>
+    <p class="g-see"><b>You should see</b>“Your application”, the reference, a stage chip and the five progress steps: Application received → Verifying your identity → Identity verified → Account created → Fully activated.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-status.jpg" data-cap="Customer · Track the application · step 1: Open the status"><img loading="lazy" src="./shots/c-status.jpg" alt="Screenshot: Open the status" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="track-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Read the checks</p>
+    <p class="g-step-b">Scroll to Checks and Activity.</p>
+    <p class="g-see"><b>You should see</b>NIN – NIMC, BVN – NIBSS, AML, PEP and fraud screening and the selfie check, each Pending, Running or Passed. A live case reads its state from Maestro every 4 seconds; an unrun one plays the demo story.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-status-checks.jpg" data-cap="Customer · Track the application · step 2: Read the checks"><img loading="lazy" src="./shots/c-status-checks.jpg" alt="Screenshot: Read the checks" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="track-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Come back later</p>
+    <p class="g-step-b">Next time, open “Open an account”: “Applications in progress” lists the applications made on this device. Tap one to reopen its status.</p>
+    <p class="g-see"><b>You should see</b>Adaeze Okafor · AO-2026-… with its current state.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-inprogress.jpg" data-cap="Customer · Track the application · step 3: Come back later"><img loading="lazy" src="./shots/c-inprogress.jpg" alt="Screenshot: Come back later" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="kyc">
+  <div class="g-flow-h">
+    <span class="g-flow-no">05</span>
+    <div class="g-flow-t">
+      <h2>Finish KYC from the link</h2>
+      <p class="g-meta"><span>2 min</span><span>Sample · The newest case waiting on KYC (e.g. AO-2026-000104)</span><span>5 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#kyc/DEMO01" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">The account opens first and works with limits; KYC is three quick things the customer does from an SMS link when it suits them — no branch visit.</p>
+  <ol class="g-steps"><li class="g-step" id="kyc-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Open the link</p>
+    <p class="g-step-b">Open localhost:5180/#kyc/DEMO01 (the launcher’s “KYC link”). The link opens the newest application waiting on documents or a selfie.</p>
+    <p class="g-see"><b>You should see</b>“Hello Adaeze 👋 Your account … is already open.” Three things: your documents, a quick selfie, your signature. “Takes about two minutes.”</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-kyc-intro.jpg" data-cap="Customer · Finish KYC from the link · step 1: Open the link"><img loading="lazy" src="./shots/c-kyc-intro.jpg" alt="Screenshot: Open the link" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="kyc-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Your documents</p>
+    <p class="g-step-b">Click “Get started”. Tap “Means of identification” and “Proof of address”.</p>
+    <p class="g-see"><b>You should see</b>Each tile turns green: “Uploaded · tap to replace”. (The tiles are a stand-in; no file picker opens.)</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-kyc-docs-done.jpg" data-cap="Customer · Finish KYC from the link · step 2: Your documents"><img loading="lazy" src="./shots/c-kyc-docs-done.jpg" alt="Screenshot: Your documents" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="kyc-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>A quick selfie</p>
+    <p class="g-step-b">Click Continue. The FaceID check opens in the page and asks for the camera.</p>
+    <p class="g-see"><b>You should see</b>“Let’s verify it’s you” and “Stay in Position”. This is the real FaceID liveness service on the staging host; finish the check, then click “I’ve finished the check”.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-kyc-selfie.jpg" data-cap="Customer · Finish KYC from the link · step 3: A quick selfie"><img loading="lazy" src="./shots/c-kyc-selfie.jpg" alt="Screenshot: A quick selfie" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="kyc-4">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">4</span>Your signature</p>
+    <p class="g-step-b">Sign in the box with a finger or the mouse.</p>
+    <p class="g-see"><b>You should see</b>“Sign here … This is the signature we’ll hold on file.” “Clear” starts again.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-kyc-sign.jpg" data-cap="Customer · Finish KYC from the link · step 4: Your signature"><img loading="lazy" src="./shots/c-kyc-sign.jpg" alt="Screenshot: Your signature" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="kyc-5">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">5</span>Done</p>
+    <p class="g-step-b">Click Finish.</p>
+    <p class="g-see"><b>You should see</b>“You’re all set. Your account is fully activated.” with the account number. On a live case, “fully activated” waits for Maestro’s Closure stage.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-kyc-done.jpg" data-cap="Customer · Finish KYC from the link · step 5: Done"><img loading="lazy" src="./shots/c-kyc-done.jpg" alt="Screenshot: Done" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="assistant">
+  <div class="g-flow-h">
+    <span class="g-flow-no">06</span>
+    <div class="g-flow-t">
+      <h2>Ask the assistant, read notifications</h2>
+      <p class="g-meta"><span>1 min</span><span>Sample · Adaeze Okafor</span><span>3 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#customer-web" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">Everyday questions answered in the app rather than by the contact centre.</p>
+  <ol class="g-steps"><li class="g-step" id="assistant-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Open the assistant</p>
+    <p class="g-step-b">Click the chat icon in the top bar (“Ask Digibot”).</p>
+    <p class="g-see"><b>You should see</b>“Hi Adaeze 👋 I’m your Stanbic IBTC assistant” and chips: Check my balance, Send money, Pay a bill, Replace my card, Reset card PIN, Talk to support.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-assistant.jpg" data-cap="Customer · Ask the assistant, read notifications · step 1: Open the assistant"><img loading="lazy" src="./shots/c-assistant.jpg" alt="Screenshot: Open the assistant" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="assistant-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Ask something</p>
+    <p class="g-step-b">Click “Check my balance”.</p>
+    <p class="g-see"><b>You should see</b>The balances of every account. The assistant is scripted in the POC; it does not call a model.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-assistant-answer.jpg" data-cap="Customer · Ask the assistant, read notifications · step 2: Ask something"><img loading="lazy" src="./shots/c-assistant-answer.jpg" alt="Screenshot: Ask something" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="assistant-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Notifications</p>
+    <p class="g-step-b">Click the bell.</p>
+    <p class="g-see"><b>You should see</b>Banking and Tips &amp; Deals tabs with unread counts: statement ready, salary received, card payment due.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-notifications.jpg" data-cap="Customer · Ask the assistant, read notifications · step 3: Notifications"><img loading="lazy" src="./shots/c-notifications.jpg" alt="Screenshot: Notifications" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="phone">
+  <div class="g-flow-h">
+    <span class="g-flow-no">07</span>
+    <div class="g-flow-t">
+      <h2>The same app on a phone</h2>
+      <p class="g-meta"><span>1 min</span><span>Sample · Adaeze Okafor</span><span>3 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#customer-mobile" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">The customer app is phone-first; the web shell is the same screens on a laptop.</p>
+  <ol class="g-steps"><li class="g-step" id="phone-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Open the phone view</p>
+    <p class="g-step-b">From the launcher click the Customer card itself (localhost:5180/#customer-mobile).</p>
+    <p class="g-see"><b>You should see</b>A phone frame with the header, balance and a bottom bar: Home, Pay, the raised “+” Open, Wealth, More.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-mobile.jpg" data-cap="Customer · The same app on a phone · step 1: Open the phone view"><img loading="lazy" src="./shots/c-mobile.jpg" alt="Screenshot: Open the phone view" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="phone-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Open an account</p>
+    <p class="g-step-b">Tap the raised “+”.</p>
+    <p class="g-see"><b>You should see</b>The same “A bank account in about five minutes” screen, with “Applications in progress” underneath.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/c-mobile-open.jpg" data-cap="Customer · The same app on a phone · step 2: Open an account"><img loading="lazy" src="./shots/c-mobile-open.jpg" alt="Screenshot: Open an account" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step noshot" id="phone-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>A call from the voice agent</p>
+    <p class="g-step-b">When the voice agent service calls the customer about their application, a “UiBank is calling you” card appears on the phone with “This is me” and “Not me”. It only appears when the voice service sends a call, so it is not in these screenshots.</p>
+    <p class="g-see"><b>You should see</b>The card only shows on the phone view.</p>
+  </div>
+  
+</li></ol>
+</section><nav class="g-pager"><a href="./index.html"><em>Back to</em>Overview</a><a class="nx" href="./rm.html"><em>Next</em>Relationship manager</a></nav></div>
+  </div>
+</main>
+<div class="g-lb" id="lb" hidden>
+  <button type="button" class="g-lb-x" aria-label="Close">✕</button>
+  <button type="button" class="g-lb-p" aria-label="Previous screenshot">‹</button>
+  <figure><img alt="" /><figcaption></figcaption></figure>
+  <button type="button" class="g-lb-n" aria-label="Next screenshot">›</button>
+</div>
+<script src="./guide.js"></script>
+</body>
+</html>

@@ -8,6 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { getActiveCountry } from '../config/countries';
+import { activeBank } from '../config/bank';
 
 const CO = getActiveCountry();
 
@@ -159,10 +160,11 @@ export const payActions = [
   { id: 'forex', label: 'Forex', icon: 'globe' },
 ] as const;
 
-export interface Recipient { id: string; name: string; detail: string; channel: 'Mobile Wallet' | 'NIP Transfer' | 'Stanbic IBTC' | 'Pay Bill'; fav?: boolean; }
+export interface Recipient { id: string; name: string; detail: string; channel: 'Mobile Wallet' | 'NIP Transfer' | 'Own bank' | 'Pay Bill'; fav?: boolean; }
 export const recipients: Recipient[] = [
   { id: 'r1', name: peer(0), detail: `Mobile Wallet · ${maskPhone('6 321')}`, channel: 'Mobile Wallet', fav: true },
-  { id: 'r2', name: peer(2), detail: 'Stanbic IBTC · 1002-••••-2231', channel: 'Stanbic IBTC', fav: true },
+  // Same-bank payee: named after the bank of the theme in view, read on access.
+  { id: 'r2', name: peer(2), get detail() { return `${activeBank().name} · 1002-••••-2231`; }, channel: 'Own bank', fav: true },
   { id: 'r3', name: `${M.otherBank} — Self`, detail: 'NIP Transfer · 0803••• 901', channel: 'NIP Transfer' },
   { id: 'r4', name: M.utility, detail: 'Pay Bill · 888880', channel: 'Pay Bill' },
   { id: 'r5', name: M.water, detail: 'Pay Bill · 535353', channel: 'Pay Bill' },
@@ -172,9 +174,9 @@ export const recipients: Recipient[] = [
 // ── digiWealth ───────────────────────────────────────────────────────────────
 export interface WealthProduct { id: string; name: string; desc: string; oneYear: number; risk: number; tag?: string; }
 export const wealthProducts: WealthProduct[] = [
-  { id: 'mmf', name: 'Stanbic IBTC Money Market Fund', desc: 'Earn daily interest on your cash with same-day access.', oneYear: 9.82, risk: 1, tag: 'POPULAR' },
-  { id: 'eq', name: 'Stanbic IBTC Equity Fund', desc: 'Long-term growth across NGX-listed blue-chip companies.', oneYear: 21.4, risk: 4 },
-  { id: 'bond', name: 'Stanbic IBTC Bond Fund', desc: 'A basket of Nigerian government & corporate bonds.', oneYear: 12.6, risk: 2 },
+  { id: 'mmf', get name() { return `${activeBank().name} Money Market Fund`; }, desc: 'Earn daily interest on your cash with same-day access.', oneYear: 9.82, risk: 1, tag: 'POPULAR' },
+  { id: 'eq', get name() { return `${activeBank().name} Equity Fund`; }, desc: 'Long-term growth across NGX-listed blue-chip companies.', oneYear: 21.4, risk: 4 },
+  { id: 'bond', get name() { return `${activeBank().name} Bond Fund`; }, desc: 'A basket of Nigerian government & corporate bonds.', oneYear: 12.6, risk: 2 },
   { id: 'dollar', name: 'Dollar Money Market Fund', desc: 'Hold and grow USD with a low-risk fund.', oneYear: 4.9, risk: 1 },
 ];
 export const investmentSummary = { total: 486120.55, change: 4210.0, changePct: 0.87, since: dmy(-30) };

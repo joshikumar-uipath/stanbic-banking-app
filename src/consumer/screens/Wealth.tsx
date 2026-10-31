@@ -1,6 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { C, FONT_HEAD } from '../theme';
 import Icon from '../icons';
+import { useBank } from '../../config';
 import { Card, Pill, Tag, RiskMeter, Amount, ScreenTitle, ChipTabs } from '../components';
 import {
   wealthProducts, investmentSummary, coverageNeeds, retirement, cashflow,
@@ -137,6 +138,7 @@ function Invest() {
 
 // ── Protect ──────────────────────────────────────────────────────────────────
 function Protect() {
+  const bank = useBank();
   return (
     <>
       <Card style={{ background: `rgba(${C.brandRgb},0.06)`, border: `1px solid rgba(${C.brandRgb},0.18)` }}>
@@ -144,7 +146,7 @@ function Protect() {
           <span style={{ width: 46, height: 46, borderRadius: 12, background: `rgba(${C.brandRgb},0.14)`, color: C.brand, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Icon name="shield" size={24} /></span>
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 14.5 }}>Free 3-month accident cover</div>
-            <div style={{ fontSize: 12.5, color: C.textSoft, marginTop: 2 }}>Activate instantly with Stanbic IBTC Insurance.</div>
+            <div style={{ fontSize: 12.5, color: C.textSoft, marginTop: 2 }}>Activate instantly with {bank.name} Insurance.</div>
           </div>
         </div>
       </Card>
@@ -187,6 +189,7 @@ function Protect() {
 
 // ── Retire ───────────────────────────────────────────────────────────────────
 function Retire() {
+  const bank = useBank();
   const r = retirement;
   return (
     <>
@@ -222,7 +225,7 @@ function Retire() {
 
       <SectionTitle>Your income streams</SectionTitle>
       <Card>
-        {['Cash savings', 'Pension (RSA)', 'Stanbic IBTC Pension Plan', 'Investments'].map((s, i) => (
+        {['Cash savings', 'Pension (RSA)', `${bank.name} Pension Plan`, 'Investments'].map((s, i) => (
           <div key={s} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px', borderTop: i > 0 ? `1px solid ${C.border}` : 'none' }}>
             <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}><Icon name="cash" size={18} color={C.brand} /><span style={{ fontSize: 14, fontWeight: 600 }}>{s}</span></span>
             <Icon name="chevronDown" size={18} color={C.textFaint} />

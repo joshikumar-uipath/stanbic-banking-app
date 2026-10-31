@@ -3,6 +3,7 @@ import { C, SHADOW, FONT_HEAD, FONT_BODY } from '../theme';
 import Icon from '../icons';
 import { useNav } from '../nav';
 import { Card, SegTabs, Sparkline, Tag, Amount } from '../components';
+import { useBank } from '../../config';
 import {
   customer, depositAccounts, depositsTotal, cards, cardsOutstanding,
   mpesa, netWorth, insights, money, CURRENCY, type Account, type CardAccount,
@@ -212,11 +213,12 @@ function AccountCard({ a, onClick, wide }: { a: Account; onClick?: () => void; w
 }
 
 function PaymentCard({ card }: { card: CardAccount }) {
+  const bank = useBank();
   return (
     <div style={{ borderRadius: 20, padding: 20, color: '#fff', position: 'relative', overflow: 'hidden', background: `linear-gradient(135deg, ${card.gradient[0]}, ${card.gradient[1]})`, boxShadow: SHADOW.lg, minHeight: 176 }}>
       <span style={{ position: 'absolute', bottom: -60, right: -40, width: 200, height: 200, borderRadius: 999, background: 'rgba(255,255,255,0.06)' }} />
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative' }}>
-        <span style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 16, letterSpacing: 0.5 }}>Stanbic IBTC</span>
+        <span style={{ fontFamily: FONT_HEAD, fontWeight: 700, fontSize: 16, letterSpacing: 0.5 }}>{bank.name}</span>
         <Icon name="globe" size={20} color="rgba(255,255,255,0.7)" />
       </div>
       {/* chip */}

@@ -185,6 +185,13 @@ export interface ExtractionTask {
 // here); matching the shared prefix means a rename cannot silently leave
 // "Confirm and continue" disabled on a case that is parked and waiting.
 const REVIEW_TASK_TITLES = ['Confirm extracted details', 'corporateextractionreview'];
+/** Title match that ignores spacing, case and punctuation. Orchestrator titles an
+ *  app task after the app's DISPLAY name, and that changed from
+ *  "individualextractionreviewao" to "Individual Extraction Review" — a plain
+ *  substring test stopped matching, the review never found its task, and the
+ *  confirm button stayed disabled while the task sat open in Action Center. */
+const squash = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+const isReviewTitle = (title: unknown) => REVIEW_TASK_TITLES.some((n) => squash(String(title ?? '')).includes(squash(n)));
 
 /** Find the pending extraction-review task for an instance, if the case has
  *  reached it. Returns null while IXP is still running — the caller polls. */
@@ -199,7 +206,7 @@ export async function findExtractionTask(instanceId: string): Promise<Extraction
   const open = new Set(['Unassigned', 'Pending']);
   const hit = (r.value ?? []).find((t) =>
     open.has(String(t.Status ?? '')) &&
-    REVIEW_TASK_TITLES.some((n) => String(t.Title ?? '').toLowerCase().includes(n.toLowerCase())));
+    isReviewTitle(t.Title));
   if (!hit) return null;
 
   const id = Number(hit.Id);
@@ -527,7 +534,7 @@ export async function reviewTaskState(instanceId: string): Promise<'open' | 'don
     const r = (await res.json()) as { elementExecutions?: ElementExec[] };
     const el = (r.elementExecutions ?? []).find(
       (e) => e.elementType === 'UserTask'
-        && REVIEW_TASK_TITLES.some((n) => e.elementName.toLowerCase().includes(n.toLowerCase())),
+        && isReviewTitle(e.elementName),
     );
     if (!el) return null;
     return el.status === 'Completed' ? 'done' : 'open';

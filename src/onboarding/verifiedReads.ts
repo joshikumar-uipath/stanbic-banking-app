@@ -335,7 +335,6 @@ const PACKS: Pack[] = [
       { check: "Company phone equals signatory 1 personal phone", result: "match", note: "Expected for a small entity, but one line serves as both the corporate contact and the OTP destination." },
       { check: "Witness address on the indemnity equals the company operating address", result: "match", note: "The witness's independence is weakened." },
       { check: "Both referees name a bank with a relationship of six months or more", result: "pass" },
-      { check: "Referee 1 banks with Stanbic IBTC, the onboarding bank", result: "note", note: "Permitted by the form, but an internal referee reduces independence." },
       { check: "Signatory count matches the mandate table", result: "pass", note: "Two signatories, two user matrix rows." },
       { check: "Passport photographs affixed and bank-stamped for both signatories", result: "pass" },
       { check: "Company seal affixed on the Letter of Indemnity and the execution page", result: "pass" },
@@ -492,7 +491,7 @@ const PACKS: Pack[] = [
         State: { value: "Lagos", confidence: 0.92 },
       },
       "Authority to Debit for Search Fee": {
-        "Bank Named": { value: "Stanbic IBTC Bank Plc", confidence: 0.8 },
+        "Bank Named": { value: null },
         "Amount Specified": { value: null, confidence: 0.9, note: "Authorises 'applicable charges' without a figure." },
         "Signatures Present": { value: "2", confidence: 0.92 },
         Dates: { value: "19/06/2026, 19/06/2026", confidence: 0.7 },
@@ -538,7 +537,7 @@ const PACKS: Pack[] = [
         Telephone: { value: null, confidence: 0.9 },
         "Mobile Number": { value: "+2348023318086", confidence: 0.55 },
         "Account Number": { value: "0029057132", confidence: 0.7 },
-        "Bank Name": { value: "Stanbic IBTC Bank Ltd", confidence: 0.88 },
+        "Bank Name": { value: null },
         Signed: { value: "Yes", confidence: 0.9 },
         Date: { value: "24/06/2026", confidence: 0.85 },
       },
@@ -594,7 +593,7 @@ const PACKS: Pack[] = [
       },
       "Bank Use Only": {
         "Signature Verified By": { value: null, confidence: 0.6, note: "Name line not legibly completed; a 'Signature Verified' stamp is applied." },
-        "Signature Verified Stamp": { value: "Stanbic IBTC Bank RC 125097 \u2014 Commercial Banking Lagos Mainland Branch", confidence: 0.85 },
+        "Signature Verified Stamp": { value: null },
         "Head, Service Support": { value: null, confidence: 0.92, note: "Blank." },
         "Business Banker": { value: "Kehinde", confidence: 0.3, note: "Partially legible." },
         "E-Business Support": { value: null, confidence: 0.4, note: "Signature and date 19/06/2026 present; the name is illegible." },
@@ -607,7 +606,7 @@ const PACKS: Pack[] = [
         "Signatory 3": { value: null, note: "Third line unsigned." },
       },
       "About This Form": {
-        Bank: "Stanbic IBTC Bank PLC (RC 125097)",
+        Bank: { value: null },
         Form: "Account Opening Form \u2013 Entities (Incorporated and Non-Incorporated)",
         "Scanned Images": "12",
         "Pages Not Present": { value: "Printed page 6", note: "Page 8 carries no footer number but is present." },

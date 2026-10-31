@@ -1,0 +1,26 @@
+  // Presenter and admin tools. Case management: never press "Run in Maestro" or "Approve {Stage}".
+  await step('p-launcher', async () => { await go(APP, 3000); await snap('p-launcher'); });
+  await step('p-launcher-tools', async () => { await toTop('Behind the scenes', 60); await snap('p-launcher-tools'); });
+  await step('p-reset', async () => { await btn(/Reset demo data/); await toTop('Reset the pipeline', 300); await snap('p-reset'); await btn('Cancel'); });
+  await step('p-cases', async () => { await go(APP + '#cases', 5000); await snap('p-cases'); });
+  await step('p-cases-secondary', async () => { await toTop('Secondary', 80); await snap('p-cases-secondary'); });
+  await step('p-cases-pick', async () => { await page.evaluate(() => window.scrollTo(0, 0)); const sel = page.locator('select').first(); const opt = await sel.locator('option').filter({ hasText: 'Amina Obi' }).first().getAttribute('value'); await sel.selectOption(opt); await page.waitForTimeout(2000); await snap('p-cases-pick'); });
+  await step('p-kafka', async () => { await go(APP + '#kafka', 4000); await snap('p-kafka'); });
+  await step('p-kafka-topic', async () => { await tap('account-created', { ms: 1500 }); await snap('p-kafka-topic'); });
+  await step('p-finacle', async () => { await go(APP + '#finacle', 4000); await snap('p-finacle'); });
+  await step('p-finacle-account', async () => { await page.getByText('Blessing Eze', { exact: true }).first().click(); await page.waitForTimeout(1500); await snap('p-finacle-account'); });
+  await step('p-comms', async () => { await go(APP + '#comms', 4000); await snap('p-comms'); });
+  await step('p-comms-thread', async () => { await page.getByText('Blessing Eze').first().click(); await page.waitForTimeout(1500); await snap('p-comms-thread'); });
+  await step('p-faceid-login', async () => { await go(APP + '#faceid', 4000); await snap('p-faceid-login'); });
+  await step('p-faceid', async () => { await page.frameLocator('iframe').first().getByText(/^Sign in with/).first().click(); await page.waitForTimeout(3000); await snap('p-faceid'); });
+  await step('p-faceid-verifications', async () => { await page.evaluate((l) => [...document.querySelectorAll('button, a, [role=button], li, div')].filter((e) => e.children.length < 4 && e.textContent.trim().startsWith(l)).pop().click(), 'Verifications'); await page.waitForTimeout(2000); await snap('p-faceid-verifications'); });
+  await step('p-faceid-identities', async () => { await page.evaluate((l) => [...document.querySelectorAll('button, a, [role=button], li, div')].filter((e) => e.children.length < 4 && e.textContent.trim().startsWith(l)).pop().click(), 'Identities'); await page.waitForTimeout(2000); await snap('p-faceid-identities'); });
+  await step('p-faceid-settings', async () => { await page.getByText('Settings', { exact: true }).first().click({ force: true }); await page.waitForTimeout(2000); await snap('p-faceid-settings'); });
+  await step('p-kiosk-success', async () => { await go(APP + '?demo=success#faceid-kiosk', 4000); await snap('p-kiosk-success'); });
+  await step('p-kiosk-mismatch', async () => { await go(APP + '?demo=mismatch#faceid-kiosk', 4000); await snap('p-kiosk-mismatch'); });
+  await step('p-kiosk-start', async () => { await go(APP + '#faceid-kiosk', 4000); await snap('p-kiosk-start'); });
+  await step('p-admin-login', async () => { await page.evaluate(() => localStorage.removeItem('aura_admin_session')); await go(APP + '#admin', 3000); await snap('p-admin-login'); });
+  await step('p-admin-picker', async () => { const i = page.locator('input:visible'); await i.nth(0).fill('admin'); await i.nth(1).fill('admin'); await btn('Continue', { ms: 2500 }); await snap('p-admin-picker'); });
+  await step('p-admin-branding', async () => { await page.getByRole('button', { name: /Load & edit|Load preset/ }).first().click(); await page.waitForTimeout(2500); await snap('p-admin-branding'); });
+  await step('p-admin-ops', async () => { await page.getByRole('button', { name: 'Operations', exact: true }).first().click(); await page.waitForTimeout(1500); await snap('p-admin-ops'); });
+  await step('p-admin-features', async () => { await page.getByRole('button', { name: 'Features', exact: true }).first().click(); await page.waitForTimeout(1500); await snap('p-admin-features'); });

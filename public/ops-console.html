@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Account Opening — Stanbic IBTC</title>
-<link rel="icon" type="image/png" href="/stanbic-favicon.png" />
+<title>Account Opening — Operations</title>
+<!-- Paths here are relative ("x.png", "./#route"): the app is served under /customer-onboarding/ on the coded-app host, where a leading "/" leaves it. -->
+<link rel="icon" type="image/png" href="stanbic-favicon.png" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -562,7 +563,183 @@
   .shell.slim .nav .badge.new { background: var(--sky); }
   .shell.slim .shrink { justify-content: center; padding: 11px 0; }
   .shell.slim .shrink .ic { transform: none; }
+  .side .logo .wm-name { font: 700 15px/1 "Libre Franklin", sans-serif; color: var(--brand-primary); letter-spacing: -.01em; }
   @media (max-width: 1180px) { .shell, .shell.slim { grid-template-columns: 1fr; height: auto; } }
+  /* ---------- phone ----------
+     The employee app (/employee-mobile) mounts this console as the operations
+     analyst's Home, and a phone can open /ops directly. Under 640px the rail
+     becomes a slide-in menu behind a ☰ button, the health strip goes 2×2, the
+     queue rows become cards and the review cockpit takes the whole screen. The
+     desktop layout above is untouched. */
+  .burger { display: none; }
+  .navscrim { display: none; }
+  @media (max-width: 640px) {
+    .shell, .shell.slim { grid-template-columns: minmax(0, 1fr); height: 100vh; height: 100dvh; }
+    .side { position: fixed; top: 0; bottom: 0; left: 0; z-index: 80; width: min(300px, 86vw);
+      transform: translateX(-104%); transition: transform .22s cubic-bezier(.16,1,.3,1);
+      box-shadow: 0 0 44px rgba(0,0,0,.35); padding-bottom: 12px; }
+    .shell.navopen .side { transform: none; }
+    .navscrim { display: block; position: fixed; inset: 0; z-index: 79; background: rgba(8,14,22,.45);
+      opacity: 0; pointer-events: none; transition: opacity .2s ease; }
+    .shell.navopen .navscrim { opacity: 1; pointer-events: auto; }
+    .shrink { display: none; }
+    .main { height: 100vh; height: 100dvh; }
+
+    .util { padding: 10px 12px; gap: 10px; }
+    .burger { display: grid; place-items: center; width: 38px; height: 38px; flex: 0 0 auto;
+      border: 1px solid var(--line-2); background: #fff; color: var(--ink); }
+    .burger svg { width: 18px; height: 18px; }
+    .find { max-width: none; }
+    .find input { font-size: 16px; padding-top: 8px; padding-bottom: 8px; } /* <16px zooms iOS on focus */
+    .live { display: none; }
+    .me { flex: 0 0 auto; cursor: pointer; }
+
+    .triage { padding: 10px 12px; }
+    .tin { flex-wrap: wrap; gap: 10px; }
+    .tin > :first-child { flex: 1 1 100%; }
+    .triage .go { flex: 1 1 100%; text-align: center; padding: 10px; }
+    .health { display: grid; grid-template-columns: 1fr 1fr; padding: 8px 12px 6px; }
+    .stat { padding: 8px 10px !important; border-left: none !important; }
+    .stat:nth-child(even) { border-left: 1px solid var(--line) !important; }
+    .stat:nth-child(n+3) { border-top: 1px solid var(--line); }
+    .stat .k { font-size: 10px; }
+    .stat .v { flex-wrap: wrap; }
+    .stat .v b { font-size: 22px; }
+
+    .body { padding: 4px 12px 20px; }
+    .qhead { flex-wrap: wrap; gap: 8px; }
+    .rowbar { flex-wrap: wrap; }
+    .segs { max-width: 100%; overflow-x: auto; }
+    .causes { grid-template-columns: minmax(0, 1fr); }
+    .cause { padding: 12px; }
+    .acts { flex-wrap: wrap; }
+    .acts .btn { flex: 1 1 auto; text-align: center; }
+    .promo { padding: 16px 14px; }
+    .promo .ev { gap: 16px; flex-wrap: wrap; }
+    .promo .cta { flex-wrap: wrap; }
+    .promo .cta > * { flex: 1 1 auto; text-align: center; }
+    .rule { flex-wrap: wrap; }
+    .rule .m { flex-wrap: wrap; gap: 12px 18px; }
+    .dmn-host, .col.full .dmn-host { height: 62vh; min-height: 320px; }
+
+    /* Queue rows: a seven-column grid becomes a three-line card. */
+    .cols { display: none !important; }
+    .row { grid-template-columns: minmax(0, 1fr) auto !important;
+      grid-template-areas: "who state" "stage sla" "asg age"; gap: 6px 10px; padding: 12px 8px; align-items: start; }
+    .row .id { display: none !important; }
+    .row > .who { grid-area: who; }
+    .row > .mcell { grid-area: stage; }
+    .row > :nth-child(4) { grid-area: state; justify-self: end; }
+    .row > .sla { grid-area: sla; justify-self: end; text-align: right; min-width: 84px; }
+    .row > .asg { grid-area: asg; display: flex !important; }
+    .row > .age { grid-area: age; }
+    .who .nm span { white-space: normal; }
+
+    .keys { display: none; }
+
+    /* Review cockpit: the whole screen, scrolling as one column. */
+    .cock, .shell:not(.nopanel) .cock { top: 0; left: 0; width: 100%; height: 100%; max-height: none; transform: none; }
+    .mhead { padding: 12px; gap: 8px 10px; }
+    .mhead h2 { font-size: 19px; }
+    .mhead .cid { font-size: 11.5px; }
+    .stepper { margin-left: auto; }
+    .mcol { padding: 14px 12px; }
+    .ev-diff { grid-template-columns: minmax(0, 1fr); }
+    .cockbar { padding: 10px 12px; }
+    .cock .prob .d { font-size: 14px; }
+    .toast { left: 12px; right: 12px; transform: none; bottom: 16px; }
+  }
+  /* ---------- phone, native skin ----------
+     Same language as the employee app's own screens: Inter, a soft page, cards
+     at 14–18px radius, pill chips, round icon buttons, and the views as a chip
+     row under the search — so the analyst's Home reads as part of the phone app
+     rather than as a web page squeezed into it. */
+  @media (max-width: 640px) {
+    html, body { background: #f3f5f7; }
+    .main { background: #f3f5f7; font-family: "Inter", system-ui, -apple-system, sans-serif; }
+    .util { background: #f3f5f7; border-bottom: none; padding: 12px 14px 4px; }
+    .burger { border: none; border-radius: 999px; background: rgba(0,0,0,.06); width: 40px; height: 40px; }
+    .find input { border-radius: 14px; background: #fff; border: 1px solid rgba(0,0,0,.08); height: 42px; }
+    .me { width: 40px; height: 40px; font-size: 13px; }
+
+    .mviews { display: flex; gap: 7px; overflow-x: auto; scrollbar-width: none; padding: 6px 14px 10px; flex: 0 0 auto; }
+    .mviews::-webkit-scrollbar { display: none; }
+    .mview { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 8px 13px;
+      font: 600 13px/1 "Inter", system-ui, sans-serif; background: #fff; border: 1px solid rgba(0,0,0,.08); color: #182126; white-space: nowrap; }
+    .mview[aria-pressed="true"] { background: var(--brand-primary); border-color: transparent; color: #fff; }
+    .mview .n { font-size: 11.5px; font-weight: 700; opacity: .75; }
+    .mview .n.hot { opacity: 1; background: var(--red); color: #fff; border-radius: 999px; padding: 2px 6px; }
+    .mview[aria-pressed="true"] .n.hot { background: #fff; color: var(--red); }
+
+    .triage, .triage.red, .triage.green { background: transparent !important; border: none !important; padding: 2px 14px 8px; }
+    .triage .tin { border-radius: 16px; padding: 14px; }
+    .triage.red .tin { background: var(--red-bg); border: 1px solid var(--red-line); }
+    .triage.green .tin { background: var(--green-bg); border: 1px solid #cfe9d9; }
+    .triage .pip { border-radius: 10px; }
+    .triage .go { border-radius: 12px; padding: 12px; }
+
+    .health { gap: 8px; padding: 4px 14px 6px; }
+    .stat, .stat:nth-child(even), .stat:nth-child(n+3) { background: #fff; border: 1px solid rgba(0,0,0,.08) !important; border-radius: 14px; padding: 12px !important; }
+    .stat .k { text-transform: none; letter-spacing: 0; font-size: 11.5px; font-weight: 600; }
+    .stat .v b { font-size: 22px; }
+
+    .body { padding: 2px 14px 24px; }
+    .qhead { padding-top: 6px; }
+    .qhead h1 { font-size: 19px; }
+    .rowbar { background: #f3f5f7; }
+    .rowbar-t { font-size: 15.5px; font-weight: 700; }
+    .segs { border-radius: 12px; background: rgba(0,0,0,.05); }
+    .segs button { border-radius: 9px; }
+    .seg { border-radius: 12px; overflow: hidden; }
+    h2.eyebrow { letter-spacing: .08em; color: #8a93a1; }
+
+    .promo { border-radius: 18px; }
+    .promo .btn-sky, .promo .btn-line { border-radius: 12px; padding: 12px; }
+    .cause { border-radius: 16px; box-shadow: 0 1px 2px rgba(16,24,32,.04); }
+    .cause .ic { border-radius: 10px; }
+    .btn { border-radius: 12px; padding: 10px 13px; }
+    .tag, .state, .pill { border-radius: 999px; }
+    .rule { border-radius: 16px; }
+
+    .row { background: #fff; border: 1px solid rgba(0,0,0,.08) !important; border-radius: 16px; margin-bottom: 8px; padding: 12px !important; box-shadow: 0 1px 2px rgba(16,24,32,.04); }
+    .row:hover { background: #fff; }
+    .row[aria-selected="true"] { box-shadow: inset 0 0 0 2px var(--brand-primary); background: #fff; }
+    .ava { border-radius: 12px; }
+
+    .side { border-radius: 0 22px 22px 0; }
+    .side .nav { border-radius: 10px; }
+
+    .cock { background: #f3f5f7; }
+    .mhead { background: #fff; }
+    .stepper button, .mhead .x { width: 36px; height: 36px; border-radius: 999px; border: none; background: rgba(0,0,0,.06); }
+    .minirail { border-radius: 12px; }
+    .mcol { background: transparent; }
+    .prob { border-radius: 14px; }
+    .ev-diff div, .ev-gauge { border-radius: 10px; }
+    .cockbar { background: rgba(246,246,246,.97); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+    .cockbar .note { border-radius: 12px; }
+    .cockbar .pair .btn { border-radius: 14px; padding: 13px; font-weight: 700; }
+    .toast { border-radius: 14px; }
+
+    /* One scroller, as a phone app has: the triage and health strip scroll away
+       with the list instead of holding half the screen; only the search bar and
+       the view chips stay pinned. */
+    .main { overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+    .body { flex: none; overflow: visible; }
+    .util { position: sticky; top: 0; z-index: 20; }
+    .mviews { position: sticky; top: 58px; z-index: 19; background: #f3f5f7; }
+    .rowbar { position: static; background: transparent; }
+    /* The case review scrolls as one page; only the decision bar stays put. */
+    .cock, .shell:not(.nopanel) .cock { overflow-y: auto; -webkit-overflow-scrolling: touch; }
+    .cock .mbody { flex: none; overflow: visible; }
+    .cockbar { position: sticky; bottom: 0; z-index: 3; }
+    .mhead { flex-wrap: wrap; }
+    .mhead .stepper { margin-left: auto; }
+    /* Close stays reachable however far down the review you are. */
+    .mhead { padding-right: 60px; }
+    .mhead .x { position: fixed; top: 12px; right: 12px; z-index: 6; margin: 0; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.12); }
+  }
+
 </style>
 </head>
 <body>
@@ -570,7 +747,7 @@
 
   <nav class="side" aria-label="Views">
     <div class="logo">
-      <span class="plate"><img class="wordmark" src="/stanbic-logo.png" alt="Stanbic IBTC" /></span>
+      <span class="plate"><img class="wordmark" src="stanbic-logo.png" alt="Stanbic IBTC" /></span>
       <span class="glyph" id="glyph" aria-hidden="true">S</span>
       <em class="wm-sub">Account Opening · Staging</em>
     </div>
@@ -584,11 +761,11 @@
       </button>
       <div class="roles" id="roles" hidden role="menu">
         <div class="hd">Same workspace — different job</div>
-        <a class="role-i" href="/employee-web" target="_top" role="menuitem">
+        <a class="role-i" href="./#employee-web" target="_top" role="menuitem">
           <span class="ck"></span>
           <span class="t"><b>Relationship Manager</b><span>Open accounts, chase your own pipeline, approve, and look after your clients.</span></span>
         </a>
-        <a class="role-i on" href="/ops" target="_top" role="menuitem">
+        <a class="role-i on" href="./#ops" target="_top" role="menuitem">
           <span class="ck">✓</span>
           <span class="t"><b>Operations analyst</b><span>Clear stuck cases across the whole bank by cause, in bulk, and write rules so they stop.</span></span>
         </a>
@@ -619,12 +796,12 @@
            (/faceid) is the admin board reading the SAME cases as this Ops board.
            Both open in their own tab; a new tab escapes the /ops iframe by
            definition. rel=noopener always. -->
-      <a class="nav" href="/faceid-kiosk" target="_blank" rel="noopener noreferrer">
+      <a class="nav" href="./#faceid-kiosk" target="_blank" rel="noopener noreferrer">
         <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></span>
         FaceID kiosk
         <span class="ext" aria-label="opens in a new tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-8 8"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></span>
       </a>
-      <a class="nav" href="/faceid" target="_blank" rel="noopener noreferrer">
+      <a class="nav" href="./#faceid" target="_blank" rel="noopener noreferrer">
         <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7V5a2 2 0 0 1 2-2h2"/><path d="M17 3h2a2 2 0 0 1 2 2v2"/><path d="M21 17v2a2 2 0 0 1-2 2h-2"/><path d="M7 21H5a2 2 0 0 1-2-2v-2"/><circle cx="12" cy="11" r="2.5"/><path d="M8 16a4 4 0 0 1 8 0"/></svg></span>
         FaceID console
         <span class="ext" aria-label="opens in a new tab"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6"/><path d="M20 4l-8 8"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></span>
@@ -636,8 +813,10 @@
     </button>
   </nav>
 
+  <div class="navscrim" id="navscrim" aria-hidden="true"></div>
   <main class="main">
     <div class="util">
+      <button class="burger" id="burger" aria-label="Menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg></button>
       <div class="find"><span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span><input id="q" placeholder="Search all applications…" aria-label="Search all applications" /></div>
       <div class="live"><i></i>Live</div>
       <div class="me">OA</div>
@@ -899,6 +1078,13 @@ let RULES = [
 // (the embedded dmn-js decision-table editor, loading /onboarding-automation.dmn).
 let RULES_MODE = "view";
 let DMN_INSTANCE = null;
+// Which decision table the Rules page shows: the onboarding automation rules, or
+// the Document rules (public/document-rules.dmn). The document rules are LIVE:
+// Save writes them to this browser and the app judges every document against
+// them (src/integrations/docRules.ts reads the same key).
+let RULES_SET = "automation";
+var DOC_RULES_KEY = "aof_document_rules_dmn";
+var DOC_RULES_CACHE = null;   // parsed rows for View mode
 
 let PROMO = {
   id: "p1", shown: true, threshold: 0.91,
@@ -1482,7 +1668,7 @@ function loadDmnLib() {
 function mountDmn() {
   if (!el("dmn-host")) return;
   loadDmnLib()
-    .then(function () { return fetch("onboarding-automation.dmn").then(function (r) { return r.text(); }); })
+    .then(function () { return currentDmnXml(); })
     .then(function (xml) {
       var host = el("dmn-host");
       if (!host || RULES_MODE !== "edit") return;
@@ -1500,19 +1686,87 @@ function mountDmn() {
     });
 }
 
+function dmnFile() { return RULES_SET === "documents" ? "document-rules.dmn" : "onboarding-automation.dmn"; }
+function savedDocRules() { try { return localStorage.getItem(DOC_RULES_KEY); } catch (e) { return null; } }
+/** The XML the editor should open: for document rules, this browser's saved edit first. */
+function currentDmnXml() {
+  var saved = RULES_SET === "documents" ? savedDocRules() : null;
+  return saved ? Promise.resolve(saved) : fetch(dmnFile()).then(function (r) { return r.text(); });
+}
+
 function exportDmn() {
+  var name = dmnFile();
   function download(xml) {
     var blob = new Blob([xml], { type: "application/xml" });
     var a = document.createElement("a");
-    a.href = URL.createObjectURL(blob); a.download = "onboarding-automation.dmn";
+    a.href = URL.createObjectURL(blob); a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 1000);
   }
   if (DMN_INSTANCE && DMN_INSTANCE.saveXML) {
-    DMN_INSTANCE.saveXML({ format: true }).then(function (res) { download(res.xml); toast("Exported onboarding-automation.dmn", "✓"); });
+    DMN_INSTANCE.saveXML({ format: true }).then(function (res) { download(res.xml); toast("Exported " + name, "✓"); });
   } else {
-    fetch("onboarding-automation.dmn").then(function (r) { return r.text(); }).then(function (xml) { download(xml); toast("Exported onboarding-automation.dmn", "✓"); });
+    currentDmnXml().then(function (xml) { download(xml); toast("Exported " + name, "✓"); });
   }
+}
+
+// ── Document rules: save, import, reset ─────────────────────────────────────
+function saveDocRules() {
+  if (!DMN_INSTANCE || !DMN_INSTANCE.saveXML) return;
+  DMN_INSTANCE.saveXML({ format: true }).then(function (res) {
+    try { localStorage.setItem(DOC_RULES_KEY, res.xml); } catch (e) { toast("Could not save — browser storage is full", "!", "#b42318"); return; }
+    DOC_RULES_CACHE = null;
+    toast("Document rules saved — every document is now judged against them", "✓");
+  });
+}
+function importDocRules(file) {
+  file.text().then(function (xml) {
+    var doc = new DOMParser().parseFromString(xml, "application/xml");
+    if (doc.getElementsByTagName("parsererror").length || !Array.from(doc.getElementsByTagName("*")).some(function (n) { return n.localName === "decisionTable"; })) {
+      toast("That file is not a DMN decision table", "!", "#b42318"); return;
+    }
+    try { localStorage.setItem(DOC_RULES_KEY, xml); } catch (e) { return; }
+    DOC_RULES_CACHE = null;
+    toast("Imported " + file.name + " — saved as the document rules", "✓");
+    render();
+  });
+}
+function resetDocRules() {
+  try { localStorage.removeItem(DOC_RULES_KEY); } catch (e) {}
+  DOC_RULES_CACHE = null;
+  toast("Document rules reset to the default", "↺");
+  render();
+}
+
+/** View mode for the document rules: the rows of the decision table, read live. */
+function docRulesRows() {
+  if (DOC_RULES_CACHE) return Promise.resolve(DOC_RULES_CACHE);
+  return currentDmnXml().then(function (xml) {
+    var doc = new DOMParser().parseFromString(xml, "application/xml");
+    var byLocal = function (el, name) { return Array.from(el.getElementsByTagName("*")).filter(function (n) { return n.localName === name; }); };
+    var strip = function (t) { return (t || "").trim().replace(/^"(.*)"$/, "$1"); };
+    DOC_RULES_CACHE = byLocal(doc, "rule").map(function (r, i) {
+      var ins = byLocal(r, "inputEntry").map(function (e) { var t = byLocal(e, "text")[0]; return t ? t.textContent : ""; });
+      var outs = byLocal(r, "outputEntry").map(function (e) { var t = byLocal(e, "text")[0]; return t ? t.textContent : ""; });
+      var d = byLocal(r, "description")[0];
+      return { row: i + 1, doc: strip(ins[0]), check: strip(ins[1]), cond: (ins[2] || "").trim(), outcome: strip(outs[0]), reason: strip(outs[1]), note: d ? d.textContent.trim() : "" };
+    });
+    return DOC_RULES_CACHE;
+  });
+}
+var OUTCOME_TONE = { "Pass": "#16a34a", "Quick review": "#1d4ed8", "Refer": "#b45309", "Fail": "#b42318" };
+function docRulesHTML(rows) {
+  var edited = !!savedDocRules();
+  return '<p style="font-size:12.5px;color:#6f6f69;margin:0 0 12px;max-width:80ch">Every document on an application is checked against these rules — type, confidence, expiry, utility-bill age, passport MRZ, file tampering, the issuing authority and certificate re-use. Every rule that matches fires and the strictest outcome wins: <b>Fail</b> › <b>Refer</b> › <b>Quick review</b> › <b>Pass</b>. ' +
+    (edited ? '<b style="color:#b45309">Edited in this browser.</b> <button class="btn" data-docrules-reset="1" style="margin-left:6px">Reset to default</button>' : "Using the default rules.") + "</p>" +
+    rows.map(function (r) {
+      var c = OUTCOME_TONE[r.outcome] || "#6f6f69";
+      return '<article class="rule"><div class="ic" style="width:28px;height:28px;display:grid;place-items:center;background:#fff;color:' + c + ';border:1px solid ' + c + '55;font-weight:700;font-size:12px">' + r.row + "</div>" +
+        '<div style="flex:1;min-width:0"><div class="t">' + esc(r.reason || r.outcome) + '</div>' +
+        '<div class="c">' + esc(r.doc) + " · " + esc(r.check) + " — " + esc(r.cond) + " → " + esc(r.outcome) + "</div>" +
+        '<div style="font-size:11.5px;color:#9a9a94;margin-top:6px">' + esc(r.note) + "</div></div>" +
+        '<span style="font-size:11px;font-weight:700;color:' + c + ';border:1px solid ' + c + '55;padding:2px 8px;white-space:nowrap">' + esc(r.outcome) + "</span></article>";
+    }).join("");
 }
 
 function panelVisible() { return !!(panelOpen && selected && view !== "rules"); }
@@ -1535,17 +1789,32 @@ function renderBody() {
     var liveCount = RULES.filter(function (r) { return r.live; }).length;
     var candCount = PROMO.shown ? 1 : 0;
     var autoSub = liveCount + " live, " + candCount + " candidate" + (candCount === 1 ? "" : "s");
+    var docs = RULES_SET === "documents";
+    var setToggle = '<div class="seg" role="tablist" aria-label="Rule set">' +
+      '<button role="tab" data-rules-set="automation" aria-selected="' + !docs + '">Onboarding automation</button>' +
+      '<button role="tab" data-rules-set="documents" aria-selected="' + docs + '">Document rules</button>' +
+      "</div>";
     var toggle = '<div class="seg" role="tablist" aria-label="Rules display mode">' +
       '<button role="tab" data-rules-mode="view" aria-selected="' + (RULES_MODE === "view") + '">View</button>' +
       '<button role="tab" data-rules-mode="edit" aria-selected="' + (RULES_MODE === "edit") + '">Edit</button>' +
       "</div>";
     var body = RULES_MODE === "edit"
       ? '<div class="dmn-wrap"><div id="dmn-host" class="dmn-host"></div>' +
-        '<div class="dmn-note"><span>Decision table · <code>onboarding-automation.dmn</code> — the same rules, editable as DMN.</span>' +
-        '<button class="btn" id="dmn-export">Download .dmn</button></div></div>'
-      : rulesHTML();
+        (docs
+          ? '<div class="dmn-note"><span>Decision table · <code>document-rules.dmn</code> — <b>live</b>: Save and the app judges every document against your edit.</span>' +
+            '<span style="display:flex;gap:6px"><label class="btn" style="cursor:pointer">Import .dmn<input type="file" accept=".dmn,.xml" id="dmn-import" hidden></label>' +
+            '<button class="btn" id="dmn-export">Download .dmn</button><button class="btn pri" id="dmn-save">Save rules</button></span></div></div>'
+          : '<div class="dmn-note"><span>Decision table · <code>onboarding-automation.dmn</code> — the same rules, editable as DMN.</span>' +
+            '<button class="btn" id="dmn-export">Download .dmn</button></div></div>')
+      : docs ? '<div id="docrules">Loading the document rules…</div>' : rulesHTML();
     var colClass = RULES_MODE === "edit" ? "col full" : "col";
-    b.innerHTML = '<div class="' + colClass + '"><div class="qhead"><h1>Automation<span class="n">' + autoSub + "</span></h1>" + toggle + "</div>" + body + "</div>";
+    var title = docs ? "Document rules" : "Automation";
+    var sub = docs ? "BR-DOC-01 to BR-DOC-08" : autoSub;
+    b.innerHTML = '<div class="' + colClass + '"><div class="qhead"><h1>' + title + '<span class="n">' + sub + "</span></h1>" +
+      '<div style="display:flex;gap:10px;align-items:center">' + setToggle + toggle + "</div></div>" + body + "</div>";
+    if (docs && RULES_MODE !== "edit") {
+      docRulesRows().then(function (rows) { var h = el("docrules"); if (h) h.innerHTML = docRulesHTML(rows); });
+    }
     panelOpen = false;
     el("shell").classList.add("nopanel");
     el("cock").innerHTML = "";
@@ -1747,6 +2016,14 @@ document.addEventListener("click", function (e) {
   const mode = t.closest("[data-rules-mode]");
   if (mode) { RULES_MODE = mode.dataset.rulesMode; if (RULES_MODE !== "edit" && DMN_INSTANCE) { try { DMN_INSTANCE.destroy(); } catch (err) {} DMN_INSTANCE = null; } render(); return; }
   if (t.closest("#dmn-export")) { exportDmn(); return; }
+  if (t.closest("#dmn-save")) { saveDocRules(); return; }
+  if (t.closest("[data-docrules-reset]")) { resetDocRules(); return; }
+  const rset = t.closest("[data-rules-set]");
+  if (rset) {
+    RULES_SET = rset.dataset.rulesSet;
+    if (DMN_INSTANCE) { try { DMN_INSTANCE.destroy(); } catch (err) {} DMN_INSTANCE = null; }
+    render(); return;
+  }
   const pause = t.closest("[data-pause]");
   if (pause) { RULES = RULES.filter(function (r) { return r.id !== pause.dataset.pause; }); render(); toast("Rule paused. Those cases route to reviewers again.", "✓", "#d97706"); return; }
   const rr = t.closest("[data-rerun]");
@@ -1774,6 +2051,11 @@ document.addEventListener("click", function (e) {
 });
 
 el("q").addEventListener("input", render);
+// Import a .dmn into the Document rules (the file input sits in the editor's note bar).
+document.addEventListener("change", function (e) {
+  var t = e.target;
+  if (t && t.id === "dmn-import" && t.files && t.files[0]) { importDocRules(t.files[0]); t.value = ""; }
+});
 
 document.addEventListener("keydown", function (e) {
   if (e.key === "Escape" && el("veil").classList.contains("on")) { closeEvidence(); return; }
@@ -1836,11 +2118,25 @@ window.addEventListener("message", function (e) {
   var d = e.data;
   if (!d) return;
   if (d.type === "aof-brand") {
-    if (d.logo) {
-      var el = document.querySelector(".side .logo .wordmark");
-      if (el && el.getAttribute("src") !== d.logo) el.setAttribute("src", d.logo);
-      if (el && d.appName) el.setAttribute("alt", d.appName);
+    // No tenant logo → show the bank's name, never the bundled Stanbic mark under
+    // another bank's theme.
+    var el = document.querySelector(".side .logo .wordmark");
+    if (el) {
+      if (d.logo) {
+        if (el.getAttribute("src") !== d.logo) el.setAttribute("src", d.logo);
+        el.style.display = "";
+        var txt = document.querySelector(".side .logo .wm-name");
+        if (txt) txt.remove();
+      } else if (d.appName) {
+        el.style.display = "none";
+        var t = document.querySelector(".side .logo .wm-name");
+        if (!t) { t = document.createElement("b"); t.className = "wm-name"; el.parentNode.appendChild(t); }
+        t.textContent = d.appName;
+      }
+      if (d.appName) el.setAttribute("alt", d.appName);
     }
+    var g = document.getElementById("glyph");
+    if (g && d.appName) g.textContent = d.appName.trim().charAt(0).toUpperCase();
     // Drive the whole navy/blue palette off the tenant's brand colours — every
     // themed token derives from these via color-mix (see :root), so this one
     // assignment re-paints the rail, banners, buttons and accents, matching the
@@ -2155,6 +2451,91 @@ render();
       try { localStorage.setItem(KEY, on ? '1' : '0'); } catch (_) { /* unavailable */ }
       apply(on);
     });
+  })();
+</script>
+<script>
+  // Phone behaviour. The ☰ menu opens the rail as a drawer and any choice in it
+  // closes it again. Embedded in the employee app (?m=1), the role switcher and
+  // the avatar ask the app to open its role sheet — the app owns the role on a
+  // phone, and a link to /employee-web would load the desk inside this frame.
+  (function () {
+    var shell = document.getElementById('shell');
+    var burger = document.getElementById('burger');
+    var mq = window.matchMedia('(max-width: 640px)');
+    var embedded = /[?&]m=1\b/.test(location.search) && window.parent !== window;
+    function setNav(open) {
+      shell.classList.toggle('navopen', open);
+      burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    function phone() { if (mq.matches) shell.classList.remove('slim'); else setNav(false); }
+    phone();
+    if (mq.addEventListener) mq.addEventListener('change', phone);
+    burger.addEventListener('click', function () { setNav(!shell.classList.contains('navopen')); });
+    document.getElementById('navscrim').addEventListener('click', function () { setNav(false); });
+    document.addEventListener('click', function (e) {
+      var t = e.target;
+      if (!t || !t.closest) return;
+      if (embedded && (t.closest('#role-btn') || t.closest('.util .me'))) {
+        e.stopImmediatePropagation(); e.preventDefault();
+        setNav(false);
+        window.parent.postMessage({ type: 'aof-role-open' }, location.origin);
+        return;
+      }
+      if (mq.matches && t.closest('.side .nav')) setNav(false);
+    }, true);
+    if (embedded) {
+      var me = document.querySelector('.util .me');
+      if (me) { me.setAttribute('role', 'button'); me.setAttribute('title', 'Switch role'); me.setAttribute('aria-label', 'Switch role'); }
+    }
+  })();
+</script>
+<script>
+  // Phone: the views as a chip row. The rail's own buttons stay the source of
+  // truth — each chip just presses the matching rail button — and the row is
+  // rebuilt whenever the rail's counts or selection change.
+  (function () {
+    var mq = window.matchMedia('(max-width: 640px)');
+    var side = document.querySelector('.side');
+    var util = document.querySelector('.util');
+    if (!side || !util) return;
+    var queued = false;
+    function labelOf(n) {
+      var t = n.querySelector('.t');
+      if (t) return t.textContent.trim();
+      var c = n.cloneNode(true);
+      c.querySelectorAll('.badge, .ic, .ext').forEach(function (x) { x.remove(); });
+      return c.textContent.replace(/\s+/g, ' ').trim();
+    }
+    function build() {
+      queued = false;
+      var bar = document.getElementById('mviews');
+      if (!mq.matches) { if (bar) bar.remove(); return; }
+      if (!bar) {
+        bar = document.createElement('div');
+        bar.id = 'mviews'; bar.className = 'mviews'; bar.setAttribute('role', 'tablist');
+        util.parentNode.insertBefore(bar, util.nextSibling);
+      }
+      var navs = Array.prototype.slice.call(side.querySelectorAll('.nav[data-view]'));
+      var html = navs.map(function (n) {
+        var b = n.querySelector('.badge') || n.querySelector('.c');
+        var hot = b && b.classList.contains('hot');
+        var on = n.getAttribute('aria-current') === 'true';
+        return '<button class="mview" role="tab" data-view-proxy="' + n.dataset.view + '" aria-pressed="' + on + '">' +
+          labelOf(n) + (b && b.textContent.trim() ? '<span class="n' + (hot ? ' hot' : '') + '">' + b.textContent.trim() + '</span>' : '') + '</button>';
+      }).join('');
+      if (bar.innerHTML !== html) bar.innerHTML = html;
+    }
+    function queue() { if (!queued) { queued = true; requestAnimationFrame(build); } }
+    new MutationObserver(queue).observe(side, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['aria-current'] });
+    if (mq.addEventListener) mq.addEventListener('change', queue);
+    document.addEventListener('click', function (e) {
+      var p = e.target && e.target.closest && e.target.closest('[data-view-proxy]');
+      if (!p) return;
+      var n = side.querySelector('.nav[data-view="' + p.getAttribute('data-view-proxy') + '"]');
+      if (n) n.click();
+      p.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+    });
+    build();
   })();
 </script>
 </body>

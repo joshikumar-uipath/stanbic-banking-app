@@ -21,12 +21,14 @@
     "@uipath/uipath-typescript": "^1.3.5",
     "autoprefixer": "^10.4.27",
     "aws-amplify": "^6.6.6",
+    "lucide-react": "^1.48.0",
     "path-browserify": "^1.0.1",
     "postcss": "^8.5.8",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-markdown": "^10.1.0",
-    "tailwindcss": "^3.4.19"
+    "tailwindcss": "^3.4.19",
+    "utif": "^3.1.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.3.1",
@@ -34,6 +36,7 @@
     "@types/node": "^24.12.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/utif": "^3.0.6",
     "@vitejs/plugin-react": "^6.0.1",
     "dmn-js": "^17.10.1",
     "eslint": "^9.39.4",

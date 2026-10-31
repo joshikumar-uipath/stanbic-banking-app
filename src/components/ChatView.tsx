@@ -10,6 +10,7 @@ import type {
 } from '@uipath/uipath-typescript/conversational-agent';
 import { useVideoBlob } from '../utils/useVideoBlob';
 import { useConfig } from '../config';
+import { agentLabel, isPrimaryAgent, PRIMARY_AGENT_LABEL } from '../config/primaryAgent';
 import VideoEl from './VideoEl';
 import type { AgentRunContext } from '../types';
 import { CHAT_ORB_LIGHT, CHAT_ORB_DARK } from '../brandAssets';
@@ -38,6 +39,7 @@ interface Props {
 
 const GENERIC = ['agent', 'assistant', 'bot', 'ai'];
 function getDisplayName(a: AgentGetResponse): string {
+  if (isPrimaryAgent(a)) return PRIMARY_AGENT_LABEL;
   const raw = a.name.trim();
   if (!GENERIC.includes(raw.toLowerCase()) && raw.length > 0) return raw;
   if (!a.processKey) return raw;
@@ -125,9 +127,8 @@ export default function ChatView({ agent, conversationalAgent, onBack, onSwitchA
   const chatOrbBlobSrc = useVideoBlob(isLight ? CHAT_ORB_LIGHT : CHAT_ORB_DARK);
   // Agent display-name override sourced from config so admins can rename
   // agents shown in the header / dropdown without redeploying.
-  const getAgentDisplayName = (name: string) =>
-    agentsConfig.displayNameOverrides[name.trim()] ?? name.replace(/_/g, ' ');
-  const agentDisplayName = getAgentDisplayName(agent.name);
+  const getAgentDisplayName = (a: AgentGetResponse) => agentLabel(a, agentsConfig.displayNameOverrides);
+  const agentDisplayName = getAgentDisplayName(agent);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   // Voice prefill is sent directly (see auto-send effect below) so we don't
   // populate the input — only non-voice context-derived prefills go in the box.
@@ -142,7 +143,7 @@ export default function ChatView({ agent, conversationalAgent, onBack, onSwitchA
   const [allAgents, setAllAgents] = useState<AgentGetResponse[]>([]);
   const [reaction, setReaction] = useState<'like' | 'dislike' | null>(null);
   const [copied, setCopied] = useState(false);
-  const [isVoiceInput, setIsVoiceInput] = useState(() => !!(context?.prefill));
+  const [isVoiceInput, setIsVoiceInput] = useState(() => !!(context?.prefill) && context?.prefillVoice !== false);
   const [showCamera, setShowCamera] = useState(false);
   const cameraStreamRef = useRef<MediaStream | null>(null);
   const videoPreviewRef = useRef<HTMLVideoElement | null>(null);
@@ -204,7 +205,7 @@ export default function ChatView({ agent, conversationalAgent, onBack, onSwitchA
         if (t2 > t1) byKey.set(a.processKey, a);
       }
       const allowed = new Set(allowedAgentNames);
-      setAllAgents(Array.from(byKey.values()).filter(a => allowed.has(a.name.trim())));
+      setAllAgents(Array.from(byKey.values()).filter(a => isPrimaryAgent(a) || allowed.has(a.name.trim())));
     }).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationalAgent, blockedProcessKeys, allowedAgentNames]);
@@ -499,6 +500,7 @@ export default function ChatView({ agent, conversationalAgent, onBack, onSwitchA
   const sendMessageRef = useRef(sendMessage);
   useEffect(() => { sendMessageRef.current = sendMessage; }, [sendMessage]);
   const prefillTextRef = useRef<string | null>(null);
+  const prefillVoiceRef = useRef(context?.prefillVoice !== false);
   if (prefillTextRef.current === null && context?.prefill && !existingConversationId) {
     prefillTextRef.current = context.prefill.trim() || '';
   }
@@ -515,11 +517,11 @@ export default function ChatView({ agent, conversationalAgent, onBack, onSwitchA
       const live = (sessionRef.current as any)?.connectionStatus;
       if (live === 'Connected') sessionConnectedRef.current = true;
       if (sessionConnectedRef.current && sessionRef.current) {
-        sendMessageRef.current(text, true);
+        sendMessageRef.current(text, prefillVoiceRef.current);
         return;
       }
       if (Date.now() - start >= 1500) {
-        sendMessageRef.current(text, true);
+        sendMessageRef.current(text, prefillVoiceRef.current);
         return;
       }
       setTimeout(trySend, 50);

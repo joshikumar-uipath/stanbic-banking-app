@@ -42,13 +42,16 @@ export interface OnboardingStore {
   remove(id: string): Promise<void>;
   advance(id: string, state: OnboardingState, message?: string): Promise<OnboardingCase>;
   checkDuplicate(input: Pick<NewCaseInput, 'bvn' | 'nin' | 'phone'>): Promise<DuplicateOutcome>;
-  publish(caseId: string, topic: KafkaTopic, message: string, payload?: Record<string, unknown>): Promise<void>;
+  /** `at` back-dates the event (the seeder replaying a case's history); default now. */
+  publish(caseId: string, topic: KafkaTopic, message: string, payload?: Record<string, unknown>, at?: string): Promise<void>;
   events(): Promise<CaseEvent[]>;      // global event log, newest first (drives the mock Kafka console)
   subscribe(listener: StoreListener): () => void;
 }
 
 // ── Mock implementation ──────────────────────────────────────────────────────
 import { casesShared, pushCase, deleteCaseRemote, fetchSharedCases, CASES_EVENT } from './caseFabric';
+// Re-exported so screens can show a "not synced" banner via the '../onboarding' barrel.
+export { onSyncProblem, syncProblems, retryPendingSync, SYNC_PROBLEM_EVENT, SYNC_OK_EVENT, type SyncProblem } from './caseFabric';
 import { getOperator, getOperatorBranch } from './operator';
 
 // Seeded demo rows go through create() like any other record, so without this
@@ -229,7 +232,22 @@ class MockOnboardingStore implements OnboardingStore {
     if (hi > cur) setApplicationSeq(hi);
   }
 
-  private emit() { this.listeners.forEach((l) => l()); }
+  /** Notify subscribers — once per synchronous burst. Writes made in the same
+   *  tick (remove() saving then emitting, Promise.all over many creates, a
+   *  storage event landing mid-write) collapse into one notification. Listeners
+   *  still run before any timer or I/O callback. Note an AWAITED chain
+   *  (await update → await publish) yields between steps, so each step still
+   *  notifies — coalescing those would need a macrotask, which delays every
+   *  listener behind pending timers. */
+  private emitQueued = false;
+  private emit() {
+    if (this.emitQueued) return;
+    this.emitQueued = true;
+    queueMicrotask(() => {
+      this.emitQueued = false;
+      this.listeners.forEach((l) => l());
+    });
+  }
 
   subscribe(listener: StoreListener) {
     this.listeners.add(listener);
@@ -288,6 +306,19 @@ class MockOnboardingStore implements OnboardingStore {
       batchId: input.batchId,
       documentId: input.documentId,
       documentName: input.documentName,
+      // Bulk intake — absent on every single capture.
+      bulkChannel: input.bulkChannel,
+      reviewState: input.reviewState,
+      extractionConfidence: input.extractionConfidence,
+      fieldConfidence: input.fieldConfidence,
+      verifications: input.verifications,
+      recon: input.recon,
+      decision: input.decision,
+      decisionReason: input.decisionReason,
+      pnd: input.pnd,
+      invite: input.invite,
+      // What the document checks read off the uploaded files (src/integrations/docChecks).
+      documentFacts: input.documentFacts,
       // The rest of the application form, when the capture collected it.
       title: input.title, middleName: input.middleName, dob: input.dob,
       gender: input.gender, maritalStatus: input.maritalStatus,
@@ -352,11 +383,18 @@ class MockOnboardingStore implements OnboardingStore {
     return hitPartial ? 'potential-duplicate' : 'new';
   }
 
-  async publish(caseId: string, topic: KafkaTopic, message: string, payload?: Record<string, unknown>) {
-    const ev: CaseEvent = { id: uid('ev'), caseId, topic, message, at: nowIso(), payload };
+  async publish(caseId: string, topic: KafkaTopic, message: string, payload?: Record<string, unknown>, at?: string) {
+    const ev: CaseEvent = { id: uid('ev'), caseId, topic, message, at: at ?? nowIso(), payload };
     this.log.unshift(ev);
     const c = this.cases.find((x) => x.id === caseId);
     if (c) c.timeline.unshift(ev);
+    // A back-dated event lands in time order, not on top: the timeline and the
+    // log are both newest first.
+    if (at) {
+      const byTime = (a: CaseEvent, b: CaseEvent) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0);
+      this.log.sort(byTime);
+      c?.timeline.sort(byTime);
+    }
     this.save();
   }
 }
@@ -579,6 +617,24 @@ function seedDetails(co: SeedCtx, r: SeedRow, n: number): Partial<NewCaseInput> 
   };
 }
 
+/** The steps of a seeded case's history, in the order they happen. */
+export type SeedStep = 'intake' | 'nin' | 'bvn' | 'exception' | 'accountRequested' | 'accountCreated' | 'notify';
+/** Where each step falls between the case opening (0) and now (1). */
+const SEED_STEP_AT: Record<SeedStep, number> = {
+  intake: 0.02, nin: 0.08, bvn: 0.11, exception: 0.3, accountRequested: 0.62, accountCreated: 0.7, notify: 0.9,
+};
+/**
+ * When a seeded case did a given step: a fixed fraction of the way from when it
+ * opened to now, so its events read in order and a few minutes apart. Seeded
+ * records have no real history to remember; this is the history they would have.
+ * Exported so the BVN/NIN call panels can place a seeded record's calls on the
+ * same timeline as its events.
+ */
+export function seededStepAt(openedAt: string, step: SeedStep, now = Date.now()): string {
+  const t0 = new Date(openedAt).getTime();
+  return new Date(t0 + Math.max(0, now - t0) * SEED_STEP_AT[step]).toISOString();
+}
+
 async function seedCase(s: MockOnboardingStore, r: SeedRow, n: number) {
   const c = await s.create({
     firstName: r.firstName, lastName: r.lastName, phone: r.phone, email: r.email,
@@ -596,27 +652,34 @@ async function seedCase(s: MockOnboardingStore, r: SeedRow, n: number) {
   const patch: Partial<OnboardingCase> = { state: r.state, validations, createdAt: at, updatedAt: at };
   if (r.account) { patch.cif = mockCif(); patch.accountNumber = mockAccountNumber(); }
   await s.update(c.id, patch);
+  // create() logged "application received" as of now; this case opened `at`. The
+  // event object is shared by the case timeline and the global log.
+  const received = c.timeline.find((e) => e.topic === 'account-opening-requested');
+  if (received) received.at = at;
 
   // Emit the events this case would have produced on its way to its state, so the
   // Kafka console shows a realistic multi-topic stream on load (create() already
-  // logged 'account-opening-requested'). Best-effort, in rough chronological order.
+  // logged 'account-opening-requested'). Each is back-dated onto the case's own
+  // history — see seededStepAt — rather than all landing in the second the seed
+  // ran, which put a NIN check and an account opening at the same instant.
   const nm = `${r.firstName} ${r.lastName}`;
+  const when = (step: SeedStep) => seededStepAt(at, step);
   const co = getActiveCountry();
   const P = co.primaryId, Sc = co.secondaryId;   // primary=BVN slot, secondary=NIN slot
   const nin = validations.find((v) => v.kind === 'NIN')?.status;
   const bvn = validations.find((v) => v.kind === 'BVN')?.status;
-  if (nin && nin !== 'pending') await s.publish(c.id, 'nin-validation', nin === 'timeout' ? `${Sc.label} check timed out for ${nm}` : nin === 'passed' ? `${Sc.label} verified with ${Sc.authority} for ${nm}` : `${Sc.label} check ${nin} for ${nm}`);
-  if (bvn && bvn !== 'pending') await s.publish(c.id, 'bvn-validation', bvn === 'failed' ? `${P.label} did not verify for ${nm}` : `${P.label} verified with ${P.authority} for ${nm}`);
-  if (r.channel === 'bulk') await s.publish(c.id, 'bulk-upload', `Row loaded from bulk batch ${r.batchId ?? ''}`.trim());
-  if (r.state === 'EXCEPTION') await s.publish(c.id, 'exception-queue', `Routed to Operations for review — ${nm}`);
-  if (BEYOND_VALIDATION.includes(r.state)) await s.publish(c.id, 'account-creation-requested', `Account creation requested in Finacle for ${nm}`);
-  if (r.account) await s.publish(c.id, 'account-created', `Finacle account ${patch.accountNumber} created for ${nm}`);
-  if (r.state === 'PENDING_LIVENESS' || r.state === 'PENDING_DOCUMENTS') await s.publish(c.id, 'customer-notification', `KYC link sent by SMS to ${nm}`);
+  if (nin && nin !== 'pending') await s.publish(c.id, 'nin-validation', nin === 'timeout' ? `${Sc.label} check timed out for ${nm}` : nin === 'passed' ? `${Sc.label} verified with ${Sc.authority} for ${nm}` : `${Sc.label} check ${nin} for ${nm}`, undefined, when('nin'));
+  if (bvn && bvn !== 'pending') await s.publish(c.id, 'bvn-validation', bvn === 'failed' ? `${P.label} did not verify for ${nm}` : `${P.label} verified with ${P.authority} for ${nm}`, undefined, when('bvn'));
+  if (r.channel === 'bulk') await s.publish(c.id, 'bulk-upload', `Row loaded from bulk batch ${r.batchId ?? ''}`.trim(), undefined, when('intake'));
+  if (r.state === 'EXCEPTION') await s.publish(c.id, 'exception-queue', `Routed to Operations for review — ${nm}`, undefined, when('exception'));
+  if (BEYOND_VALIDATION.includes(r.state)) await s.publish(c.id, 'account-creation-requested', `Account creation requested in Finacle for ${nm}`, undefined, when('accountRequested'));
+  if (r.account) await s.publish(c.id, 'account-created', `Finacle account ${patch.accountNumber} created for ${nm}`, undefined, when('accountCreated'));
+  if (r.state === 'PENDING_LIVENESS' || r.state === 'PENDING_DOCUMENTS') await s.publish(c.id, 'customer-notification', `KYC link sent by SMS to ${nm}`, undefined, when('notify'));
   // Secondary / branch-stage narrative — show how the case diverted (and will loop back).
-  if (r.state === 'COMPLIANCE_HOLD') await s.publish(c.id, 'exception-queue', `Sanctions/PEP screening hit — routed from Verification to Compliance escalations for ${nm}`);
-  if (r.state === 'EDD_REVIEW') await s.publish(c.id, 'customer-notification', `Risk-based enhanced due diligence opened from Decision for ${nm} — returns to Decision when cleared`);
-  if (r.state === 'PENDING_CUSTOMER') await s.publish(c.id, 'customer-notification', `Additional information requested from ${nm} (RFI) — paused pending customer response`);
-  if (r.state === 'DECLINED') await s.publish(c.id, 'customer-notification', `Application declined at Decision for ${nm} — case closed`);
+  if (r.state === 'COMPLIANCE_HOLD') await s.publish(c.id, 'exception-queue', `Sanctions/PEP screening hit — routed from Verification to Compliance escalations for ${nm}`, undefined, when('exception'));
+  if (r.state === 'EDD_REVIEW') await s.publish(c.id, 'customer-notification', `Risk-based enhanced due diligence opened from Decision for ${nm} — returns to Decision when cleared`, undefined, when('notify'));
+  if (r.state === 'PENDING_CUSTOMER') await s.publish(c.id, 'customer-notification', `Additional information requested from ${nm} (RFI) — paused pending customer response`, undefined, when('notify'));
+  if (r.state === 'DECLINED') await s.publish(c.id, 'customer-notification', `Application declined at Decision for ${nm} — case closed`, undefined, when('notify'));
 }
 
 // Shared singleton — import this everywhere.

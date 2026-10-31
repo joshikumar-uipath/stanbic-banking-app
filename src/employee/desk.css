@@ -439,6 +439,16 @@
    its text vanished. Pinning applicant to its floor hands the remainder back. */
 .dk-split.busy { --dk-open-grid: 168px minmax(0, 1fr) 170px 130px 84px 20px; }
 
+/* The way across to the Batches workbench, where Open an account used to carry
+   a Bulk/Single filter. A row, not a banner: it belongs to the list beneath it. */
+.dk-across { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 10px 14px; margin-bottom: 10px; cursor: pointer;
+  border: 1px solid var(--d-line-2); border-left: 3px solid var(--d-accent);
+  background: var(--d-wash); font-size: 13px; color: var(--d-ink-2); }
+.dk-across:hover { background: #fff; border-color: var(--d-accent); }
+.dk-across b { color: var(--d-ink); font-weight: 600; }
+.dk-across .go { margin-left: auto; color: var(--d-brand); font-weight: 600; white-space: nowrap; }
+
 /* Approvals queue. Same two-width problem as above, so the same treatment: with
    the decision pane open there is roughly half the width, and a capped customer
    column would eat the free space before the request column got any. Flags holds
@@ -701,6 +711,48 @@
 .dk-check .l { flex: 1; min-width: 0; font-size: 13px; }
 .dk-check .s { font-size: 12px; color: var(--d-ink-3); }
 .dk-check .s.good { color: var(--d-green-ink); }
+/* NIN and BVN rows open Details on that check's own tab. */
+.dk-check-open { font: inherit; font-size: 11.5px; font-weight: 600; color: var(--d-brand); background: none;
+  border: 1px solid var(--d-line-2); padding: 2px 8px; cursor: pointer; }
+.dk-check-open:hover { background: var(--d-wash, #f7f7f3); }
+
+/* Side by side across the dialog (NIN's checkNIN + LinkNIN); stacks when narrow. */
+.kx { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; align-items: start; }
+.kx-one { background: #fff; border: 1px solid var(--d-line-2); padding: 11px 12px; }
+.kx-head { display: flex; align-items: center; gap: 8px; }
+.kx-head b { font-size: 12.5px; flex: 1; min-width: 0; }
+.kx-rerun { font: inherit; font-size: 11.5px; font-weight: 600; color: var(--d-brand); background: #fff;
+  border: 1px solid var(--d-line-2); padding: 3px 9px; cursor: pointer; white-space: nowrap; }
+.kx-rerun:hover:not(:disabled) { background: var(--d-wash, #f7f7f3); }
+.kx-rerun:disabled { color: var(--d-ink-3); cursor: default; }
+.kx-verdict.dim { opacity: .45; }
+.kx-when { margin: -2px 0 8px; font-size: 11.5px; color: var(--d-ink-3); }
+.kx-count { font-weight: 400; color: var(--d-ink-3); margin-left: 4px; }
+.kx-runs { width: 100%; margin-top: 6px; border-collapse: collapse; font-size: 11.5px; }
+.kx-runs th { text-align: left; font-size: 10.5px; font-weight: 600; color: var(--d-ink-3); padding: 3px 8px 4px 0; border-bottom: 1px solid var(--d-line-2); }
+.kx-runs td { padding: 4px 8px 4px 0; border-bottom: 1px solid var(--d-line-3, #f2f2ec); white-space: nowrap; }
+.kx-runs td.ok { color: #12805c; font-weight: 700; } .kx-runs td.bad { color: #b42318; font-weight: 700; }
+.kx-purpose { margin: 4px 0 8px; font-size: 12px; color: var(--d-ink-3); line-height: 1.4; }
+.kx-line { display: flex; align-items: center; gap: 8px; font-size: 11.5px; margin-bottom: 8px; flex-wrap: wrap; }
+.kx-m { font-weight: 700; color: var(--d-brand); }
+.kx-p { flex: 1; min-width: 0; word-break: break-all; }
+.kx-http { font-weight: 700; padding: 1px 6px; }
+.kx-http.ok { background: #e8f6ef; color: #12805c; }
+.kx-http.bad { background: #fdecec; color: #b42318; }
+.kx-ms { color: var(--d-ink-3); }
+.kx-verdict { font-size: 12.5px; font-weight: 600; padding: 7px 9px; border-left: 3px solid; }
+.kx-verdict.good { color: #12805c; border-color: #12805c; background: #f1faf5; }
+.kx-verdict.crit { color: #b42318; border-color: #b42318; background: #fdf3f2; }
+.kx-verdict.idle { color: var(--d-ink-3); border-color: var(--d-line-2); background: #fafaf7; }
+.kx-note { margin: 6px 0 0; font-size: 11.5px; color: var(--d-ink-3); line-height: 1.4; }
+.kx-match { width: 100%; margin-top: 9px; border-collapse: collapse; font-size: 12px; }
+.kx-match th { text-align: left; font-size: 10.5px; font-weight: 600; color: var(--d-ink-3); padding: 3px 6px 4px 0; border-bottom: 1px solid var(--d-line-2); }
+.kx-match td { padding: 4px 6px 4px 0; border-bottom: 1px solid var(--d-line-3, #f2f2ec); word-break: break-word; }
+.kx-match td.ok { color: #12805c; font-weight: 700; } .kx-match td.bad { color: #b42318; font-weight: 700; }
+.kx-raw { margin-top: 8px; }
+.kx-raw summary { font-size: 11.5px; font-weight: 600; cursor: pointer; color: var(--d-ink-2, #333); }
+.kx-json { margin: 6px 0 0; padding: 8px 10px; background: #0f1720; color: #d6e2ee; font-size: 11px; line-height: 1.45;
+  overflow-x: auto; max-height: 280px; }
 .dk-check .s.crit { color: var(--d-red-ink); font-weight: 600; }
 .dk-check .s.info { color: var(--d-brand); }
 
@@ -748,7 +800,7 @@
 .dk-msgs { display: flex; flex-direction: column; gap: 8px; }
 .dk-msg { display: flex; gap: 10px; border: 1px solid var(--d-line-2); border-radius: 0; background: #fff; padding: 10px 12px; }
 .dk-msg-ch { flex: 0 0 auto; align-self: flex-start; display: inline-flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; letter-spacing: .02em; padding: 3px 7px; border-radius: 0; white-space: nowrap; }
-.dk-msg-ch.sms { background: rgba(0, 145, 218, .12); color: #0079b3; }
+.dk-msg-ch.sms { background: color-mix(in srgb, var(--d-accent) 12%, transparent); color: #0079b3; }
 .dk-msg-ch.whatsapp { background: rgba(37, 211, 102, .15); color: #1da851; }
 .dk-msg-ch.email { background: rgba(var(--d-brand-rgb), .1); color: var(--d-brand); }
 .dk-msg-b { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
@@ -847,7 +899,7 @@
 .ad .cx-foot { padding: 14px 24px 18px; }
 
 .ad-pill { margin-left: auto; font-size: 10.5px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
-.ad-pill.progress { background: #eef3fb; color: #0033a1; }
+.ad-pill.progress { background: color-mix(in srgb, var(--d-brand) 8%, #fff); color: var(--d-brand); }
 .ad-pill.pending  { background: #fdf5e6; color: #b7791f; }
 .ad-pill.good     { background: #e8f6ef; color: #12805c; }
 .ad-pill.exception{ background: #fdecea; color: #c0392b; }
@@ -897,8 +949,8 @@
   font-size: 12.5px; color: var(--d-ink-4); }
 /* Sweeps only while the read is outstanding — it stops when the data lands. */
 .ad-scan { position: absolute; left: 0; right: 0; height: 130px; top: -130px; pointer-events: none; z-index: 2;
-  background: linear-gradient(180deg, rgba(0,51,161,0) 0%, rgba(0,51,161,.08) 55%, rgba(0,145,218,.26) 92%, rgba(0,145,218,.85) 100%);
-  border-bottom: 1.5px solid #0091da; box-shadow: 0 6px 22px rgba(0,145,218,.4);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--d-brand) 0%, transparent) 0%, color-mix(in srgb, var(--d-brand) 8%, transparent) 55%, color-mix(in srgb, var(--brand-secondary, #0091da) 26%, transparent) 92%, color-mix(in srgb, var(--brand-secondary, #0091da) 85%, transparent) 100%);
+  border-bottom: 1.5px solid var(--d-accent); box-shadow: 0 6px 22px color-mix(in srgb, var(--d-accent) 40%, transparent);
   animation: adsweep 2.4s cubic-bezier(.4,0,.5,1) infinite; }
 @keyframes adsweep { 0% { top: -130px; } 100% { top: 100%; } }
 @media (prefers-reduced-motion: reduce) { .ad-scan { animation: none; } }
@@ -925,7 +977,7 @@
 .ad-check:last-child { border-bottom: 0; }
 .ad-dot { width: 8px; height: 8px; flex: none; border-radius: 50%; background: rgba(17,24,29,.18); }
 .ad-dot.good { background: #16a34a; }
-.ad-dot.progress { background: #0033a1; }
+.ad-dot.progress { background: var(--d-brand); }
 .ad-dot.exception { background: #dc2626; }
 .ad-check-t { flex: 1; min-width: 0; }
 .ad-check-t b { display: block; font-size: 13.5px; font-weight: 500; }
@@ -970,6 +1022,16 @@
 .ad-row dt { flex: 0 0 42%; font-size: 12px; color: rgba(17,24,29,.40); }
 .ad-row dd { flex: 1; font-size: 13.5px; font-weight: 500; word-break: break-word; }
 .ad-row dd.empty { color: rgba(17,24,29,.40); font-weight: 400; font-style: italic; }
+/* Edit mode: the value cell becomes an input on the same baseline, so the grid
+   does not jump when editing starts. */
+.ad-row.editing { align-items: center; }
+.ad-input { width: 100%; min-width: 0; font: inherit; font-size: 13.5px; font-weight: 500; color: inherit;
+  padding: 5px 8px; border: 1px solid rgba(17,24,29,.16); border-radius: 8px; background: #fff; }
+.ad-input::placeholder { color: rgba(17,24,29,.34); font-weight: 400; font-style: italic; }
+.ad-input:focus { outline: none; border-color: var(--d-brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--d-brand) 16%, transparent); }
+.ad-foot-row { display: flex; gap: 10px; }
+.ad-foot-row .cx-btn { flex: 1; }
+.ad-save-err { font-size: 12.5px; color: #b42318; }
 
 .ad-people { display: flex; flex-direction: column; gap: 10px; }
 .ad-person { display: flex; gap: 11px; padding: 11px 12px; border: 1px solid rgba(17,24,29,.10);
@@ -977,7 +1039,7 @@
 .ad-person b { display: block; font-size: 13.5px; }
 .ad-person span { display: block; font-size: 11.5px; color: rgba(17,24,29,.58); }
 .ad-ava { width: 34px; height: 34px; flex: none; border-radius: 11px; display: grid; place-items: center;
-  font-size: 12px; font-weight: 700; color: #fff; background: linear-gradient(135deg, #0033a1, #0091da); }
+  font-size: 12px; font-weight: 700; color: #fff; background: linear-gradient(135deg, var(--d-brand), var(--brand-secondary, #0091da)); }
 
 .ad-note { margin-top: 16px; font-size: 12.5px; color: rgba(17,24,29,.58); }
 @media (prefers-reduced-motion: reduce) { .ad, .ad-scrim { animation: none; } }
@@ -1028,3 +1090,31 @@
   0%, 100% { box-shadow: 0 0 0 0 rgba(209, 68, 58, 0); }
   50% { box-shadow: 0 0 0 5px rgba(209, 68, 58, .18), 0 0 22px rgba(209, 68, 58, .35); }
 }
+
+/* ── Document checks (Details → Document checks) ─────────────────────────── */
+.dc { display: flex; flex-direction: column; gap: 14px; }
+.dc-top { display: flex; align-items: center; gap: 16px; padding: 12px 14px; border: 1px solid var(--d-line-2); border-left: 3px solid; }
+.dc-top > div:first-child { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.dc-top b { font-size: 14px; } .dc-top span { font-size: 12px; color: var(--d-ink-3); }
+.dc-top.good { border-left-color: #12805c; } .dc-top.info { border-left-color: var(--d-brand); }
+.dc-top.warn { border-left-color: #b7791f; } .dc-top.crit { border-left-color: #b42318; }
+.dc-top .dc-done { color: #12805c; font-weight: 600; }
+.dc-act { display: flex; gap: 8px; flex: none; } .dc-act .cx-btn { width: auto; height: 38px; padding: 0 16px; font-size: 13px; white-space: nowrap; }
+.dc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; align-items: start; }
+.dc-card { border: 1px solid var(--d-line-2); padding: 12px; background: #fff; }
+.dc-head { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 8px; }
+.dc-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.dc-name b { font-size: 13.5px; } .dc-name span { font-size: 11.5px; color: var(--d-ink-3); word-break: break-all; }
+.dc-badge, .dc-chip { font-size: 10.5px; font-weight: 700; padding: 2px 7px; white-space: nowrap; }
+.dc-badge.good, .dc-chip.good { background: #e8f6ef; color: #12805c; }
+.dc-badge.info, .dc-chip.info { background: color-mix(in srgb, var(--d-brand) 10%, #fff); color: var(--d-brand); }
+.dc-badge.warn, .dc-chip.warn { background: #fdf5e6; color: #b7791f; }
+.dc-badge.crit, .dc-chip.crit { background: #fdecec; color: #b42318; }
+.dc-badge.idle, .dc-chip.idle { background: #f2f2ee; color: var(--d-ink-3); }
+.dc-lines { width: 100%; border-collapse: collapse; font-size: 12px; }
+.dc-lines td { padding: 5px 8px 5px 0; border-top: 1px solid var(--d-line-3, #f2f2ec); vertical-align: top; }
+.dc-lines td.k { width: 30%; color: var(--d-ink-3); white-space: nowrap; }
+.dc-lines td.d { line-height: 1.4; }
+.dc-rule { display: block; font-size: 10.5px; color: var(--d-ink-3); margin-top: 2px; }
+.dc-ev { margin: 8px 0 0; font-size: 11px; color: var(--d-ink-3); }
+.dc-from { font-weight: 700; color: var(--d-ink-2, #374151); }

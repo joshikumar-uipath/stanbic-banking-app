@@ -65,6 +65,42 @@ video::-webkit-media-controls { display: none !important; }
   src: url('/fonts/Poppins-900.woff2') format('woff2');
 }
 
+/* ── Slate as tokens, for the architecture relays ─────────────────────────
+   tailwind.config.js points the slate scale at these variables. :root keeps
+   Tailwind's stock slate, so slate classes elsewhere in the app are unchanged;
+   only a [data-relay-theme='light'] subtree swaps in the relay's light palette.
+   Note that palette is INVERTED against Tailwind's: -900 is white (cards), -50 is
+   navy (ink) — the relay kit is written against it. */
+:root {
+  --c-slate-50:  248 250 252;
+  --c-slate-100: 241 245 249;
+  --c-slate-200: 226 232 240;
+  --c-slate-300: 203 213 225;
+  --c-slate-400: 148 163 184;
+  --c-slate-500: 100 116 139;
+  --c-slate-600: 71 85 105;
+  --c-slate-700: 51 65 85;
+  --c-slate-800: 30 41 59;
+  --c-slate-900: 15 23 42;
+  --c-slate-950: 2 6 23;
+  --c-line:      51 65 85;
+}
+[data-relay-theme='light'] {
+  color-scheme: light;
+  --c-slate-950: 246 246 246;  /* #F6F6F6  page canvas        */
+  --c-slate-900: 255 255 255;  /* #FFFFFF  cards / panels      */
+  --c-slate-800: 226 226 226;  /* #E2E2E2  borders / chips     */
+  --c-slate-700: 214 214 214;  /* #D6D6D6  control borders     */
+  --c-slate-600: 130 130 130;  /* #828282  faintest text/icon  */
+  --c-slate-500: 110 110 110;  /* #6E6E6E  secondary           */
+  --c-slate-400: 97 97 97;     /* #616161  muted               */
+  --c-slate-300: 72 72 72;     /* #484848  body                */
+  --c-slate-200: 52 52 52;     /* #343434  strong              */
+  --c-slate-100: 36 44 48;     /* #242C30                      */
+  --c-slate-50:  24 33 38;     /* #182126  headings (navy)     */
+  --c-line:      80 80 80;     /* #505050  dashed dividers     */
+}
+
 /* ── UiPath Brand Base ───────────────────────────────────────────── */
 /* Robotic Orange: #FF3333 | Agentic Teal: #FF3333 | Deep Blue: #182126 */
 

@@ -1,0 +1,96 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 1006 >>
+stream
+BT
+/F1 16 Tf
+1 0 0 1 56 780 Tm
+(Account Opening Form) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 760 Tm
+(DEMO DATA - not a real customer. Replace when FirstBank supplies the real document.) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 728 Tm
+(Reference          EVB-003) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 708 Tm
+(Name               Ngozi Eze) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 688 Tm
+(Date of birth      25/07/1992) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 668 Tm
+(BVN                22210000103) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 648 Tm
+(NIN                10120000103) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 628 Tm
+(Phone              08030000103) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 608 Tm
+(Email              ngozi.eze@payroll.example) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 588 Tm
+(Address            7 Adeola Odeku St, Lagos, Lagos State) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 568 Tm
+(Entity type        Sole Trader) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 548 Tm
+(Product            Current) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 516 Tm
+(Signature  ______________________    Date  ____________) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000001299 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1369
+%%EOF

@@ -8,3 +8,10 @@
   border: 0;
   display: block;
 }
+
+/* Inside the employee phone: one tab's content area, not the whole window. */
+.ops-frame.ops-frame-m {
+  position: absolute;
+}
+/* While the console loads, show the phone page colour — not the black backdrop. */
+.ops-frame.ops-frame-m { background: #f3f5f7; }

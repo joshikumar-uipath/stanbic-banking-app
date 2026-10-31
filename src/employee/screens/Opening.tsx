@@ -5,24 +5,22 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useState } from 'react';
 import { stateMeta, fullName, isCorporate, FUNNEL_STATES, type OnboardingCase } from '../../onboarding';
-import { FILTERS, SOURCES, KINDS, matchesFilters, type Filter, type Src, type Kind } from '../caseFilters';
+import { FILTERS, KINDS, matchesFilters, type Filter, type Kind } from '../caseFilters';
 import { useMaestroStates, MaestroCell } from '../maestroStatus';
 import type { LiveStateLite } from '../../onboarding/maestro';
 import AccountOpeningFlow from '../../customer/flow';
 import CaseDetail from './CaseDetail';
-import BulkUpload from './BulkUpload';
 import { I, Tag, Dot, Stat, type Tone } from '../ui';
 import { ago } from '../time';
 
-// Sentinel for the right-pane mode: '' = new single capture, '__bulk__' = bulk
-// upload, a case id = track that case, null = nothing open.
-const BULK = '__bulk__';
+// Right-pane mode: '' = new single capture, a case id = track that case,
+// null = nothing open. Bulk is no longer one of these — it outgrew the pane and
+// became its own destination (see employee/bulk/BulkOpening).
 
 const TONE: Record<string, Tone> = { good: 'good', pending: 'warn', exception: 'crit', progress: 'info', neutral: 'idle' };
 
-export default function Opening({ cases, flow, setFlow, onNewApplication, captureSeq }: { cases: OnboardingCase[]; flow: string | null; setFlow: (v: string | null) => void; onNewApplication: () => void; captureSeq: number }) {
+export default function Opening({ cases, flow, setFlow, onNewApplication, captureSeq, onBulk }: { cases: OnboardingCase[]; flow: string | null; setFlow: (v: string | null) => void; onNewApplication: () => void; captureSeq: number; onBulk: () => void }) {
   const [filter, setFilter] = useState<Filter>('all');
-  const [source, setSource] = useState<Src>('all');
   const [kind, setKind] = useState<Kind>('all');
   const [q, setQ] = useState('');
   // Which groups the banker has expanded/collapsed by hand. Bulk batches start
@@ -37,7 +35,7 @@ export default function Opening({ cases, flow, setFlow, onNewApplication, captur
   const [revealed, setRevealed] = useState<string | null>(null);
   if (flow !== revealed) {
     setRevealed(flow);
-    const target = flow && flow !== '' && flow !== BULK ? cases.find((c) => c.id === flow) : null;
+    const target = flow && flow !== '' ? cases.find((c) => c.id === flow) : null;
     if (target) {
       setOpenMap((m) => {
         const next = { ...m };
@@ -50,11 +48,13 @@ export default function Opening({ cases, flow, setFlow, onNewApplication, captur
   }
 
   const list = useMemo(() => {
-    let l = cases.filter((c) => matchesFilters(c, { filter, source, kind }));
+    // `source: 'all'` always — this list is the whole pipeline. Narrowing it to
+    // bulk is what the Batches workbench is for, and it does the job properly.
+    let l = cases.filter((c) => matchesFilters(c, { filter, source: 'all', kind }));
     const t = q.trim().toLowerCase();
     if (t) l = l.filter((c) => fullName(c).toLowerCase().includes(t) || c.id.toLowerCase().includes(t));
     return l;
-  }, [cases, filter, source, kind, q]);
+  }, [cases, filter, kind, q]);
 
   // A batch upload is one node; loose single captures share a "Walk-in" node.
   const groups = useMemo(() => buildGroups(list), [list]);
@@ -80,7 +80,13 @@ export default function Opening({ cases, flow, setFlow, onNewApplication, captur
   // Read the selected case out of the live list rather than holding a copy, so an
   // action taken in the right pane re-renders it as the store moves the case on.
   // '' (new) and BULK are pane modes, not case ids.
-  const picked = flow && flow !== '' && flow !== BULK ? cases.find((c) => c.id === flow) ?? null : null;
+  const picked = flow && flow !== '' ? cases.find((c) => c.id === flow) ?? null : null;
+
+  // Batches with anything still moving, and how many of their rows are parked on
+  // a person — the two numbers that decide whether the workbench is worth opening.
+  const batchCount = new Set(cases.filter((c) => c.batchId && c.state !== 'FULLY_ACTIVATED').map((c) => c.batchId)).size;
+  const needsPerson = cases.filter((c) => c.batchId
+    && (c.reviewState === 'awaiting' || (c.reviewState === 'approved' && !c.accountNumber))).length;
 
   const open = cases.filter((c) => c.state !== 'FULLY_ACTIVATED').length;
   const waiting = cases.filter((c) => c.state === 'PENDING_LIVENESS' || c.state === 'PENDING_DOCUMENTS').length;
@@ -124,7 +130,7 @@ export default function Opening({ cases, flow, setFlow, onNewApplication, captur
                 <div className="sub">Assisted capture · branch pipeline</div>
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button className="dk-btn lg" onClick={() => setFlow(BULK)}><I n="layers" s={15} />Bulk upload</button>
+                <button className="dk-btn lg" onClick={onBulk}><I n="layers" s={15} />Bulk upload</button>
                 <button className="dk-btn pri lg" onClick={onNewApplication}><I n="plus" s={15} w={2.4} />New application</button>
               </div>
             </div>
@@ -140,11 +146,6 @@ export default function Opening({ cases, flow, setFlow, onNewApplication, captur
                 ))}
               </div>
               <div className="dk-segs">
-                {SOURCES.map((f) => (
-                  <button key={f.id} aria-pressed={source === f.id} onClick={() => setSource(f.id)}>{f.label}</button>
-                ))}
-              </div>
-              <div className="dk-segs">
                 {KINDS.map((f) => (
                   <button key={f.id} aria-pressed={kind === f.id} onClick={() => setKind(f.id)}>{f.label}</button>
                 ))}
@@ -153,6 +154,18 @@ export default function Opening({ cases, flow, setFlow, onNewApplication, captur
                 <I n={anyOpen ? 'collapse' : 'expand'} s={14} />{anyOpen ? 'Collapse all' : 'Expand all'}
               </button>
             </div>
+
+            {/* Where the Bulk/Single filter used to be. A batch is worked in its
+                own screen — intake rejections, the review queue, authorisation —
+                none of which exist here, so point at it rather than pretending
+                a filtered list is the same thing. */}
+            {batchCount > 0 && (
+              <button className="dk-across" onClick={onBulk}>
+                <I n="layers" s={14} />
+                <span><b>{batchCount} batch{batchCount === 1 ? '' : 'es'}</b> in flight{needsPerson > 0 ? ` · ${needsPerson} need${needsPerson === 1 ? 's' : ''} a person` : ''}</span>
+                <span className="go">Open in Batches →</span>
+              </button>
+            )}
 
             {list.length ? (
               <GroupedTable groups={groups} active={flow} onPick={setFlow} isOpen={isOpen} toggle={toggle} mstates={mstates} />
@@ -168,11 +181,10 @@ export default function Opening({ cases, flow, setFlow, onNewApplication, captur
           customer, so customer voice is correct there. An *existing* case gets
           the staff view: what to do about it, in the banker's voice. */}
       <div className="p r" style={{ position: 'relative' }}>
-        {(flow === null || composing) && <Blank onNew={onNewApplication} onBulk={() => setFlow(BULK)} />}
-        {flow === BULK && <BulkUpload onExit={() => setFlow(null)} />}
-        {flow && flow !== BULK && flow !== '' && (picked
+        {(flow === null || composing) && <Blank onNew={onNewApplication} onBulk={onBulk} />}
+        {flow && flow !== '' && (picked
           ? <CaseDetail key={picked.id} c={picked} onClose={() => setFlow(null)} />
-          : <Blank onNew={onNewApplication} onBulk={() => setFlow(BULK)} />)}
+          : <Blank onNew={onNewApplication} onBulk={onBulk} />)}
       </div>
 
       {composing && (

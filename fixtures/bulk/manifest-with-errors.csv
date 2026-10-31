@@ -1,0 +1,9 @@
+Reference,First name,Last name,BVN,NIN,Phone,Email
+EVB-001,Adaeze,Okafor,22210000101,10120000101,08030000101,adaeze.okafor@payroll.example
+EVB-002,Chidi,Balogun,22210000102,10120000102,08030000102,chidi.balogun@payroll.example
+EVB-003,Ngozi,Eze,22210000103,10120000103,08030000103,ngozi.eze@payroll.example
+,Nameless,Row,22210000901,10120000901,08030000901,nameless@payroll.example
+EVB-901,,,22210000902,10120000902,08030000902,noname@payroll.example
+EVB-902,Missing,Identifiers,,,08030000903,noids@payroll.example
+EVB-903,No,Contact,22210000904,10120000904,,
+EVB-001,Duplicate,Reference,22210000905,10120000905,08030000905,dupe@payroll.example

@@ -14,9 +14,13 @@ interface Props {
    * resolveTenantConnection() and rerender the auth tree.
    */
   onResetTenant?: () => void;
+  /** The employee app's current role, shown with a way to switch it. */
+  roleName?: string;
+  roleSub?: string;
+  onSwitchRole?: () => void;
 }
 
-export default function ProfileTab({ userName, userEmail, onLogout, onResetTenant }: Props) {
+export default function ProfileTab({ userName, userEmail, onLogout, onResetTenant, roleName, roleSub, onSwitchRole }: Props) {
   const { theme, t, tr, toggleTheme, lang, setLang, currentLanguage } = useTheme();
   const { branding } = useConfig();
   const [showLangPicker, setShowLangPicker] = useState(false);
@@ -132,6 +136,33 @@ export default function ProfileTab({ userName, userEmail, onLogout, onResetTenan
 
         {/* Settings */}
         <div className="px-4 flex flex-col gap-5 pb-6">
+
+          {/* Work role — which job this app is doing. Switchable when the admin allows it. */}
+          {roleName && (
+            <div>
+              <p className="text-xs font-semibold tracking-widest mb-2 px-1" style={{ color: t.textLabel }}>WORK ROLE</p>
+              <button
+                type="button" onClick={onSwitchRole} disabled={!onSwitchRole}
+                className="w-full flex items-center gap-3 px-4 py-3.5 rounded-2xl text-left transition-colors active:opacity-70"
+                style={{ background: t.bgCard, border: `1px solid ${t.border}`, cursor: onSwitchRole ? 'pointer' : 'default' }}
+              >
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: t.bgIconBox }}>
+                  <svg className="w-4 h-4" style={{ color: 'var(--brand-primary)' }} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2m-12 0h16a1 1 0 011 1v10a2 2 0 01-2 2H5a2 2 0 01-2-2V8a1 1 0 011-1z" />
+                  </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold" style={{ color: t.textBody }}>{roleName}</div>
+                  {roleSub && <div className="text-xs mt-0.5" style={{ color: t.textMuted }}>{roleSub}</div>}
+                </div>
+                {onSwitchRole ? (
+                  <span className="text-xs font-semibold" style={{ color: 'var(--brand-primary)' }}>Switch</span>
+                ) : (
+                  <span className="text-xs" style={{ color: t.textMuted }}>Set by admin</span>
+                )}
+              </button>
+            </div>
+          )}
 
           {/* Preferences */}
           <div>

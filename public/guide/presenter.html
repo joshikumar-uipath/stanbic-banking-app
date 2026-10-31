@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Presenter and admin guide — Account opening</title>
+<script>(function () {
+  var here = "stanbic", want = "stanbic";
+  try {
+    var q = new URLSearchParams(location.search).get("bank");
+    if (q) want = q;
+    else {
+      var s = JSON.parse(localStorage.getItem("zara_local_profiles_v1") || "null");
+      var p = s && s.profiles && s.profiles.find(function (x) { return x.id === s.activeId; });
+      var n = (p && p.config && p.config.branding && p.config.branding.appName) || "";
+      if (/first\s*bank|\bfbn\b/i.test(n)) want = "firstbank";
+    }
+  } catch (e) {}
+  if (want !== here && (want === "stanbic" || want === "firstbank")) {
+    var f = location.pathname.split("/").pop() || "index.html";
+    location.replace((here === "stanbic" ? "firstbank/" : "../") + f + location.hash);
+  }
+})();</script>
+<meta name="description" content="The launcher opens every surface; the tools behind it are the bank’s systems stood in for — the case in Maestro, the Kafka stream, Finacle, the notification service and FaceID — plus the admin console that sets the brand, the market and the operating rules." />
+<link rel="icon" href="../stanbic-favicon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./guide.css" />
+
+</head>
+<body>
+<header class="g-top">
+  <div class="g-top-in">
+    <a class="g-brand" href="./index.html"><img src="../stanbic-logo.png" alt="Stanbic IBTC" /><span><b>Feature guide</b><em>Account opening POC</em></span></a>
+    <a class="g-back" href="../">← Launcher</a>
+  </div>
+  <nav class="g-tabs" aria-label="Personas"><div class="g-tabs-in"><a href="./index.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h11a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3V4Z"/><path d="M4 17a3 3 0 0 1 3-3h11"/></svg><span>Overview</span></a><a href="./brd.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>BRD coverage</span></a><a href="./customer.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><path d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/></svg><span>Customer</span></a><a href="./rm.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18v13H3z"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/></svg><span>Relationship manager</span></a><a href="./bulkops.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M2 16l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg><span>Bulk operations</span></a><a href="./ops.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v7H4z"/><path d="M14 4h6v4h-6z"/><path d="M14 12h6v8h-6z"/><path d="M4 15h6v5H4z"/></svg><span>Operations analyst</span></a><a href="./management.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v7H4z"/><path d="M14 4h6v4h-6z"/><path d="M14 12h6v8h-6z"/><path d="M4 15h6v5H4z"/></svg><span>Management</span></a><a href="./presenter.html" class="on" aria-current=page><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18v12H3z"/><path d="M8 20h8"/><path d="M12 16v4"/><path d="M10 7.5v5l4.5-2.5z"/></svg><span>Presenter and admin</span></a></div></nav>
+</header>
+
+<main class="g-wrap">
+  <section class="g-hero">
+    <span class="g-hero-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18v12H3z"/><path d="M8 20h8"/><path d="M12 16v4"/><path d="M10 7.5v5l4.5-2.5z"/></svg></span>
+    <div class="g-hero-t">
+      <p class="g-eyebrow">Persona guide · 5 flows · 22 steps</p>
+      <h1>Presenter and admin</h1>
+      <p class="g-who">Whoever runs the demo · Launcher and the tools behind the scenes</p>
+      <p class="g-intro">The launcher opens every surface; the tools behind it are the bank’s systems stood in for — the case in Maestro, the Kafka stream, Finacle, the notification service and FaceID — plus the admin console that sets the brand, the market and the operating rules.</p>
+    </div>
+    <a class="g-open lg" href="http://localhost:5180/" target="_blank" rel="noopener"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open Launcher and the tools behind the scenes</a>
+  </section>
+  <section class="g-before"><p class="h">Before you start</p><ul><li>Open localhost:5180. Every card opens in a new tab.</li><li>Case management’s “▶ Run in Maestro” and “Approve {Stage}” act on the real tenant; the admin console’s Connect, Provision and “Publish to Data Fabric” write to the tenant you connect.</li></ul></section>
+  <div class="g-grid">
+    <aside class="g-toc"><p class="h">Flows on this page</p><ol><li><a href="#launcher"><span class="n">01</span><span class="t">Open the demo and reset it</span><span class="c">3</span></a></li><li><a href="#cases"><span class="n">02</span><span class="t">Show the case in Maestro terms</span><span class="c">3</span></a></li><li><a href="#systems"><span class="n">03</span><span class="t">The bank’s systems: Kafka, Finacle, notifications</span><span class="c">5</span></a></li><li><a href="#faceid"><span class="n">04</span><span class="t">FaceID: the console and the kiosk</span><span class="c">6</span></a></li><li><a href="#admin"><span class="n">05</span><span class="t">Configure the demo</span><span class="c">5</span></a></li></ol><button type="button" class="g-print" onclick="window.print()">Print or save as PDF</button></aside>
+    <div class="g-main"><section class="g-flow" id="launcher">
+  <div class="g-flow-h">
+    <span class="g-flow-no">01</span>
+    <div class="g-flow-t">
+      <h2>Open the demo and reset it</h2>
+      <p class="g-meta"><span>1 min</span><span>Sample · —</span><span>3 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">Role first: you pick who you are, and it opens the tool that role uses.</p>
+  <ol class="g-steps"><li class="g-step" id="launcher-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>The launcher</p>
+    <p class="g-step-b">Open localhost:5180.</p>
+    <p class="g-see"><b>You should see</b>The feature guide banner, then Who are you? — Relationship Manager, Operations analyst, Customer — each with its other surfaces and a “Step-by-step guide” link.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-launcher.jpg" data-cap="Presenter and admin · Open the demo and reset it · step 1: The launcher"><img loading="lazy" src="./shots/p-launcher.jpg" alt="Screenshot: The launcher" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="launcher-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Behind the scenes</p>
+    <p class="g-step-b">Scroll down.</p>
+    <p class="g-see"><b>You should see</b>The feature guide, Mock Kafka console, Mock Finacle UI, Notification service, Control tower, Case management and FaceID.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-launcher-tools.jpg" data-cap="Presenter and admin · Open the demo and reset it · step 2: Behind the scenes"><img loading="lazy" src="./shots/p-launcher-tools.jpg" alt="Screenshot: Behind the scenes" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step noshot" id="launcher-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Reset before a run</p>
+    <p class="g-step-b">Click “↺ Reset demo data”, then “Yes, reset”.</p>
+    <p class="g-see"><b>You should see</b>The pipeline reseeds: exceptions come back and ages are current. Branding is kept. Records on the shared tenant are not touched.</p>
+  </div>
+  
+</li></ol>
+</section><section class="g-flow" id="cases">
+  <div class="g-flow-h">
+    <span class="g-flow-no">02</span>
+    <div class="g-flow-t">
+      <h2>Show the case in Maestro terms</h2>
+      <p class="g-meta"><span>2 min</span><span>Sample · Blessing Eze; Amina Obi for a secondary stage</span><span>3 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#cases" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">The OnboardingCase as a case plan: five stages, the tasks in each — agent, robot, human, app, gateway — and the four stages a case can divert into.</p>
+  <ol class="g-steps"><li class="g-step" id="cases-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>The canvas</p>
+    <p class="g-step-b">Open Case management from the launcher.</p>
+    <p class="g-see"><b>You should see</b>OnboardingCase with Start onboarding, then Intake, Verification, Decision, Activation and Closure, each with its SLA, duration and tasks, and where it may route to.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-cases.jpg" data-cap="Presenter and admin · Show the case in Maestro terms · step 1: The canvas"><img loading="lazy" src="./shots/p-cases.jpg" alt="Screenshot: The canvas" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="cases-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Secondary stages</p>
+    <p class="g-step-b">Scroll down.</p>
+    <p class="g-see"><b>You should see</b>Compliance escalations, EDD review, Pending customer and Declined / withdrawn, with where each comes from and whether it loops back.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-cases-secondary.jpg" data-cap="Presenter and admin · Show the case in Maestro terms · step 2: Secondary stages"><img loading="lazy" src="./shots/p-cases-secondary.jpg" alt="Screenshot: Secondary stages" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="cases-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Pick a case</p>
+    <p class="g-step-b">Choose AO-2026-000137 · Amina Obi in the case list.</p>
+    <p class="g-see"><b>You should see</b>“Compliance hold”: the case lit in Compliance escalations. The canvas is drawn from the local record; “▶ Run in Maestro” starts a new real instance.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-cases-pick.jpg" data-cap="Presenter and admin · Show the case in Maestro terms · step 3: Pick a case"><img loading="lazy" src="./shots/p-cases-pick.jpg" alt="Screenshot: Pick a case" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="systems">
+  <div class="g-flow-h">
+    <span class="g-flow-no">03</span>
+    <div class="g-flow-t">
+      <h2>The bank’s systems: Kafka, Finacle, notifications</h2>
+      <p class="g-meta"><span>2 min</span><span>Sample · Any</span><span>5 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#kafka" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">Every step on the case lands somewhere the bank already runs. These stand-ins read the same store, so they move as the demo moves.</p>
+  <ol class="g-steps"><li class="g-step" id="systems-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Kafka event stream</p>
+    <p class="g-step-b">Open Mock Kafka console.</p>
+    <p class="g-see"><b>You should see</b>Events across the eight topics — account-opening-requested, nin-validation, bvn-validation, account-created, bulk-upload, exception-queue, customer-notification…</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-kafka.jpg" data-cap="Presenter and admin · The bank’s systems: Kafka, Finacle, notifications · step 1: Kafka event stream"><img loading="lazy" src="./shots/p-kafka.jpg" alt="Screenshot: Kafka event stream" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="systems-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>One topic</p>
+    <p class="g-step-b">Click account-created.</p>
+    <p class="g-see"><b>You should see</b>Only the “Finacle account … created for …” events.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-kafka-topic.jpg" data-cap="Presenter and admin · The bank’s systems: Kafka, Finacle, notifications · step 2: One topic"><img loading="lazy" src="./shots/p-kafka-topic.jpg" alt="Screenshot: One topic" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="systems-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Finacle</p>
+    <p class="g-step-b">Open Mock Finacle UI.</p>
+    <p class="g-see"><b>You should see</b>CIFs, active accounts, “Limited (KYC pending)” and opened today, and every account with its status.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-finacle.jpg" data-cap="Presenter and admin · The bank’s systems: Kafka, Finacle, notifications · step 3: Finacle"><img loading="lazy" src="./shots/p-finacle.jpg" alt="Screenshot: Finacle" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="systems-4">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">4</span>An account</p>
+    <p class="g-step-b">Click Blessing Eze.</p>
+    <p class="g-see"><b>You should see</b>The account card, customer and account details.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-finacle-account.jpg" data-cap="Presenter and admin · The bank’s systems: Kafka, Finacle, notifications · step 4: An account"><img loading="lazy" src="./shots/p-finacle-account.jpg" alt="Screenshot: An account" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="systems-5">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">5</span>Notification service</p>
+    <p class="g-step-b">Open Notification service, then click Blessing Eze.</p>
+    <p class="g-see"><b>You should see</b>Every SMS and WhatsApp the customer received, with delivery status. Nothing is actually sent.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-comms-thread.jpg" data-cap="Presenter and admin · The bank’s systems: Kafka, Finacle, notifications · step 5: Notification service"><img loading="lazy" src="./shots/p-comms-thread.jpg" alt="Screenshot: Notification service" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="faceid">
+  <div class="g-flow-h">
+    <span class="g-flow-no">04</span>
+    <div class="g-flow-t">
+      <h2>FaceID: the console and the kiosk</h2>
+      <p class="g-meta"><span>2 min</span><span>Sample · —</span><span>6 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#faceid" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">The selfie check is a liveness and 1:1 match service. The console is where the bank reviews every check; the kiosk is the walk-up version.</p>
+  <ol class="g-steps"><li class="g-step" id="faceid-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Sign in</p>
+    <p class="g-step-b">Open FaceID Verify console and click “Sign in with Stanbic IBTC”.</p>
+    <p class="g-see"><b>You should see</b>“Verify a real, live person. In seconds.” No credentials are asked for.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-faceid-login.jpg" data-cap="Presenter and admin · FaceID: the console and the kiosk · step 1: Sign in"><img loading="lazy" src="./shots/p-faceid-login.jpg" alt="Screenshot: Sign in" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="faceid-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Dashboard</p>
+    <p class="g-step-b">You land on the dashboard.</p>
+    <p class="g-see"><b>You should see</b>Enrolled identities, verifications today, pass rate, spoofs blocked, recent verifications and what needs attention.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-faceid.jpg" data-cap="Presenter and admin · FaceID: the console and the kiosk · step 2: Dashboard"><img loading="lazy" src="./shots/p-faceid.jpg" alt="Screenshot: Dashboard" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="faceid-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Identities</p>
+    <p class="g-step-b">Click Identities.</p>
+    <p class="g-see"><b>You should see</b>Every enrolled identity (the opened accounts) with “Verify now”, “Update photo” and remove.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-faceid-identities.jpg" data-cap="Presenter and admin · FaceID: the console and the kiosk · step 3: Identities"><img loading="lazy" src="./shots/p-faceid-identities.jpg" alt="Screenshot: Identities" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="faceid-4">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">4</span>Settings</p>
+    <p class="g-step-b">Click Settings.</p>
+    <p class="g-see"><b>You should see</b>Face match similarity 80%, liveness confidence 70%, detection mode, region and security.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-faceid-settings.jpg" data-cap="Presenter and admin · FaceID: the console and the kiosk · step 4: Settings"><img loading="lazy" src="./shots/p-faceid-settings.jpg" alt="Screenshot: Settings" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="faceid-5">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">5</span>The kiosk</p>
+    <p class="g-step-b">Open FaceID kiosk. For a result without a camera add ?demo=success or ?demo=mismatch before the #.</p>
+    <p class="g-see"><b>You should see</b>“Customer Verification Complete” with face match and liveness passed. A real scan uses the camera and AWS.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-kiosk-success.jpg" data-cap="Presenter and admin · FaceID: the console and the kiosk · step 5: The kiosk"><img loading="lazy" src="./shots/p-kiosk-success.jpg" alt="Screenshot: The kiosk" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="faceid-6">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">6</span>A failed match</p>
+    <p class="g-step-b">Use ?demo=mismatch.</p>
+    <p class="g-see"><b>You should see</b>“Verification Failed — the submitted selfie does not sufficiently match the identity document on file.”</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-kiosk-mismatch.jpg" data-cap="Presenter and admin · FaceID: the console and the kiosk · step 6: A failed match"><img loading="lazy" src="./shots/p-kiosk-mismatch.jpg" alt="Screenshot: A failed match" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="admin">
+  <div class="g-flow-h">
+    <span class="g-flow-no">05</span>
+    <div class="g-flow-t">
+      <h2>Configure the demo</h2>
+      <p class="g-meta"><span>2 min</span><span>Sample · admin / admin</span><span>5 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#admin" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">Brand, market, SLAs and routing are configuration, not code — the same app can be shown to another bank or country.</p>
+  <ol class="g-steps"><li class="g-step" id="admin-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Sign in</p>
+    <p class="g-step-b">Open localhost:5180/#admin (it is deliberately not on the launcher) and sign in with admin / admin.</p>
+    <p class="g-see"><b>You should see</b>“Demo admin gate — sign in with admin / admin.”</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-admin-login.jpg" data-cap="Presenter and admin · Configure the demo · step 1: Sign in"><img loading="lazy" src="./shots/p-admin-login.jpg" alt="Screenshot: Sign in" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="admin-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Choose a configuration</p>
+    <p class="g-step-b">Pick a saved configuration or create one.</p>
+    <p class="g-see"><b>You should see</b>“Choose a configuration” with Load preset, Rename, Delete and Create. “Connect a UiPath tenant instead” uses a PAT.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-admin-picker.jpg" data-cap="Presenter and admin · Configure the demo · step 2: Choose a configuration"><img loading="lazy" src="./shots/p-admin-picker.jpg" alt="Screenshot: Choose a configuration" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="admin-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Branding and market</p>
+    <p class="g-step-b">Load one. The Branding tab holds the app name, colours, logo and Country.</p>
+    <p class="g-see"><b>You should see</b>Changing Country relocalises names, currency, phone and ID formats and the KYC authorities — and reseeds the store.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-admin-branding.jpg" data-cap="Presenter and admin · Configure the demo · step 3: Branding and market"><img loading="lazy" src="./shots/p-admin-branding.jpg" alt="Screenshot: Branding and market" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="admin-4">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">4</span>Operations</p>
+    <p class="g-step-b">Click Operations.</p>
+    <p class="g-see"><b>You should see</b>Straight-through target, exception SLA, retry backoff and queue routing (cause → queue → owner) — what the control tower measures against.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-admin-ops.jpg" data-cap="Presenter and admin · Configure the demo · step 4: Operations"><img loading="lazy" src="./shots/p-admin-ops.jpg" alt="Screenshot: Operations" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="admin-5">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">5</span>Features</p>
+    <p class="g-step-b">Click Features.</p>
+    <p class="g-see"><b>You should see</b>Feature flags and the bottom-navigation tabs. “Save configuration” keeps it in this browser; “Publish to Data Fabric” writes it to the tenant.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/p-admin-features.jpg" data-cap="Presenter and admin · Configure the demo · step 5: Features"><img loading="lazy" src="./shots/p-admin-features.jpg" alt="Screenshot: Features" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><nav class="g-pager"><a href="./management.html"><em>Previous</em>Management</a><a class="nx" href="./index.html"><em>Back to</em>Overview</a></nav></div>
+  </div>
+</main>
+<div class="g-lb" id="lb" hidden>
+  <button type="button" class="g-lb-x" aria-label="Close">✕</button>
+  <button type="button" class="g-lb-p" aria-label="Previous screenshot">‹</button>
+  <figure><img alt="" /><figcaption></figcaption></figure>
+  <button type="button" class="g-lb-n" aria-label="Next screenshot">›</button>
+</div>
+<script src="./guide.js"></script>
+</body>
+</html>

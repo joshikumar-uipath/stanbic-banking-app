@@ -5,16 +5,21 @@
 // primary signatory's identity (for validations/pipeline) plus the full entity
 // metadata (see EntityInfo). Same shared OnboardingStore as the individual flow.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { store, CORPORATE_ACCOUNT_TYPE, type OnboardingCase } from '../onboarding';
 import { getActiveCountry } from '../config/countries';
 import { useConfig } from '../config';
 import { Button, Field, Note, Rail, KV, Brand } from './ui';
 import Icon from './icons';
 import type { ApplyMode } from './Apply';
-import { extractAof } from './ixp';
-import { attachmentReadUrl, clearPendingExtraction, corporateMaestroReady, loadPendingExtraction, savePendingExtraction, startCorporateCase, uploadCaseAttachment, type JobAttachmentRef, type PendingExtraction } from '../onboarding/maestro-corporate';
+import { clearPendingExtraction, corporateMaestroReady, loadPendingExtraction, startCorporateCase, type JobAttachmentRef, type PendingExtraction } from '../onboarding/maestro-corporate';
 import { fingerprint } from '../onboarding/extractionCache';
+import { analyseFile, rememberFingerprint, type DocFacts } from '../integrations/docChecks';
+import PackageUpload from './PackageUpload';
+import { useFormRead, startWithRetry } from './useFormRead';
+import { packageFacts, type PackageResult, type Row as PackageRow } from '../integrations/packageDocs';
+import { confirmPackageReview } from '../integrations/packageCase';
+import { savePackage } from '../integrations/packageStore';
 import ExtractionReview, { type ReviewField } from './ExtractionReview';
 import { linkInstance } from '../onboarding/maestro';
 
@@ -31,17 +36,6 @@ function matchOption(raw: string, options: string[]): string | null {
   return options.find((o) => s.includes(o.toLowerCase()) || o.toLowerCase().includes(s)) ?? null;
 }
 
-/** IXP reads the street line and the city/state boxes separately, but on this form the
- *  street line usually already spells out the city and state — so only append the parts
- *  the address doesn't already contain, instead of repeating them. */
-function joinAddress(address: string, city: string, state: string): string {
-  const base = (address || '').trim();
-  const seen = base.toLowerCase();
-  const extra = [city, state]
-    .map((p) => (p || '').trim())
-    .filter((p) => p && !seen.includes(p.toLowerCase()));
-  return [base, ...extra].filter(Boolean).join(', ');
-}
 
 type Dir = { name: string; bvn: string; idType: string; idNumber: string; phone: string; email: string; role: string };
 type Corp = { company: string; rc: string; bizType: string; sector: string; tin: string; turnover: string; address: string; email: string; phone: string };
@@ -50,24 +44,9 @@ const BIZ_TYPES = ['Limited Liability Company', 'Partnership', 'Sole Proprietor'
 const ROLES = ['Director', 'Shareholder', 'Signatory'];
 const TURNOVERS = [`Less than ${CUR}400m`, `${CUR}400m – ${CUR}1bn`, `${CUR}1bn – ${CUR}4bn`, `Greater than ${CUR}4bn`];
 
-/** Stands in on the desk between "form uploaded" and "we know the company name".
- *  Never the file name — a record is the business, not the scan it arrived on. */
-const PLACEHOLDER_NAME = 'Business application';
-
 const EMPTY_DIR: Dir = { name: '', bvn: '', idType: 'International Passport', idNumber: '', phone: '', email: '', role: 'Director' };
 const EMPTY_CORP: Corp = { company: '', rc: '', bizType: BIZ_TYPES[0], sector: '', tin: '', turnover: TURNOVERS[0], address: '', email: '', phone: '' };
 
-// Demo Document Understanding result for the corporate AOF — company + directors.
-const EXTRACTED_CORP: Corp = {
-  company: 'George Emore Technical Enterprises Ltd', rc: '961813',
-  bizType: 'Limited Liability Company', sector: 'Information Technology',
-  tin: '26224878833179', turnover: TURNOVERS[0],
-  address: '45 Ajose Street, Mende, Maryland', email: 'eemore@gmail.com', phone: '08027317889',
-};
-const EXTRACTED_DIRS: Dir[] = [
-  { name: 'Efe George Emore', bvn: '22143511463', idType: 'International Passport', idNumber: 'B03199156', phone: '08027317889', email: 'eemore@gmail.com', role: 'Director' },
-  { name: 'Kehinde Omotayo Akerele', bvn: '22148013170', idType: 'International Passport', idNumber: 'B00597328', phone: '08066526627', email: 'meetsweetkenny@yahoo.com', role: 'Director' },
-];
 
 
 const STEPS = ['Business', 'Directors', 'Review'];
@@ -94,7 +73,7 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [doc, setDoc] = useState<
-    { name: string; phase: 'reading'; note?: string } | { name: string; phase: 'done'; source: 'ixp' | 'sample' } | null
+    { name: string; phase: 'reading'; note?: string } | { name: string; phase: 'done'; source?: 'ixp' | 'sample' } | null
   >(null);
   // The uploaded form, parked as an Orchestrator attachment so the case can read it.
   // The screen fills itself from IXP for immediate review; the case re-reads the same
@@ -125,7 +104,14 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
     });
   }, []);
   // The record opened at upload. Submit fills it in rather than creating a second one.
-  const [draftId, setDraftId] = useState<string | null>(null);
+  const [draftId] = useState<string | null>(null);
+  /** What the document checks read off the uploaded pack (BR-DOC-01, 07, 08). */
+  const [docFacts, setDocFacts] = useState<DocFacts | null>(null);
+  /** The documents of an uploaded package (the package flow — separate from the form upload). */
+  const [pkgFacts, setPkgFacts] = useState<DocFacts[]>([]);
+  /** The package's confirmed rows — they answer the case's own extraction review. */
+  const [pkgRows, setPkgRows] = useState<PackageRow[]>([]);
+  const [pkgRes, setPkgRes] = useState<PackageResult | null>(null);
 
   const set = (k: keyof Corp) => (e: React.ChangeEvent<HTMLInputElement>) => setV((p) => ({ ...p, [k]: e.target.value }));
   const setDir = (i: number, k: keyof Dir, val: string) => setDirs((ds) => ds.map((d, j) => (j === i ? { ...d, [k]: val } : d)));
@@ -141,102 +127,25 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
     try { await store.update(id, { firstName: name, lastName: '' }); } catch { /* keeps the placeholder */ }
   };
 
+  // "Have a completed form? Upload it": read in the browser and shown being
+  // scanned (useFormRead → PackageReview). The case starts at Submit like any
+  // application — nothing here waits on IXP or on the network.
+  const applyRef = useRef<(r: PackageResult) => void>(() => {});
+  const formRead = useFormRead('business', (r, name) => {
+    applyRef.current(r);
+    setDoc({ name, phase: 'done' });
+    setReviewDone(true);
+  });
   const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     e.target.value = '';
     if (!f) return;
     setDocKey(fingerprint(f));
-    setDoc({ name: f.name, phase: 'reading', note: 'Uploading the form…' });
-    setAttachment(null);
-    // Held locally as well as in state: the read finishes in the same call, before
-    // a state update from this handler would be readable.
-    let createdDraftId: string | null = null;
-    // Also held locally: `extractionInstance` is state, so this handler cannot read
-    // back what it just set, and whether a case started decides whether the review
-    // can open ahead of the read.
-    let startedInstance: string | null = null;
-    // Park the document in Orchestrator first, then start the case immediately so
-    // the server-side extraction is already running while the RM is still on this
-    // screen. The review step opens against that same instance.
-    if (corporateMaestroReady()) {
-      try {
-        const att = await uploadCaseAttachment(f);
-        setAttachment(att);
-        try {
-          const uri = await attachmentReadUrl(att.ID);
-          const id = await startCorporateCase({
-            applicantId: 'pending', companyName: 'Corporate applicant',
-            document: att, documentUri: uri,
-          });
-          setExtractionInstance(id);
-          startedInstance = id;
-          // Open the record now so the running case is visible on the desk. A record
-          // is named for its business, never for the file it arrived on — the document
-          // name belongs to the extraction (and shows in the details popup). This
-          // placeholder stands for the few seconds until the read returns a name.
-          const draft = await store.create({
-            firstName: PLACEHOLDER_NAME, lastName: '',
-            phone: '', email: '', bvn: '', nin: '', address: '',
-            channel: 'single', source: 'rm', state: 'AWAITING_EXTRACTION',
-            documentId: att.ID, documentName: att.FullName,
-            // Written so the record still reads as corporate before the entity is
-            // confirmed — isCorporate() no longer treats the draft state as the marker.
-            accountType: CORPORATE_ACCOUNT_TYPE,
-          });
-          createdDraftId = draft.id;
-          setDraftId(draft.id);
-          linkInstance(draft.id, id);
-          savePendingExtraction({ recordId: draft.id, instanceId: id, attachmentId: att.ID, documentName: att.FullName });
-        } catch { /* review falls back to the local read */ }
-      } catch { /* case starts without it */ }
-    }
-    // Open the review NOW, not after the read. The screen already renders the
-    // uploaded page with a scan running over it and a skeleton column, and holding
-    // it back until extraction finished meant nobody ever saw the document being
-    // read — the wizard showed a one-line spinner instead. The read carries on
-    // underneath and fills the wizard's own fields for the steps that follow.
-    const started = Boolean(startedInstance);
-    if (started) setReviewing(true);
-
-    const runRead = async () => {
-    try {
-      // Real UiPath IXP (Document Understanding) read of the scanned AOF.
-      const x = await extractAof(f, (note) => setDoc({ name: f.name, phase: 'reading', note }));
-      setV((p) => ({
-        ...p,
-        company: x.company.companyName || p.company,
-        rc: x.company.rcNumber || p.rc,
-        tin: x.company.tin || p.tin,
-        sector: x.company.industry || x.company.businessType || p.sector,
-        bizType: matchOption(x.company.businessType, BIZ_TYPES) ?? p.bizType,
-        address: joinAddress(x.company.address, x.company.city, x.company.state) || p.address,
-        email: x.company.email || p.email,
-        phone: x.company.phone || p.phone,
-      }));
-      if (x.directors.length) {
-        setDirs(x.directors.map((d) => ({
-          name: d.fullName, bvn: digits(d.bvn),
-          idType: EMPTY_DIR.idType, idNumber: d.idNumber,
-          phone: digits(d.phone), email: d.email,
-          role: matchOption(d.role, ROLES) ?? 'Director',
-        })));
-      }
-      setDoc({ name: f.name, phase: 'done', source: 'ixp' });
-      await nameDraft(createdDraftId, x.company.companyName);
-    } catch {
-      // IXP unreachable (in production the app token still lacks the Du.* scopes) —
-      // fall back to the sample read so the walkthrough never dead-ends.
-      setV(EXTRACTED_CORP);
-      setDirs(EXTRACTED_DIRS.map((d) => ({ ...d })));
-      setDoc({ name: f.name, phase: 'done', source: 'sample' });
-      await nameDraft(createdDraftId, EXTRACTED_CORP.company);
-    }
-    };
-
-    // With a live case the review is already up and owns the wait, so the read runs
-    // underneath it. Without one there is nothing to watch, so keep the old order:
-    // finish the read, then open the review against whatever it produced.
-    if (started) { void runRead(); } else { await runRead(); setReviewing(true); }
+    const facts = await f.arrayBuffer()
+      .then((b) => analyseFile(f.name, new Uint8Array(b), { hint: 'cac-certificate' }))
+      .catch(() => null);
+    if (facts) setDocFacts(facts);
+    await formRead.read(f);
   };
 
   /** Fold confirmed values back into the form so the rest of the wizard starts
@@ -290,6 +199,45 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
     clearPendingExtraction();
     setResume(null);
   };
+  /** A package's rows fill the company and its signatories. Deliberately its own
+   *  mapping rather than applyConfirmed(): that one also closes a parked single-form
+   *  review, which a package has nothing to do with. */
+  const applyPackage = (r: PackageResult) => {
+    const own = r.rows.filter((x) => /company details/i.test(x.group));
+    const pick = (re: RegExp) => own.find((x) => re.test(x.name))?.value?.trim() ?? '';
+    setV((p) => ({
+      ...p,
+      company: pick(/business name|company name/i) || p.company,
+      rc: pick(/^rc|registration number/i) || p.rc,
+      tin: pick(/^tin$/i) || p.tin,
+      sector: pick(/sector|industry/i) || pick(/nature of business/i) || p.sector,
+      address: pick(/operating business address|registered office address|^address/i) || p.address,
+      email: pick(/^email$/i) || p.email,
+      phone: digits(pick(/^phone$|phone number 1/i)) || p.phone,
+      bizType: matchOption(pick(/business category|type\/nature of business/i), BIZ_TYPES) ?? p.bizType,
+      turnover: matchOption(pick(/annual turnover|turnover/i), TURNOVERS) ?? p.turnover,
+    }));
+    const byDir = new Map<string, typeof r.rows>();
+    r.rows.filter((x) => /directors?\s*\/\s*signator/i.test(x.group))
+      .forEach((x) => { if (!byDir.has(x.group)) byDir.set(x.group, []); byDir.get(x.group)!.push(x); });
+    if (byDir.size) {
+      setDirs([...byDir.values()].map((fs) => {
+        const g = (re: RegExp) => fs.find((x) => re.test(x.name))?.value?.trim() ?? '';
+        return {
+          name: g(/full name/i), bvn: digits(g(/bvn/i)),
+          idType: matchOption(g(/means of identification|id type/i), ['International Passport', 'National ID card', "Driver's licence", "Voter's card"]) ?? EMPTY_DIR.idType,
+          idNumber: g(/^id number|identification number/i),
+          phone: digits(g(/phone/i)), email: g(/email/i),
+          role: matchOption(g(/designation|role/i), ROLES) ?? 'Director',
+        };
+      }));
+    }
+    setPkgFacts(packageFacts(r));
+    setPkgRows(r.rows);
+    setPkgRes(r);
+  };
+  useEffect(() => { applyRef.current = applyPackage; });
+
   const clearUpload = () => {
     setV(EMPTY_CORP); setDirs([{ ...EMPTY_DIR }]); setDoc(null); setAttachment(null);
     setExtractionInstance(null); setReviewDone(false);
@@ -314,12 +262,16 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
       channel: 'single' as const, source: 'rm' as const,
       // The corporate marker isCorporate() keys on.
       accountType: CORPORATE_ACCOUNT_TYPE,
+      ...(docFacts || pkgFacts.length ? { documentFacts: [...(docFacts ? [docFacts] : []), ...pkgFacts] } : {}),
     };
     // An upload already opened a draft record — fill that one in rather than
     // leaving it orphaned beside a second, near-identical row.
     const c = draftId
       ? await store.update(draftId, { ...fields, state: 'PRE_REGISTERED' })
       : await store.create(fields);
+    // The package's files and rows, kept against the record for the desk's review.
+    if (pkgRes) void savePackage(c.id, pkgRes);
+    if (docFacts?.t === 'cac-certificate') rememberFingerprint(docFacts.h, c.id);
     // Start the REAL corporate Maestro case and link it to this record, so the
     // desk shows its live stage exactly like an individual one. Best-effort: a
     // Maestro hiccup must not lose an application the RM just captured.
@@ -331,15 +283,18 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
       clearPendingExtraction();
     } else if (corporateMaestroReady()) {
       try {
-        const instanceId = await startCorporateCase({
+        const instanceId = await startWithRetry(() => startCorporateCase({
           applicantId: c.id,
           companyName: v.company.trim() || 'Unnamed business',
           rcNumber: v.rc.trim(),
           tin: v.tin.trim(),
           directors: dirs.length,
           document: attachment ?? undefined,
-        });
+        }));
         linkInstance(c.id, instanceId);
+        // A package was confirmed in the package review: answer the case's own
+        // "Confirm extracted details" with it, so nobody is asked twice.
+        if (pkgRows.length) void confirmPackageReview(instanceId, pkgRows, true);
       } catch { /* case still captured; it just isn't live in Maestro */ }
     }
     onDone(c);
@@ -393,17 +348,29 @@ export default function ApplyCorporate({ onBack, onDone, mode = 'rm', onKind }: 
                 <button type="button" className="cx-clearbtn" onClick={() => { clearPendingExtraction(); setResume(null); }}>Discard</button>
               </Note>
             )}
-            {!doc && (
-              <label className="cx-drop">
-                <input type="file" accept="application/pdf,image/*" onChange={onUpload} hidden />
-                <span className="cx-drop-ic"><Icon name="upload" size={18} /></span>
-                <span className="cx-drop-t"><b>Have a completed form? Upload it</b><em>Scan or photo of the account opening form — we’ll read the company and directors.</em></span>
-              </label>
-            )}
+            {/* The two ways in, side by side: one completed form (read by the
+                case's IXP), or the whole package (read here, in the browser). */}
+            <div className={rm && !doc ? 'cx-drop-row' : undefined}>
+              {!doc && (
+                <label className="cx-drop">
+                  <input type="file" accept="application/pdf,image/*" onChange={onUpload} hidden />
+                  <span className="cx-drop-ic"><Icon name="upload" size={18} /></span>
+                  <span className="cx-drop-t"><b>Have a completed form? Upload it</b><em>Scan or photo of the account opening form — we’ll read the company and directors.</em></span>
+                </label>
+              )}
+              {rm && !doc && !formRead.reading && <PackageUpload kind="business" onApply={applyPackage} />}
+            </div>
             {/* No inline "Reading…" card any more: the review screen opens on the
                 upload and shows the page being scanned, so the wait belongs there.
                 This is only reached if the review could not open — no live case —
                 in which case the wizard is genuinely the only thing on screen. */}
+            {formRead.reading && (
+              <div className="cx-drop reading"><span className="cx-spin" aria-hidden /><span className="cx-drop-t"><b>Opening {formRead.name}…</b><em>Reading the form in the browser.</em></span></div>
+            )}
+            {formRead.wrongKind && (
+              <Note tone="warn" icon="clock"><b>{formRead.name} is an individual account form.</b> Switch to the Individual tab and upload it there.</Note>
+            )}
+            {formRead.review}
             {doc?.phase === 'reading' && !extractionInstance && (
               <div className="cx-drop reading"><span className="cx-spin" aria-hidden /><span className="cx-drop-t"><b>Reading {doc.name}…</b><em>{doc.note ?? 'Document Understanding is extracting the form.'}</em></span></div>
             )}

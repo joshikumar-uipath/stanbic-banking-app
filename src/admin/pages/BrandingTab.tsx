@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import type { Branding, LogoSize } from '../../config';
-import { generatedFavicon } from '../../config';
+import { generatedFavicon, bankIdentity } from '../../config';
 import { COUNTRY_OPTIONS, getCountry, type CountryCode } from '../../config/countries';
 import { fieldLabel, fieldInput } from '../components/AdminShell';
 
@@ -58,6 +58,14 @@ export default function BrandingTab({ branding, onChange }: { branding: Branding
       <Field label="App name">
         <input className="admin-input" style={fieldInput} value={branding.appName} onChange={(e) => set('appName', e.target.value)} />
       </Field>
+      <Row>
+        <Field label="Legal name (document headers — optional)">
+          <input className="admin-input" style={fieldInput} value={branding.legalName ?? ''} placeholder={bankIdentity({ appName: branding.appName }).legalName} onChange={(e) => set('legalName', e.target.value)} />
+        </Field>
+        <Field label="KYC link domain (customer messages — optional)">
+          <input className="admin-input" style={fieldInput} value={branding.kycDomain ?? ''} placeholder={bankIdentity({ appName: branding.appName }).kycDomain} onChange={(e) => set('kycDomain', e.target.value)} />
+        </Field>
+      </Row>
       <Row>
         <Field label="Primary color">
           <ColorInput value={branding.primaryColor} onChange={(v) => set('primaryColor', v)} />

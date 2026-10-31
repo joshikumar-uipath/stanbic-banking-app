@@ -3,17 +3,23 @@
 // About you → Identity (+ live duplicate check) → Address → Review → submit.
 // Writes through the shared OnboardingStore; no waiting on downstream systems.
 // ─────────────────────────────────────────────────────────────────────────────
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { store, type OnboardingCase, type DuplicateOutcome, type NewCaseInput } from '../onboarding';
 import {
-  clearPendingExtraction, linkInstance, maestroReady, savePendingExtraction,
-  startCase, uploadCaseAttachment, type JobAttachmentRef,
+  clearPendingExtraction, linkInstance, maestroReady,
+  startCase, type JobAttachmentRef,
 } from '../onboarding/maestro';
 import { useConfig } from '../config';
 import { getActiveCountry } from '../config/countries';
 import { Button, Field, Note, Rail, KV, Brand } from './ui';
 import { fingerprint } from '../onboarding/extractionCache';
-import ExtractionReview, { type ReviewField } from './ExtractionReview';
+import { analyseFile, type DocFacts } from '../integrations/docChecks';
+import PackageUpload from './PackageUpload';
+import { useFormRead, startWithRetry } from './useFormRead';
+import { packageFacts, type PackageResult, type Row as PackageRow } from '../integrations/packageDocs';
+import { confirmPackageReview } from '../integrations/packageCase';
+import { savePackage } from '../integrations/packageStore';
+import ExtractionReview, { type ReviewField, personFromRows } from './ExtractionReview';
 import Icon from './icons';
 
 const CO = getActiveCountry();
@@ -101,20 +107,6 @@ function fillBlanks(vals: Vals, ...steps: number[]): Vals {
   return out;
 }
 
-// Illustrative pre-fill, used ONLY when there is no live case to read from (no
-// token, or the case failed to start). The real path reads the applicant's own
-// form through IXP — see onUpload.
-const EXTRACTED: Partial<Vals> = {
-  firstName: 'Efe', lastName: 'Emore',
-  phone: '08027317889', email: 'eemore@gmail.com',
-  bvn: '22143511463', nin: '',
-  address: '62 Ire Akari Street, Isolo, Lagos',
-};
-
-/** Stands in until the read returns a name. A record is named for its applicant,
- *  never for the file it arrived on. */
-const PLACEHOLDER_NAME = 'Individual application';
-
 const digits = (s: string) => s.replace(/\D/g, '');
 
 /** Drop empty strings so an untouched field stays absent on the record — the
@@ -156,7 +148,9 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   // Scanned-form upload → Document Understanding → pre-fill.
-  const [doc, setDoc] = useState<{ name: string; phase: 'reading' | 'done' | 'deferred'; fields?: number } | null>(null);
+  const [doc, setDoc] = useState<{ name: string; phase: 'reading' | 'done' | 'deferred' | 'failed'; fields?: number; error?: string } | null>(null);
+  /** The last file picked, so a failed upload can be retried without picking it again. */
+  const lastFile = useRef<File | null>(null);
   /** The uploaded form, parked as an Orchestrator attachment for the case to read. */
   const [attachment, setAttachment] = useState<JobAttachmentRef | null>(null);
   /** The case started by the upload. Linked to the record at submit. */
@@ -165,74 +159,46 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
   /** Fingerprint of the uploaded file, so a document seen before paints at once. */
   const [docKey, setDocKey] = useState<string | null>(null);
   /** The record opened by the upload, filled in at submit rather than replaced. */
-  const [draftId, setDraftId] = useState<string | null>(null);
+  const [draftId] = useState<string | null>(null);
+  /** What the document checks read off the uploaded file (BR-DOC-01, 07). */
+  const [docFacts, setDocFacts] = useState<DocFacts | null>(null);
+  /** The documents of an uploaded package (the package flow — separate from the form upload). */
+  const [pkgFacts, setPkgFacts] = useState<DocFacts[]>([]);
+  /** The package's confirmed rows — they answer the case's own extraction review. */
+  const [pkgRows, setPkgRows] = useState<PackageRow[]>([]);
+  const [pkgRes, setPkgRes] = useState<PackageResult | null>(null);
 
   const set = (k: keyof Vals) => (ev: React.ChangeEvent<HTMLInputElement>) => {
     setV((p) => ({ ...p, [k]: ev.target.value }));
   };
 
+  /** The single form, read in the browser. Confirming fills the wizard exactly as
+   *  a package does, and marks the upload as read. */
+  // Through a ref: applyPackage is declared further down, and only runs on confirm.
+  const applyRef = useRef<(r: PackageResult) => void>(() => {});
+  const formRead = useFormRead('individual', (r, name) => {
+    applyRef.current(r);
+    setDoc({ name, phase: 'done', fields: r.rows.filter((x) => x.value).length });
+  });
+
   const onUpload = async (ev: React.ChangeEvent<HTMLInputElement>) => {
     const f = ev.target.files?.[0];
     ev.target.value = '';                 // let the same file be re-picked
     if (!f) return;
+    await uploadFile(f);
+  };
+
+  const uploadFile = async (f: File) => {
+    lastFile.current = f;
     setDocKey(fingerprint(f));
-    setDoc({ name: f.name, phase: 'reading' });
-
-    // Park the form in Orchestrator, then start the case straight away so the
-    // server-side extraction is already running while the applicant is still on
-    // this screen. The review opens against that same instance.
-    //
-    // No draft record here, unlike the corporate wizard: `isCorporate()` treats
-    // AWAITING_EXTRACTION as a corporate marker, so an individual draft parked in
-    // that state would route every later read to the corporate folder and 404.
-    // Upload is an accelerator here rather than the entry point, so the record is
-    // created at submit as it always was, and the instance is linked then.
-    if (maestroReady()) {
-      try {
-        const att = await uploadCaseAttachment(f);
-        setAttachment(att);
-        const id = await startCase({
-          applicantId: 'pending',
-          firstName: v.firstName.trim() || 'Applicant',
-          lastName: v.lastName.trim(),
-          channel: rm ? 'single' : 'self',
-          document: att,
-        });
-        setExtractionInstance(id);
-
-        // Open the record NOW, so the running case is visible on the desk. Without
-        // this, "Finish later" left nothing behind at all: the case was live, the
-        // document was uploaded and IXP was reading it, but no row pointed at any
-        // of it, and the only way back was to upload the form again.
-        //
-        // PRE_REGISTERED and no `entity`, deliberately — `isCorporate()` treats
-        // AWAITING_EXTRACTION (and any entity) as a corporate marker, and a record
-        // misread as corporate sends every later read to the wrong Orchestrator
-        // folder. The parked slot below is what makes the review resumable.
-        try {
-          const draft = await store.create({
-            firstName: PLACEHOLDER_NAME, lastName: '',
-            phone: '', email: '', bvn: '', nin: '', address: '',
-            channel: rm ? 'single' : 'self', source: rm ? 'rm' : 'customer',
-            state: 'PRE_REGISTERED',
-            documentId: att.ID, documentName: att.FullName,
-          });
-          setDraftId(draft.id);
-          linkInstance(draft.id, id);
-          savePendingExtraction({ recordId: draft.id, instanceId: id, attachmentId: att.ID, documentName: att.FullName });
-        } catch { /* the review still works; it just is not on the desk yet */ }
-
-        setReviewing(true);
-        return;                            // the review screen owns the rest
-      } catch {
-        // Fall through to the local read: a Maestro hiccup must not cost the
-        // applicant the upload they just made.
-      }
-    }
-    // No live case (no token, or the start failed) — keep the illustrative read so
-    // the walkthrough still demonstrates the step.
-    setV((p) => ({ ...p, ...EXTRACTED }));
-    setDoc({ name: f.name, phase: 'done' });
+    // Read in the browser and show it being scanned (useFormRead → PackageReview).
+    // The case starts at Submit like any application; nothing here waits on IXP
+    // or on the network.
+    const facts = await f.arrayBuffer()
+      .then((b) => analyseFile(f.name, new Uint8Array(b), { hint: 'aof', address: v.address }))
+      .catch(() => null);
+    if (facts) setDocFacts(facts);
+    await formRead.read(f);
   };
 
   /** Confirmed review rows → the wizard's fields. Names come from the IXP taxonomy,
@@ -301,21 +267,18 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
       return out ? { [k]: out } : {};
     };
 
-    // Names decide what the record is CALLED on the desk, so they get their own
-    // handling. Discrete fields win; failing that, split a one-line name.
-    const names = (() => {
-      const first = val(APPLICANT, /first name|given name/i);
-      const last = val(APPLICANT, /surname|last name|family name/i);
-      if (first || last) return { firstName: first, lastName: last };
-      const full = val(APPLICANT, /full name|applicant name|^name$/i);
-      if (!full) return {};
-      if (/,/.test(full)) {
-        const [surname, rest] = full.split(',').map((x) => x.trim());
-        return { firstName: (rest ?? '').split(/\s+/)[0] ?? '', lastName: surname };
-      }
-      const parts = full.split(/\s+/).filter(Boolean);
-      return { firstName: parts[0] ?? '', lastName: parts.slice(1).join(' ') };
-    })();
+    // Names decide what the record is CALLED on the desk — the shared mapper, so
+    // the wizard and the desk read a name out of the same rows the same way.
+    const person = personFromRows(rows);
+    const names = { firstName: person.firstName ?? '', lastName: person.lastName ?? '' };
+
+    // The draft record was opened at upload under a placeholder name. Write the
+    // confirmed read onto it now — not at Submit — so the desk shows who this is
+    // the moment the read is confirmed, even if the applicant stops here ("Finish
+    // later") and the case runs on without them. Best-effort, as for corporate.
+    if (draftId && names.firstName) {
+      void store.update(draftId, person).catch(() => { /* keeps the placeholder until Submit */ });
+    }
 
     setV((p) => ({
       ...p,
@@ -380,6 +343,19 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
     setReviewing(false);
   };
 
+
+  /** A package's confirmed rows fill the wizard the way a confirmed review does;
+   *  its documents ride on the record for the document checks. The single-form
+   *  status card is cleared — a package is not "the form". */
+  const applyPackage = (r: PackageResult) => {
+    applyRows(r.rows as ReviewField[]);
+    setDoc(null);
+    setPkgFacts(packageFacts(r));
+    setPkgRows(r.rows);
+    setPkgRes(r);
+  };
+  useEffect(() => { applyRef.current = applyPackage; });
+
   const clearUpload = () => { setV(EMPTY); setDoc(null); setAttachment(null); setExtractionInstance(null); };
 
   const next = async () => {
@@ -414,6 +390,7 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
         incomeBand: v.incomeBand, sourceOfFunds: v.sourceOfFunds,
         accountType: v.accountType, accountPurpose: v.accountPurpose, branch: v.branch,
       }),
+      ...(docFacts || pkgFacts.length ? { documentFacts: [...(docFacts ? [docFacts] : []), ...pkgFacts] } : {}),
       nextOfKin: v.nokName.trim()
         ? { name: v.nokName.trim(), relationship: v.nokRelationship, phone: digits(v.nokPhone), address: v.nokAddress.trim() || undefined }
         : undefined,
@@ -421,9 +398,30 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
     // An upload already opened a record for this application — fill that one in
     // rather than leaving it orphaned beside a second, near-identical row.
     const c = draftId ? await store.update(draftId, fields) : await store.create(fields);
-    // Started before the record existed on the typed-entry path, so tie them
-    // together now; a no-op when the draft already carried the link.
-    if (extractionInstance) linkInstance(c.id, extractionInstance);
+    // The package's files and rows, kept against the record for the desk's review.
+    if (pkgRes) void savePackage(c.id, pkgRes);
+    // An upload already started the case so the extraction could run while the
+    // applicant was still typing — tie it to the record now rather than starting
+    // a second one. A no-op when the draft already carried the link.
+    if (extractionInstance) {
+      linkInstance(c.id, extractionInstance);
+    } else if (maestroReady()) {
+      // Nothing was uploaded, so nothing has started yet. Submitting the form IS
+      // the trigger — open the case here, the way the corporate wizard does, so
+      // the desk shows a live stage without anyone pressing "Run this case in
+      // Maestro". Best-effort: a Maestro hiccup must not lose the application.
+      try {
+        const id = await startWithRetry(() => startCase({
+          applicantId: c.id,
+          firstName: c.firstName, lastName: c.lastName,
+          bvn: c.bvn, nin: c.nin, channel: c.channel,
+        }));
+        linkInstance(c.id, id);
+        // A package was confirmed in the package review: answer the case's own
+        // "Confirm extracted details" with it, so nobody is asked twice.
+        if (pkgRows.length) void confirmPackageReview(id, pkgRows, false);
+      } catch { /* captured all the same; it just isn't live in Maestro */ }
+    }
     clearPendingExtraction();
     onDone(c);
   };
@@ -475,16 +473,33 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
             <p className="cx-p" style={{ marginBottom: 16 }}>{rm ? `Enter their name exactly as it appears on their ${Sc.label}.` : `Use your name exactly as it appears on your ${Sc.label}.`}</p>
 
             {/* Upload a completed form → Document Understanding reads it and pre-fills. */}
-            {!doc && (
-              <label className="cx-drop">
-                <input type="file" accept="application/pdf,image/*" onChange={onUpload} hidden />
-                <span className="cx-drop-ic"><Icon name="upload" size={18} /></span>
-                <span className="cx-drop-t">
-                  <b>{rm ? 'Have a completed form? Upload it' : 'Have a completed form? Upload it'}</b>
-                  <em>Scan or photo of the account opening form — we’ll read it and fill this in.</em>
-                </span>
-              </label>
+            {/* The two ways in, side by side: one completed form (read by the
+                case's IXP), or the whole package (read here, in the browser). */}
+            <div className={rm && !doc ? 'cx-drop-row' : undefined}>
+              {!doc && (
+                <label className="cx-drop">
+                  <input type="file" accept="application/pdf,image/*" onChange={onUpload} hidden />
+                  <span className="cx-drop-ic"><Icon name="upload" size={18} /></span>
+                  <span className="cx-drop-t">
+                    <b>{rm ? 'Have a completed form? Upload it' : 'Have a completed form? Upload it'}</b>
+                    <em>Scan or photo of the account opening form — we’ll read it and fill this in.</em>
+                  </span>
+                </label>
+              )}
+              {rm && !doc && !formRead.reading && <PackageUpload kind="individual" onApply={applyPackage} />}
+            </div>
+            {formRead.reading && (
+              <div className="cx-drop reading">
+                <span className="cx-spin" aria-hidden />
+                <span className="cx-drop-t"><b>Opening {formRead.name}…</b><em>Reading the form in the browser.</em></span>
+              </div>
             )}
+            {formRead.wrongKind && (
+              <Note tone="warn" icon="clock">
+                <b>{formRead.name} is a company account form.</b> Switch to the Corporate tab and upload it there.
+              </Note>
+            )}
+            {formRead.review}
             {doc?.phase === 'reading' && (
               <div className="cx-drop reading">
                 <span className="cx-spin" aria-hidden />
@@ -501,6 +516,15 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
                     Resume review
                   </button>
                 )}
+                <button type="button" className="cx-clearbtn" onClick={clearUpload}>Clear</button>
+              </Note>
+            )}
+            {doc?.phase === 'failed' && (
+              <Note tone="warn" icon="clock">
+                <b>{doc.name} could not be sent to the case.</b> {/failed to fetch|network|ENOTFOUND|ECONN|load failed/i.test(doc.error ?? '')
+                  ? 'The connection to UiPath dropped — check the network (or VPN) and try again.'
+                  : `UiPath answered: ${doc.error}`}
+                <button type="button" className="cx-clearbtn" onClick={() => { if (lastFile.current) void uploadFile(lastFile.current); }}>Try again</button>
                 <button type="button" className="cx-clearbtn" onClick={clearUpload}>Clear</button>
               </Note>
             )}
@@ -532,7 +556,7 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
             </div>
             <div className="cx-row">
               <Field label="Nationality" name="nationality" value={v.nationality} onChange={set('nationality')} />
-              <Field label="State of origin" name="stateOfOrigin" value={v.stateOfOrigin} onChange={set('stateOfOrigin')} placeholder={CO.cities[0]} />
+              <Field label="State of origin" name="stateOfOrigin" value={v.stateOfOrigin} onChange={set('stateOfOrigin')} placeholder={`e.g. ${CO.cities[0]}`} />
             </div>
             <Field label="Phone number" name="phone" value={v.phone} onChange={set('phone')} inputMode="numeric" placeholder="0803 000 0000" autoComplete="tel" />
             <Field label="Email address" name="email" value={v.email} onChange={set('email')} inputMode="email" placeholder="you@example.com" autoComplete="email" />
@@ -572,8 +596,8 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
             <p className="cx-p" style={{ marginBottom: 18 }}>{rm ? 'Proof of address can follow later — it won’t hold up the account.' : 'You can send proof of address later — it won’t hold up your account.'}</p>
             <Field label="Residential address" name="address" value={v.address} onChange={set('address')} placeholder={`7 ${CO.streets[0]}`} autoComplete="street-address" />
             <div className="cx-row">
-              <Field label="City / town" name="city" value={v.city} onChange={set('city')} placeholder={CO.cities[0]} autoComplete="address-level2" />
-              <Field label="State" name="stateOfResidence" value={v.stateOfResidence} onChange={set('stateOfResidence')} placeholder={CO.cities[1]} autoComplete="address-level1" />
+              <Field label="City / town" name="city" value={v.city} onChange={set('city')} placeholder={`e.g. ${CO.cities[0]}`} autoComplete="address-level2" />
+              <Field label="State" name="stateOfResidence" value={v.stateOfResidence} onChange={set('stateOfResidence')} placeholder={`e.g. ${CO.cities[1]}`} autoComplete="address-level1" />
             </div>
             <div className="cx-row">
               <Field label="LGA / district" name="lga" value={v.lga} onChange={set('lga')} />
@@ -595,7 +619,7 @@ export default function Apply({ onBack, onDone, mode = 'self', onKind }: { onBac
               <Select label="Employment status" value={v.employmentStatus} onChange={(x) => setV((p) => ({ ...p, employmentStatus: x }))} options={EMPLOYMENT} />
               <Field label="Occupation" name="occupation" value={v.occupation} onChange={set('occupation')} placeholder="Teacher" />
             </div>
-            <Field label="Employer" name="employer" value={v.employer} onChange={set('employer')} placeholder={CO.companies[0]} hint="Leave blank if self-employed or not working." />
+            <Field label="Employer" name="employer" value={v.employer} onChange={set('employer')} placeholder={`e.g. ${CO.companies[0]}`} hint="Leave blank if self-employed or not working." />
             <div className="cx-row">
               <Select label="Annual income" value={v.incomeBand} onChange={(x) => setV((p) => ({ ...p, incomeBand: x }))} options={INCOME} />
               <Select label="Source of funds" value={v.sourceOfFunds} onChange={(x) => setV((p) => ({ ...p, sourceOfFunds: x }))} options={FUNDS} />

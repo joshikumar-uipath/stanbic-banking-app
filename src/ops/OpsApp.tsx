@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { ConfigProvider, useConfig, loadLocalConfig, stanbicConfig, applyFavicon } from '../config';
 import { getCountry } from '../config/countries';
+import { asset } from '../config/presets';
 import { maestroConfig } from '../onboarding/maestro';
 import './ops.css';
 
@@ -24,7 +25,12 @@ function hexToRgbTriplet(hex: string): string | null {
   return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }
 
-function OpsInner() {
+/**
+ * The console in its frame. `/ops` mounts it full-screen; the employee phone
+ * mounts it as the operations analyst's Home with `mobile`, which loads the
+ * console's phone layout and routes its role switcher back to the app.
+ */
+export function OpsFrame({ mobile = false, onRoleRequest }: { mobile?: boolean; onRoleRequest?: () => void } = {}) {
   const { branding } = useConfig();
   const frame = useRef<HTMLIFrameElement>(null);
   // The rail paints a white plate behind the mark, so send the standard logo —
@@ -34,9 +40,23 @@ function OpsInner() {
   const country = getCountry(branding.country);
 
   useEffect(() => {
+    // On the phone the frame is one tab of a larger app — leave its title alone.
+    if (mobile) return;
     document.title = `${appName} — Operations`;
     applyFavicon(branding.favicon, appName, branding.deepBlue || branding.primaryColor);
-  }, [appName, branding.favicon, branding.deepBlue, branding.primaryColor]);
+  }, [mobile, appName, branding.favicon, branding.deepBlue, branding.primaryColor]);
+
+  // The console's role button can't navigate a phone app it doesn't own, so in
+  // mobile mode it asks the app to open its role sheet instead.
+  useEffect(() => {
+    if (!onRoleRequest) return;
+    const on = (e: MessageEvent) => {
+      if (e.origin !== window.location.origin || e.source !== frame.current?.contentWindow) return;
+      if (e.data && e.data.type === 'aof-role-open') onRoleRequest();
+    };
+    window.addEventListener('message', on);
+    return () => window.removeEventListener('message', on);
+  }, [onRoleRequest]);
 
   // The console is its own document, so it can't read the config directly. Hand it
   // the tenant logo and the active market instead of letting it ship hard-coded
@@ -69,8 +89,9 @@ function OpsInner() {
   return (
     <iframe
       ref={frame}
-      className="ops-frame"
-      src="/ops-console.html"
+      className={mobile ? 'ops-frame ops-frame-m' : 'ops-frame'}
+      // Against the app's <base href>: a leading "/" leaves the app under the coded-app host.
+      src={asset('ops-console.html') + (mobile ? '?m=1' : '')}
       title="Operations Workbench — Account Opening"
       onLoad={pushBrand}
     />
@@ -80,5 +101,5 @@ function OpsInner() {
 export default function OpsApp() {
   // Admin's profile wins; Stanbic is the fallback when nothing is configured.
   const initial = useMemo(() => loadLocalConfig() ?? stanbicConfig, []);
-  return <ConfigProvider initialOverride={initial}><OpsInner /></ConfigProvider>;
+  return <ConfigProvider initialOverride={initial}><OpsFrame /></ConfigProvider>;
 }

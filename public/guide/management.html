@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Management guide — Account opening</title>
+<script>(function () {
+  var here = "stanbic", want = "stanbic";
+  try {
+    var q = new URLSearchParams(location.search).get("bank");
+    if (q) want = q;
+    else {
+      var s = JSON.parse(localStorage.getItem("zara_local_profiles_v1") || "null");
+      var p = s && s.profiles && s.profiles.find(function (x) { return x.id === s.activeId; });
+      var n = (p && p.config && p.config.branding && p.config.branding.appName) || "";
+      if (/first\s*bank|\bfbn\b/i.test(n)) want = "firstbank";
+    }
+  } catch (e) {}
+  if (want !== here && (want === "stanbic" || want === "firstbank")) {
+    var f = location.pathname.split("/").pop() || "index.html";
+    location.replace((here === "stanbic" ? "firstbank/" : "../") + f + location.hash);
+  }
+})();</script>
+<meta name="description" content="The control tower is a six-page report in the Power BI look over the same case store: how many applications arrived, how many went straight through, where every application sits, why work stops, which channels perform and how long an account takes to open." />
+<link rel="icon" href="../stanbic-favicon.png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="./guide.css" />
+
+</head>
+<body>
+<header class="g-top">
+  <div class="g-top-in">
+    <a class="g-brand" href="./index.html"><img src="../stanbic-logo.png" alt="Stanbic IBTC" /><span><b>Feature guide</b><em>Account opening POC</em></span></a>
+    <a class="g-back" href="../">← Launcher</a>
+  </div>
+  <nav class="g-tabs" aria-label="Personas"><div class="g-tabs-in"><a href="./index.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h11a3 3 0 0 1 3 3v13H7a3 3 0 0 1-3-3V4Z"/><path d="M4 17a3 3 0 0 1 3-3h11"/></svg><span>Overview</span></a><a href="./brd.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg><span>BRD coverage</span></a><a href="./customer.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><path d="M16 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0Z"/></svg><span>Customer</span></a><a href="./rm.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h18v13H3z"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M3 12h18"/></svg><span>Relationship manager</span></a><a href="./bulkops.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 2 8l10 5 10-5-10-5Z"/><path d="M2 16l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg><span>Bulk operations</span></a><a href="./ops.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v7H4z"/><path d="M14 4h6v4h-6z"/><path d="M14 12h6v8h-6z"/><path d="M4 15h6v5H4z"/></svg><span>Operations analyst</span></a><a href="./management.html" class="on" aria-current=page><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v7H4z"/><path d="M14 4h6v4h-6z"/><path d="M14 12h6v8h-6z"/><path d="M4 15h6v5H4z"/></svg><span>Management</span></a><a href="./presenter.html" class=""><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 4h18v12H3z"/><path d="M8 20h8"/><path d="M12 16v4"/><path d="M10 7.5v5l4.5-2.5z"/></svg><span>Presenter and admin</span></a></div></nav>
+</header>
+
+<main class="g-wrap">
+  <section class="g-hero">
+    <span class="g-hero-ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h6v7H4z"/><path d="M14 4h6v4h-6z"/><path d="M14 12h6v8h-6z"/><path d="M4 15h6v5H4z"/></svg></span>
+    <div class="g-hero-t">
+      <p class="g-eyebrow">Persona guide · 2 flows · 9 steps</p>
+      <h1>Management</h1>
+      <p class="g-who">Head of retail onboarding, operations leads · Control tower</p>
+      <p class="g-intro">The control tower is a six-page report in the Power BI look over the same case store: how many applications arrived, how many went straight through, where every application sits, why work stops, which channels perform and how long an account takes to open.</p>
+    </div>
+    <a class="g-open lg" href="http://localhost:5180/#tower" target="_blank" rel="noopener"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open Control tower</a>
+  </section>
+  <section class="g-before"><p class="h">Before you start</p><ul><li>Open the launcher and click “Control tower” under Behind the scenes (localhost:5180/#tower).</li><li>It reads the local store plus a synthetic 60-day history; the Power BI chrome (File, Export, Share…) is for the look and is disabled.</li><li>“Simulate an application” creates a new record that is mirrored to Data Fabric. Leave it alone unless you want a moving number.</li></ul></section>
+  <div class="g-grid">
+    <aside class="g-toc"><p class="h">Flows on this page</p><ol><li><a href="#overview"><span class="n">01</span><span class="t">Read the report</span><span class="c">6</span></a></li><li><a href="#filter"><span class="n">02</span><span class="t">Filter and change the range</span><span class="c">3</span></a></li></ol><button type="button" class="g-print" onclick="window.print()">Print or save as PDF</button></aside>
+    <div class="g-main"><section class="g-flow" id="overview">
+  <div class="g-flow-h">
+    <span class="g-flow-no">01</span>
+    <div class="g-flow-t">
+      <h2>Read the report</h2>
+      <p class="g-meta"><span>3 min</span><span>Sample · Last 48 hours</span><span>6 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#tower" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">One place to answer “how are we doing” with the same numbers operations works from.</p>
+  <ol class="g-steps"><li class="g-step" id="overview-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Overview</p>
+    <p class="g-step-b">The report opens on Overview.</p>
+    <p class="g-see"><b>You should see</b>Applications, straight-through, accounts opened and exceptions against the prior period, applications received, the straight-through gauge against 80%, where every application sits and how work arrives.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/m-overview.jpg" data-cap="Management · Read the report · step 1: Overview"><img loading="lazy" src="./shots/m-overview.jpg" alt="Screenshot: Overview" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="overview-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Exceptions &amp; SLA</p>
+    <p class="g-step-b">Click “Exceptions &amp; SLA” at the bottom.</p>
+    <p class="g-see"><b>You should see</b>Open work, breached SLA, at risk, oldest item, “Why work stops”, queue load by routing rule and aging.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/m-exceptions.jpg" data-cap="Management · Read the report · step 2: Exceptions &amp; SLA"><img loading="lazy" src="./shots/m-exceptions.jpg" alt="Screenshot: Exceptions &amp; SLA" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="overview-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Flow</p>
+    <p class="g-step-b">Click Flow.</p>
+    <p class="g-see"><b>You should see</b>The account opening Sankey from channel through verification to outcome.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/m-flow.jpg" data-cap="Management · Read the report · step 3: Flow"><img loading="lazy" src="./shots/m-flow.jpg" alt="Screenshot: Flow" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="overview-4">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">4</span>Channels</p>
+    <p class="g-step-b">Click Channels.</p>
+    <p class="g-see"><b>You should see</b>Bulk payroll, branch and digital, intake and straight-through by channel, and top employers.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/m-channels.jpg" data-cap="Management · Read the report · step 4: Channels"><img loading="lazy" src="./shots/m-channels.jpg" alt="Screenshot: Channels" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="overview-5">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">5</span>Verification</p>
+    <p class="g-step-b">Click Verification.</p>
+    <p class="g-see"><b>You should see</b>First-time right, failures, timeouts and retries, and result by check.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/m-verification.jpg" data-cap="Management · Read the report · step 5: Verification"><img loading="lazy" src="./shots/m-verification.jpg" alt="Screenshot: Verification" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="overview-6">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">6</span>Timing</p>
+    <p class="g-step-b">Click Timing.</p>
+    <p class="g-see"><b>You should see</b>Median and 90th percentile time to open, and when applications arrive by hour and weekday.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/m-timing.jpg" data-cap="Management · Read the report · step 6: Timing"><img loading="lazy" src="./shots/m-timing.jpg" alt="Screenshot: Timing" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><section class="g-flow" id="filter">
+  <div class="g-flow-h">
+    <span class="g-flow-no">02</span>
+    <div class="g-flow-t">
+      <h2>Filter and change the range</h2>
+      <p class="g-meta"><span>1 min</span><span>Sample · Bulk payroll</span><span>3 steps</span></p>
+    </div>
+    <a class="g-open" href="http://localhost:5180/#tower" target="_blank" rel="noopener"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v6H4V6h6"/></svg> Open it</a>
+  </div>
+  <p class="g-why">Every visual answers the same question for a slice: one channel, one outcome, one failing check.</p>
+  <ol class="g-steps"><li class="g-step" id="filter-1">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">1</span>Open Filters</p>
+    <p class="g-step-b">Click Filters.</p>
+    <p class="g-see"><b>You should see</b>Channel, verification, outcome and failing check, each with counts.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/m-filters.jpg" data-cap="Management · Filter and change the range · step 1: Open Filters"><img loading="lazy" src="./shots/m-filters.jpg" alt="Screenshot: Open Filters" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="filter-2">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">2</span>Filter a channel</p>
+    <p class="g-step-b">Tick “Bulk payroll”.</p>
+    <p class="g-see"><b>You should see</b>“Filtered by: Channel: Bulk payroll” and every visual recalculated. “Clear all” removes it. Clicking a bar or a Sankey node filters the same way.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/m-filtered.jpg" data-cap="Management · Filter and change the range · step 2: Filter a channel"><img loading="lazy" src="./shots/m-filtered.jpg" alt="Screenshot: Filter a channel" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li><li class="g-step" id="filter-3">
+  <div class="g-step-txt">
+    <p class="g-step-h"><span class="num">3</span>Change the range</p>
+    <p class="g-step-b">Click “7 days”.</p>
+    <p class="g-see"><b>You should see</b>The same report over 7 days; 24 hours, 48 hours and 30 days are there too.</p>
+  </div>
+  <button type="button" class="g-shot" data-src="./shots/m-range.jpg" data-cap="Management · Filter and change the range · step 3: Change the range"><img loading="lazy" src="./shots/m-range.jpg" alt="Screenshot: Change the range" width="1440" height="900" /><span class="zoom">Click to enlarge</span></button>
+</li></ol>
+</section><nav class="g-pager"><a href="./ops.html"><em>Previous</em>Operations analyst</a><a class="nx" href="./presenter.html"><em>Next</em>Presenter and admin</a></nav></div>
+  </div>
+</main>
+<div class="g-lb" id="lb" hidden>
+  <button type="button" class="g-lb-x" aria-label="Close">✕</button>
+  <button type="button" class="g-lb-p" aria-label="Previous screenshot">‹</button>
+  <figure><img alt="" /><figcaption></figcaption></figure>
+  <button type="button" class="g-lb-n" aria-label="Next screenshot">›</button>
+</div>
+<script src="./guide.js"></script>
+</body>
+</html>

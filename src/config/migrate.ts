@@ -41,6 +41,9 @@ export function migrate(raw: unknown): TenantConfig {
   if (cfg && !cfg.operations) {
     cfg.operations = defaultConfig.operations;
   }
+  if (cfg && !cfg.employeeApp) {
+    cfg.employeeApp = defaultConfig.employeeApp;
+  }
 
   // We don't validate the shape at runtime in Phase 0; once Zod arrives in
   // Phase 2 (Data Service loader), this is where parse() goes.

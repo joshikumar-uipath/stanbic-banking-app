@@ -7,6 +7,7 @@
 // live store without a second write path.
 // ─────────────────────────────────────────────────────────────────────────────
 import { fullName, type OnboardingCase } from './types';
+import { activeBank } from '../config/bank';
 
 export type MsgChannel = 'sms' | 'whatsapp' | 'email';
 export type Delivery = 'delivered' | 'sent';
@@ -16,7 +17,7 @@ export type Delivery = 'delivered' | 'sent';
 export const CHANNEL_META: Record<MsgChannel, { label: string; color: string }> = {
   sms: { label: 'SMS', color: '#0091DA' },
   whatsapp: { label: 'WhatsApp', color: '#25D366' },
-  email: { label: 'Email', color: '#0033A1' },
+  email: { label: 'Email', color: 'var(--brand-primary, #0033A1)' },
 };
 export const MSG_CHANNELS: MsgChannel[] = ['sms', 'whatsapp', 'email'];
 export interface Msg {
@@ -44,7 +45,8 @@ export function commsFor(c: OnboardingCase): Msg[] {
   const phone = c.phone || 'no number on file';
   const email = c.email || 'no email on file';
   const acct = c.accountNumber;
-  const link = `kyc.stanbicibtc.com/${token(c)}`;
+  const bank = activeBank();
+  const link = `${bank.kycDomain}/${token(c)}`;
   const out: { order: number; channel: MsgChannel; to: string; at: string; label: string; body: string; delivery?: Delivery }[] = [];
 
   // 1 · Application received — always.
@@ -68,7 +70,7 @@ export function commsFor(c: OnboardingCase): Msg[] {
     out.push({
       order: 3, channel: 'sms', to: phone, at: evAt(c, 'account-created') ?? c.updatedAt,
       label: 'Account opened',
-      body: `Good news ${first}! Your Stanbic IBTC account ${acct} is now open. Complete a quick KYC check to unlock full access.`,
+      body: `Good news ${first}! Your ${bank.name} account ${acct} is now open. Complete a quick KYC check to unlock full access.`,
     });
     // 4 · KYC link — a rich link, so it goes by WhatsApp.
     out.push({
@@ -83,7 +85,7 @@ export function commsFor(c: OnboardingCase): Msg[] {
     out.push({
       order: 5, channel: 'whatsapp', to: phone, at: c.updatedAt, delivery: 'sent',
       label: 'Reminder',
-      body: `Reminder: your Stanbic account is open but needs a quick selfie to finish. Tap to complete: ${link}`,
+      body: `Reminder: your ${bank.name} account is open but needs a quick selfie to finish. Tap to complete: ${link}`,
     });
   }
 
@@ -92,7 +94,7 @@ export function commsFor(c: OnboardingCase): Msg[] {
     out.push({
       order: 6, channel: 'email', to: email, at: c.updatedAt,
       label: 'Welcome',
-      body: `Welcome to Stanbic IBTC, ${first}. Your account ${acct} is fully active and your debit card is on the way. Manage everything in the Stanbic app.`,
+      body: `Welcome to ${bank.name}, ${first}. Your account ${acct} is fully active and your debit card is on the way. Manage everything in the ${bank.name} app.`,
     });
   }
 

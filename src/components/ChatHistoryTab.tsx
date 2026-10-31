@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useConfig } from '../config';
+import { agentLabel } from '../config/primaryAgent';
 import type { ConversationalAgent, AgentGetResponse, ConversationGetResponse } from '@uipath/uipath-typescript/conversational-agent';
 
 interface Props {
@@ -69,7 +70,7 @@ export default function ChatHistoryTab({ onExplore, conversationalAgent, onOpenC
   const filtered = search
     ? conversations.filter((c) => {
         const agent = c.agentId != null ? agentMap.get(c.agentId) : undefined;
-        const agentName = agent?.name.replace(/_/g, ' ') ?? '';
+        const agentName = agentLabel(agent, agentsConfig.displayNameOverrides);
         return (
           c.label.toLowerCase().includes(search.toLowerCase()) ||
           agentName.toLowerCase().includes(search.toLowerCase())
@@ -151,7 +152,7 @@ export default function ChatHistoryTab({ onExplore, conversationalAgent, onOpenC
                 <div className="rounded-2xl overflow-hidden" style={{ background: t.bgCard, border: `1px solid ${t.border}` }}>
                   {group.items.map((conv, idx) => {
                     const agent = conv.agentId != null ? agentMap.get(conv.agentId) : undefined;
-                    const agentName = agent?.name.replace(/_/g, ' ') ?? 'Unknown Agent';
+                    const agentName = agentLabel(agent, agentsConfig.displayNameOverrides) || 'Unknown Agent';
                     return (
                       <button
                         key={conv.id}

@@ -1,3 +1,6 @@
+import { useEffect, useState } from 'react';
+import { goToLauncher } from './routes';
+
 // A way back to the launcher from every surface.
 //
 // Fixed to the viewport rather than added to each surface's own chrome: the
@@ -15,15 +18,22 @@
 // Bottom-left, at the very bottom. Surfaces reserve the corner (desk.css
 // .dk-side, ops-console.html .side) rather than the button dodging whatever is
 // beneath it on any given screen.
-export default function HomeButton() {
-  const home = () => {
-    try { window.location.assign(new URL('./', document.baseURI).href); }
-    catch { window.location.href = '/'; }
-  };
+//
+// Not on the employee phone app at phone width: there the corner is the tab
+// bar's Home tab and the review footer's Flag button, so the way back lives in
+// the role sheet instead (see RoleSheet).
+export default function HomeButton({ route }: { route?: string }) {
+  const [narrow, setNarrow] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 600);
+  useEffect(() => {
+    const on = () => setNarrow(window.innerWidth <= 600);
+    window.addEventListener('resize', on);
+    return () => window.removeEventListener('resize', on);
+  }, []);
+  if (route === 'employee-mobile' && narrow) return null;
   return (
     <button
       type="button"
-      onClick={home}
+      onClick={goToLauncher}
       title="Back to the launcher"
       style={{
         position: 'fixed', bottom: 12, left: 14, zIndex: 2147483000,

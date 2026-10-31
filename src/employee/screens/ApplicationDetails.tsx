@@ -1,9 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { OnboardingCase } from '../../onboarding';
+import { store, type OnboardingCase } from '../../onboarding';
+import { confidenceThresholdPct } from '../../integrations/docRules';
 import { stateMeta, isCorporate } from '../../onboarding/types';
 import { Brand } from '../../customer/ui';
 import Icon from '../../customer/icons';
 import { toRows, type ReviewField } from '../../customer/ExtractionReview';
+import KycExchange from './KycExchange';
+import DocumentChecks from './DocumentChecks';
+import { bvnExchange, ninCheckExchange, ninLinkExchange } from '../../integrations/kyc';
+import type { ValidationStatus } from '../../onboarding/types';
 // Each module is pinned to its own Orchestrator folder, so the case type picks
 // the set — reading an individual instance through the corporate helpers 404s,
 // and vice versa.
@@ -40,16 +45,52 @@ const SOURCE_LABEL: Record<string, string> = {
 };
 
 const when = (iso?: string) => (iso ? new Date(iso).toLocaleString() : '');
-const band = (c: number, missing: boolean) => (missing || c < 80 ? 'lo' : c < 90 ? 'mid' : 'hi');
+const band = (c: number, missing: boolean) => (missing || c < confidenceThresholdPct() ? 'lo' : c < 90 ? 'mid' : 'hi');
 
-function Row({ label, value, mono }: { label: string; value?: string; mono?: boolean }) {
+/** A field while the record is being edited: its current text and a setter. */
+type EditBind = { value: string; set: (v: string) => void };
+
+function Row({ label, value, mono, edit }: { label: string; value?: string; mono?: boolean; edit?: EditBind }) {
   const v = (value ?? '').trim();
+  if (edit) {
+    return (
+      <div className="ad-row editing">
+        <dt>{label}</dt>
+        <dd>
+          <input className={`ad-input${mono ? ' num' : ''}`} value={edit.value} aria-label={label}
+                 placeholder="Not captured" onChange={(ev) => edit.set(ev.target.value)} />
+        </dd>
+      </div>
+    );
+  }
   return (
     <div className="ad-row">
       <dt>{label}</dt>
       <dd className={`${v ? '' : 'empty'} ${mono ? 'num' : ''}`}>{v || 'Not captured'}</dd>
     </div>
   );
+}
+
+// The record's own fields a person can correct here. Everything the Applicant and
+// Employment & account tabs show, bar provenance (channel, batch, timestamps),
+// which is a fact about how the record arrived rather than about the applicant.
+const EDITABLE = [
+  'title', 'firstName', 'middleName', 'lastName', 'dob', 'gender', 'maritalStatus', 'motherMaidenName',
+  'nationality', 'stateOfOrigin', 'bvn', 'nin', 'idType', 'idNumber', 'idExpiry', 'tin',
+  'phone', 'altPhone', 'email', 'address', 'city', 'stateOfResidence', 'lga', 'yearsAtAddress',
+  'employmentStatus', 'occupation', 'employer', 'incomeBand', 'sourceOfFunds',
+  'accountType', 'accountPurpose', 'branch',
+] as const;
+const ENTITY_EDITABLE = ['companyName', 'rcNumber', 'tin', 'businessType', 'sector', 'turnover', 'address', 'email', 'phone'] as const;
+const NOK_EDITABLE = ['name', 'relationship', 'phone', 'address'] as const;
+
+/** The record as flat strings, keyed the way the form binds them. */
+function snapshot(c: OnboardingCase): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const k of EDITABLE) out[k] = String(c[k] ?? '');
+  for (const k of ENTITY_EDITABLE) out[`entity.${k}`] = String(c.entity?.[k] ?? '');
+  for (const k of NOK_EDITABLE) out[`nok.${k}`] = String(c.nextOfKin?.[k] ?? '');
+  return out;
 }
 
 function Section({ title, count, children }: { title: string; count?: number; children: React.ReactNode }) {
@@ -65,8 +106,12 @@ function Nothing({ children }: { children: React.ReactNode }) {
   return <div className="ad-none">{children}</div>;
 }
 
-export default function ApplicationDetails({ c, instanceId, onReviewExtraction, onClose }: {
+export default function ApplicationDetails({ c, instanceId, onReviewExtraction, onClose, initialTab, checkStatus = {} }: {
   c: OnboardingCase;
+  /** Open on this tab rather than the applicant (the BVN/NIN buttons in Checks). */
+  initialTab?: 'bvn' | 'nin' | 'docs';
+  /** Each check's status as the case reports it, so the calls shown agree with it. */
+  checkStatus?: Partial<Record<string, ValidationStatus>>;
   /** The live case, when this record has one — the extraction is read from it. */
   instanceId?: string | null;
   /** Present while the case is still parked at its extraction gate. */
@@ -127,6 +172,12 @@ export default function ApplicationDetails({ c, instanceId, onReviewExtraction, 
   const tabs = useMemo(() => [
     { id: 'who', label: corporate ? 'Business' : 'Applicant' },
     { id: 'account', label: 'Employment & account' },
+    // What NIBSS and NIMC were asked, what they said, and whether it is this
+    // person — opened from the BVN / NIN buttons in the case pane's Checks.
+    { id: 'bvn', label: 'BVN' },
+    { id: 'nin', label: 'NIN' },
+    // Every document checked against the Document rules DMN (BR-DOC-01…08).
+    { id: 'docs', label: 'Document checks' },
     ...(e && e.directors.length ? [{ id: 'directors', label: 'Directors', badge: e.directors.length }] : []),
     // Always offered. "Where did this data come from" has an answer for every
     // record — a scanned form, a payroll row, or someone typing — and a tab bar
@@ -137,10 +188,57 @@ export default function ApplicationDetails({ c, instanceId, onReviewExtraction, 
   ], [corporate, e]);
 
   // A waiting review is the reason the popup was opened, so start there.
-  const [tab, setTab] = useState(onReviewExtraction ? 'extraction' : 'who');
+  const [tab, setTab] = useState<string>(initialTab ?? (onReviewExtraction ? 'extraction' : 'who'));
   const active = tabs.some((t) => t.id === tab) ? tab : 'who';
   /** The Document tab splits the dialog into two full-height frames. */
   const wide = active === 'extraction';
+
+  // Editing. The draft is the whole record as flat strings; Save writes back only
+  // what changed, so a field nobody touched keeps exactly what it had (including
+  // being absent, which the rows show as "Not captured").
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const canEdit = active === 'who' || active === 'account';
+  const startEdit = () => { setDraft(snapshot(c)); setSaveError(''); setEditing(true); };
+  const cancelEdit = () => { setEditing(false); setSaveError(''); };
+  /** Bind a row to the draft while editing; undefined (read-only) otherwise. */
+  const bind = (k: string): EditBind | undefined =>
+    editing ? { value: draft[k] ?? '', set: (v) => setDraft((d) => ({ ...d, [k]: v })) } : undefined;
+
+  const save = async () => {
+    const before = snapshot(c);
+    const changed = (k: string) => (draft[k] ?? '').trim() !== (before[k] ?? '').trim();
+    const patch: Record<string, unknown> = {};
+    for (const k of EDITABLE) {
+      if (!changed(k)) continue;
+      const v = draft[k].trim();
+      // A cleared optional field goes back to absent; the two names stay strings.
+      patch[k] = v || (k === 'firstName' || k === 'lastName' ? '' : undefined);
+    }
+    if (c.entity && ENTITY_EDITABLE.some((k) => changed(`entity.${k}`))) {
+      const ent: Record<string, unknown> = { ...c.entity };
+      for (const k of ENTITY_EDITABLE) ent[k] = draft[`entity.${k}`].trim() || (k === 'companyName' ? '' : undefined);
+      patch.entity = ent;
+    }
+    if (NOK_EDITABLE.some((k) => changed(`nok.${k}`))) {
+      const n = Object.fromEntries(NOK_EDITABLE.map((k) => [k, draft[`nok.${k}`].trim()]));
+      patch.nextOfKin = n.name
+        ? { name: n.name, relationship: n.relationship, phone: n.phone, address: n.address || undefined }
+        : undefined;
+    }
+    if (!Object.keys(patch).length) { setEditing(false); return; }
+    setSaving(true); setSaveError('');
+    try {
+      await store.update(c.id, patch as Partial<OnboardingCase>);
+      setEditing(false);
+    } catch (err) {
+      setSaveError('Could not save: ' + (err as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   // Rendered either under the brand strip (normal) or inside the left frame
   // (Document tab) — same markup, two homes.
@@ -167,60 +265,63 @@ export default function ApplicationDetails({ c, instanceId, onReviewExtraction, 
   const body = (
     <>
           {active === 'web' && <WebResearch c={c} corporate={corporate} e={e} />}
+          {active === 'bvn' && <KycExchange exchanges={[bvnExchange(c, checkStatus.BVN)]} />}
+          {active === 'docs' && <DocumentChecks c={c} />}
+          {active === 'nin' && <KycExchange exchanges={[ninCheckExchange(c, checkStatus.NIN), ninLinkExchange(c)]} />}
           {active === 'who' && (
             <>
               {e && (
                 <Section title="Registered business">
                   <dl className="ad-grid">
-                    <Row label="Registered name" value={e.companyName} />
-                    <Row label="RC number" value={e.rcNumber} mono />
-                    <Row label="Tax ID (TIN)" value={e.tin} mono />
-                    <Row label="Category" value={e.businessType} />
-                    <Row label="Sector" value={e.sector} />
-                    <Row label="Annual turnover" value={e.turnover} />
-                    <Row label="Registered address" value={e.address} />
-                    <Row label="Business email" value={e.email} />
-                    <Row label="Business phone" value={e.phone} mono />
+                    <Row label="Registered name" value={e.companyName} edit={bind('entity.companyName')} />
+                    <Row label="RC number" value={e.rcNumber} mono edit={bind('entity.rcNumber')} />
+                    <Row label="Tax ID (TIN)" value={e.tin} mono edit={bind('entity.tin')} />
+                    <Row label="Category" value={e.businessType} edit={bind('entity.businessType')} />
+                    <Row label="Sector" value={e.sector} edit={bind('entity.sector')} />
+                    <Row label="Annual turnover" value={e.turnover} edit={bind('entity.turnover')} />
+                    <Row label="Registered address" value={e.address} edit={bind('entity.address')} />
+                    <Row label="Business email" value={e.email} edit={bind('entity.email')} />
+                    <Row label="Business phone" value={e.phone} mono edit={bind('entity.phone')} />
                   </dl>
                 </Section>
               )}
 
               <Section title={e ? 'Primary signatory' : 'Personal'}>
                 <dl className="ad-grid">
-                  <Row label="Title" value={c.title} />
-                  <Row label="First name" value={c.firstName} />
-                  <Row label="Middle name" value={c.middleName} />
-                  <Row label="Last name" value={c.lastName} />
-                  <Row label="Date of birth" value={c.dob} />
-                  <Row label="Gender" value={c.gender} />
-                  <Row label="Marital status" value={c.maritalStatus} />
-                  <Row label="Mother's maiden name" value={c.motherMaidenName} />
-                  <Row label="Nationality" value={c.nationality} />
-                  <Row label="State of origin" value={c.stateOfOrigin} />
+                  <Row label="Title" value={c.title} edit={bind('title')} />
+                  <Row label="First name" value={c.firstName} edit={bind('firstName')} />
+                  <Row label="Middle name" value={c.middleName} edit={bind('middleName')} />
+                  <Row label="Last name" value={c.lastName} edit={bind('lastName')} />
+                  <Row label="Date of birth" value={c.dob} edit={bind('dob')} />
+                  <Row label="Gender" value={c.gender} edit={bind('gender')} />
+                  <Row label="Marital status" value={c.maritalStatus} edit={bind('maritalStatus')} />
+                  <Row label="Mother's maiden name" value={c.motherMaidenName} edit={bind('motherMaidenName')} />
+                  <Row label="Nationality" value={c.nationality} edit={bind('nationality')} />
+                  <Row label="State of origin" value={c.stateOfOrigin} edit={bind('stateOfOrigin')} />
                 </dl>
               </Section>
 
               <Section title="Identification">
                 <dl className="ad-grid">
-                  <Row label={kycLabelAuthority('BVN', ' · ', CO)} value={c.bvn} mono />
-                  <Row label={kycLabelAuthority('NIN', ' · ', CO)} value={c.nin} mono />
-                  <Row label="Means of ID" value={c.idType} />
-                  <Row label="ID number" value={c.idNumber} mono />
-                  <Row label="ID expiry" value={c.idExpiry} />
-                  <Row label="Tax ID (TIN)" value={c.tin} mono />
+                  <Row label={kycLabelAuthority('BVN', ' · ', CO)} value={c.bvn} mono edit={bind('bvn')} />
+                  <Row label={kycLabelAuthority('NIN', ' · ', CO)} value={c.nin} mono edit={bind('nin')} />
+                  <Row label="Means of ID" value={c.idType} edit={bind('idType')} />
+                  <Row label="ID number" value={c.idNumber} mono edit={bind('idNumber')} />
+                  <Row label="ID expiry" value={c.idExpiry} edit={bind('idExpiry')} />
+                  <Row label="Tax ID (TIN)" value={c.tin} mono edit={bind('tin')} />
                 </dl>
               </Section>
 
               <Section title="Contact and address">
                 <dl className="ad-grid">
-                  <Row label="Phone" value={c.phone} mono />
-                  <Row label="Alternate phone" value={c.altPhone} mono />
-                  <Row label="Email" value={c.email} />
-                  <Row label="Address" value={c.address} />
-                  <Row label="City / town" value={c.city} />
-                  <Row label="State" value={c.stateOfResidence} />
-                  <Row label="LGA / district" value={c.lga} />
-                  <Row label="Years at address" value={c.yearsAtAddress} />
+                  <Row label="Phone" value={c.phone} mono edit={bind('phone')} />
+                  <Row label="Alternate phone" value={c.altPhone} mono edit={bind('altPhone')} />
+                  <Row label="Email" value={c.email} edit={bind('email')} />
+                  <Row label="Address" value={c.address} edit={bind('address')} />
+                  <Row label="City / town" value={c.city} edit={bind('city')} />
+                  <Row label="State" value={c.stateOfResidence} edit={bind('stateOfResidence')} />
+                  <Row label="LGA / district" value={c.lga} edit={bind('lga')} />
+                  <Row label="Years at address" value={c.yearsAtAddress} edit={bind('yearsAtAddress')} />
                 </dl>
               </Section>
 
@@ -231,29 +332,31 @@ export default function ApplicationDetails({ c, instanceId, onReviewExtraction, 
             <>
               <Section title="Employment and income">
                 <dl className="ad-grid">
-                  <Row label="Employment status" value={c.employmentStatus} />
-                  <Row label="Occupation" value={c.occupation} />
-                  <Row label="Employer" value={c.employer} />
-                  <Row label="Annual income" value={c.incomeBand} />
-                  <Row label="Source of funds" value={c.sourceOfFunds} />
+                  <Row label="Employment status" value={c.employmentStatus} edit={bind('employmentStatus')} />
+                  <Row label="Occupation" value={c.occupation} edit={bind('occupation')} />
+                  <Row label="Employer" value={c.employer} edit={bind('employer')} />
+                  <Row label="Annual income" value={c.incomeBand} edit={bind('incomeBand')} />
+                  <Row label="Source of funds" value={c.sourceOfFunds} edit={bind('sourceOfFunds')} />
                 </dl>
               </Section>
 
               <Section title="The account applied for">
                 <dl className="ad-grid">
-                  <Row label="Account type" value={c.accountType} />
-                  <Row label="Purpose" value={c.accountPurpose} />
-                  <Row label="Preferred branch" value={c.branch} />
+                  <Row label="Account type" value={c.accountType} edit={bind('accountType')} />
+                  <Row label="Purpose" value={c.accountPurpose} edit={bind('accountPurpose')} />
+                  <Row label="Preferred branch" value={c.branch} edit={bind('branch')} />
                 </dl>
               </Section>
 
               <Section title="Next of kin">
-                {c.nextOfKin ? (
+                {/* While editing, offered even when none was captured — adding one is
+                    as much a correction as fixing one. */}
+                {c.nextOfKin || editing ? (
                   <dl className="ad-grid">
-                    <Row label="Name" value={c.nextOfKin.name} />
-                    <Row label="Relationship" value={c.nextOfKin.relationship} />
-                    <Row label="Phone" value={c.nextOfKin.phone} mono />
-                    <Row label="Address" value={c.nextOfKin.address} />
+                    <Row label="Name" value={c.nextOfKin?.name} edit={bind('nok.name')} />
+                    <Row label="Relationship" value={c.nextOfKin?.relationship} edit={bind('nok.relationship')} />
+                    <Row label="Phone" value={c.nextOfKin?.phone} mono edit={bind('nok.phone')} />
+                    <Row label="Address" value={c.nextOfKin?.address} edit={bind('nok.address')} />
                   </dl>
                 ) : <Nothing>No next of kin was captured on this application.</Nothing>}
               </Section>
@@ -412,7 +515,20 @@ export default function ApplicationDetails({ c, instanceId, onReviewExtraction, 
         )}
 
         <div className="cx-foot">
-          <button className="cx-btn" onClick={onClose}>Close</button>
+          {saveError && <div className="ad-save-err" role="alert">{saveError}</div>}
+          {editing ? (
+            <div className="ad-foot-row">
+              <button className="cx-btn ghost" onClick={cancelEdit} disabled={saving}>Cancel</button>
+              <button className="cx-btn" onClick={() => void save()} disabled={saving}>{saving ? 'Saving…' : 'Save changes'}</button>
+            </div>
+          ) : (
+            <div className="ad-foot-row">
+              {/* Offered where the fields are — the Document and Web research tabs
+                  show what was read and found, which is not the record to edit. */}
+              {canEdit && <button className="cx-btn ghost" onClick={startEdit}>Edit details</button>}
+              <button className="cx-btn" onClick={onClose}>Close</button>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -20,14 +20,17 @@ import MyDesk from './screens/MyDesk';
 import Opening from './screens/Opening';
 import Approvals from './screens/Approvals';
 import Clients from './screens/Clients';
+import BulkOpening from './bulk/BulkOpening';
+import type { Persona } from './roles';
 import './desk.css';
 
-export type Dest = 'desk' | 'open-account' | 'approvals' | 'customers' | 'chat' | 'explore' | 'alerts' | 'profile';
+export type Dest = 'desk' | 'open-account' | 'bulk' | 'approvals' | 'customers' | 'chat' | 'explore' | 'alerts' | 'profile';
 
 const SLIM_KEY = 'dk_rail_slim';
 
-/** Everything the branch captured, newest first, live off the shared store. */
-function useBranchCases(): OnboardingCase[] {
+/** Everything the branch captured, newest first, live off the shared store.
+ *  Exported for the phone's work screens, which show the same pipeline. */
+export function useBranchCases(): OnboardingCase[] {
   const [list, setList] = useState<OnboardingCase[]>([]);
   useEffect(() => {
     let alive = true;
@@ -58,6 +61,10 @@ export interface DeskProps {
 export default function DeskShell({ userName, userEmail, unreadAlerts = 0, onLogout, agentSurfaces, onAlertsSeen }: DeskProps) {
   const { branding } = useConfig();
   const [dest, setDest] = useState<Dest>('desk');
+  // Which job the banker is doing. Batch opening is maker-checker (§9.1): the
+  // person who confirms an OCR read may not be the one who opens the account.
+  // Both jobs are on THIS desk, so it is a persona rather than another tool.
+  const [persona, setPersona] = useState<Persona>('rm');
   // null = nothing open; '' = start a new capture; an id = that application.
   const [flow, setFlow] = useState<string | null>(null);
   const cases = useBranchCases();
@@ -75,11 +82,15 @@ export default function DeskShell({ userName, userEmail, unreadAlerts = 0, onLog
     opening: cases.filter((c) => c.state !== 'FULLY_ACTIVATED').length,
     attention: cases.filter((c) => c.state === 'EXCEPTION' || c.state === 'PENDING_LIVENESS' || c.state === 'PENDING_DOCUMENTS').length,
     approvals: approvalsPulse().pending,
+    // Bulk rows still needing a person — a maker's review or a verifier's signature.
+    bulk: cases.filter((c) => c.reviewState === 'awaiting'
+      || (c.reviewState === 'approved' && !c.accountNumber)).length,
   }), [cases]);
 
   const go = (d: Dest) => {
     setDest(d);
     if (d !== 'open-account') setFlow(null);
+    if (d !== 'bulk') setPersona('rm');
     if (d === 'alerts') onAlertsSeen?.();
   };
   const openCase = (id: string) => { setDest('open-account'); setFlow(id); };
@@ -110,12 +121,20 @@ export default function DeskShell({ userName, userEmail, unreadAlerts = 0, onLog
         {/* Who am I, and what else could I be? The desk and the Operations
             Workbench share a design language on purpose — this is what makes
             that read as one platform rather than as the same app twice. */}
-        <RoleSwitch active="rm" />
+        <RoleSwitch active="rm" persona={dest === 'bulk' ? persona : undefined} />
 
         <div className="scroll">
           <h2>Your desk</h2>
           <Nav d="desk" on={dest} go={go} ic="desk" label="My desk" badge={counts.attention} hot={counts.attention > 0} />
           <Nav d="open-account" on={dest} go={go} ic="idcard" label="Open an account" badge={counts.opening} />
+          {/* Its own destination, not a pane inside Open an account: the review
+              checkpoint is a side-by-side document view and the batch table has
+              to hold 200 rows. Neither fits in half a window.
+
+              Named for the UNIT OF WORK, not the act. "Bulk opening" beside
+              "Open an account" read as two doors onto the same job; they are a
+              directory and a workbench, and the labels now say so. */}
+          <Nav d="bulk" on={dest} go={go} ic="layers" label="Batches" badge={counts.bulk} />
           <Nav d="approvals" on={dest} go={go} ic="check" label="Approvals" badge={counts.approvals} />
           <Nav d="customers" on={dest} go={go} ic="users" label="Clients" />
 
@@ -152,7 +171,8 @@ export default function DeskShell({ userName, userEmail, unreadAlerts = 0, onLog
         </div>
 
         {dest === 'desk' && <MyDesk cases={cases} onNavigate={go} onOpenCase={openCase} onNewApplication={newApplication} />}
-        {dest === 'open-account' && <Opening cases={cases} flow={flow} setFlow={setFlow} onNewApplication={newApplication} captureSeq={captureSeq} />}
+        {dest === 'open-account' && <Opening cases={cases} flow={flow} setFlow={setFlow} onNewApplication={newApplication} captureSeq={captureSeq} onBulk={() => go('bulk')} />}
+        {dest === 'bulk' && <BulkOpening persona={persona} onPersona={setPersona} />}
         {dest === 'approvals' && <Approvals />}
         {dest === 'customers' && <Clients />}
         {dest === 'chat' && <div className="dk-hold">{agentSurfaces.chat}</div>}

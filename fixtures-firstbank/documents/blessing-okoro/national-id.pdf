@@ -1,0 +1,71 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 595 >>
+stream
+BT
+/F1 16 Tf
+1 0 0 1 56 780 Tm
+(National Identity Card \(scan\)) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 760 Tm
+(DEMO DATA - not a real customer. Replace when FirstBank supplies the real document.) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 728 Tm
+(Surname            OKORO) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 708 Tm
+(Given names        BLESSING) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 688 Tm
+(NIN                10120000108) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 668 Tm
+(Date of birth      22/02/1991) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 648 Tm
+(Issuing authority  NIMC) Tj
+ET
+BT
+/F1 11 Tf
+1 0 0 1 56 628 Tm
+(Expiry             30/05/2029) Tj
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000887 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+957
+%%EOF

@@ -57,6 +57,7 @@ export const defaultConfig: TenantConfig = {
     // Only these agent display names appear in the Chat Agents section.
     // Others are excluded. Order here is the display order.
     allowedChatAgentNames: [
+      'Stanbic_Convo_Agent',
       'HR Assistant',
       'FinSight Agent',
       'Cheque Processing Agent',
@@ -71,7 +72,7 @@ export const defaultConfig: TenantConfig = {
     ],
     // Override the display name of specific agents in headers/menus.
     displayNameOverrides: {
-      'Ask UiPath': 'Ask UiPath',
+      'Stanbic_Convo_Agent': 'Ask Pulse',
     },
   },
 
@@ -463,5 +464,14 @@ export const defaultConfig: TenantConfig = {
       { cause: 'Liveness below threshold', queue: 'Manual review', assignTo: '' },
       { cause: 'Documents outstanding', queue: 'Customer chaser', assignTo: '' },
     ],
+  },
+
+  // ── Employee app roles ───────────────────────────────────────────────
+  // The phone opens as a Relationship Manager; every role is switchable so a
+  // demo can walk the branch, the maker-checker pair and operations in one app.
+  employeeApp: {
+    defaultRole: 'rm',
+    roles: ['rm', 'maker', 'verifier', 'ops'],
+    allowSwitch: true,
   },
 };

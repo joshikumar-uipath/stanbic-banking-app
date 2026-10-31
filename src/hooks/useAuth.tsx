@@ -5,6 +5,7 @@ import type { UiPathSDKConfig } from '@uipath/uipath-typescript/core';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { App as CapacitorApp } from '@capacitor/app';
+import { detectRoute } from '../skeleton/routes';
 
 // Module-level: deduplicates OAuth completion to handle React 18 StrictMode's
 // double-invocation of effects during development (each effect fires twice).
@@ -107,7 +108,15 @@ export const AuthProvider: React.FC<{ children: ReactNode; config: UiPathSDKConf
         // Without this guard, a stale sessionStorage context from a prior failed
         // attempt causes completeOAuth() to throw "Authorization code missing".
         const urlHasCode = new URLSearchParams(window.location.search).has('code');
-        if (!demoInitRef.current && demoToken && !urlHasCode) {
+        // The phone app (the employee app, and any native build) is what goes to
+        // the App Store: it must open on its welcome and sign-in screens, not
+        // silently sign everyone in. It only restores a session someone actually
+        // started (and keeps it until they sign out). The web desk and demo
+        // surfaces still sign straight in.
+        const phoneApp = Capacitor.isNativePlatform() || detectRoute() === 'employee-mobile';
+        let remembered = false;
+        try { remembered = localStorage.getItem(DEMO_SESSION_KEY) === '1'; } catch { /* storage unavailable */ }
+        if (!demoInitRef.current && demoToken && !urlHasCode && (!phoneApp || remembered)) {
           demoInitRef.current = true;
           const secretSdk = new UiPath({
             baseUrl: config.baseUrl, orgName: config.orgName, tenantName: config.tenantName,

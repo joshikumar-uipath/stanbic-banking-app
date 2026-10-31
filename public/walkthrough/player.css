@@ -1,0 +1,139 @@
+/* Demo walkthrough player. Family A (staff tools): IBM Plex, square, hairlines. */
+:root {
+  /* FirstBank: blue #003B65, gold #F0BD2D (from the admin theme). */
+  --brand: #003B65; --brand-rgb: 0, 59, 101; --accent: #F0BD2D; --accent-rgb: 240, 189, 45;
+  --navy: #002a48; --ink: #0b1220; --text: #4a5261; --soft: #566072; --faint: #8a93a1;
+  --line: #e6e9ef; --line-2: #eef1f5; --wash: #f6f8fb; --ground: #eef1f6;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { background: var(--ground); color: var(--text); font: 400 14px/1.5 'IBM Plex Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+button { font: inherit; }
+.num { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+.wt { display: flex; flex-direction: column; height: 100vh; }
+.wt-top { flex: none; display: flex; align-items: center; gap: 18px; padding: 10px 18px; background: #fff; border-bottom: 1px solid var(--line); }
+.wt-brand { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--ink); flex: none; }
+.wt-brand img { width: 26px; height: 26px; }
+.wt-brand b { display: block; font: 700 14px/1.2 'IBM Plex Sans', sans-serif; }
+.wt-brand small { display: block; font: 500 11px/1.3 var(--mono); color: var(--faint); letter-spacing: .02em; }
+.wt-prog { flex: 1; display: flex; gap: 8px; min-width: 0; }
+.wt-stage-seg { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; border: 0; background: none; padding: 2px 0; cursor: pointer; text-align: left; }
+.wt-stage-seg .lab { display: flex; align-items: center; gap: 6px; font: 600 11px/1.2 'IBM Plex Sans', sans-serif; color: var(--ink-4); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wt-stage-seg .lab em { flex: none; width: 16px; height: 16px; display: grid; place-items: center; font: 700 9.5px/1 var(--mono); font-style: normal; border: 1px solid var(--line); color: var(--ink-4); }
+.wt-stage-seg .bar { display: block; height: 6px; background: #d9dee6; }
+.wt-stage-seg .bar i { display: block; height: 100%; width: 0; background: var(--brand); transition: width .35s ease; }
+.wt-stage-seg.done .lab { color: var(--ink-2); }
+.wt-stage-seg.done .lab em { background: rgba(var(--brand-rgb), .1); border-color: transparent; color: var(--brand); }
+.wt-stage-seg.done .bar i { background: rgba(var(--brand-rgb), .45); }
+.wt-stage-seg.on .lab { color: var(--ink); font-weight: 700; }
+.wt-stage-seg.on .lab em { background: var(--brand); border-color: var(--brand); color: #fff; }
+.wt-stage-seg:hover .lab { color: var(--brand); }
+.wt-stage-seg:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+.wt-count { flex: none; font-size: 12px; color: var(--soft); }
+
+.wt-body { flex: 1; display: flex; min-height: 0; }
+.wt-rail { flex: none; width: 260px; overflow-y: auto; background: #fff; border-right: 1px solid var(--line); padding: 10px 0 24px; transition: margin-left .25s ease; }
+.wt.norail .wt-rail { margin-left: -260px; }
+.wt-railbtn { flex: none; display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 7px 10px; font: 600 12px/1 'IBM Plex Sans', sans-serif; cursor: pointer; }
+.wt-railbtn svg { width: 15px; height: 15px; }
+.wt-railbtn:hover { border-color: var(--brand); }
+.wt:not(.norail) .wt-railbtn { background: var(--wash); }
+.wt-act { margin: 14px 16px 6px; font: 600 10.5px/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+.wt-act:first-child { margin-top: 4px; }
+.wt-sc { display: flex; gap: 10px; width: 100%; text-align: left; border: 0; border-left: 3px solid transparent; background: none; padding: 7px 14px 7px 13px; cursor: pointer; color: var(--ink); }
+.wt-sc:hover { background: var(--wash); }
+.wt-sc .n { flex: none; width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--line); font: 600 11px/1 var(--mono); color: var(--soft); }
+.wt-sc b { display: block; font: 500 13px/1.3 'IBM Plex Sans', sans-serif; }
+.wt-sc small { display: block; font-size: 11.5px; color: var(--faint); }
+.wt-sc.done .n { background: rgba(var(--brand-rgb), .08); color: var(--brand); border-color: rgba(var(--brand-rgb), .2); }
+.wt-sc.on { background: rgba(var(--brand-rgb), .06); border-left-color: var(--brand); }
+.wt-sc.on .n { background: var(--brand); color: #fff; border-color: var(--brand); }
+
+/* The flow picker, left of the screen. */
+.wt-flows { flex: none; width: 200px; padding: 14px 0 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+.wt-flows label { font: 600 10.5px/1.2 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
+.wt-flows select { width: 100%; border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 8px 10px; font: 600 13px/1.3 'IBM Plex Sans', sans-serif; cursor: pointer; }
+.wt-flows select:hover { border-color: var(--brand); }
+.wt-flows select:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+
+/* The screen takes every pixel the side panels leave: as wide as fits, as tall as fits. */
+.wt-stage { flex: 1; min-width: 0; min-height: 0; padding: 10px; display: flex; align-items: center; justify-content: center; container-type: size; }
+.wt-win { width: min(100cqw, (100cqh - 34px) * 1.6); background: #fff; border: 1px solid #d7dce4; box-shadow: 0 24px 60px -30px rgba(1, 20, 70, .45); display: flex; flex-direction: column; }
+.wt-bar { flex: none; height: 34px; display: flex; align-items: center; gap: 12px; padding: 0 12px; background: #f1f3f7; border-bottom: 1px solid var(--line); min-width: 0; }
+.wt-dots { display: flex; gap: 6px; flex: none; }
+.wt-dots i { width: 10px; height: 10px; border-radius: 50%; background: #d3d8e0; }
+.wt-app { flex: none; font: 600 11.5px/1 'IBM Plex Sans', sans-serif; color: var(--ink); background: #fff; border: 1px solid var(--line); padding: 5px 9px; }
+.wt-url { flex: 1; min-width: 0; font-size: 11.5px; color: var(--soft); background: #fff; border: 1px solid var(--line); padding: 5px 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.wt-screen { position: relative; aspect-ratio: 1440 / 900; overflow: hidden; background: #f4f6fa; container-type: inline-size; }
+.wt-screen img { position: absolute; inset: 0; width: 100%; height: 100%;  transition: opacity .35s ease; }
+#imgB { opacity: 0; }
+.wt-screen video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity .35s ease; background: #000; }
+.wt-screen video.on { opacity: 1; }
+
+.wt-ring { position: absolute; border: 2.5px solid var(--accent); box-shadow: 0 0 0 4px rgba(var(--accent-rgb), .18); opacity: 0; transition: opacity .25s, left .5s, top .5s, width .5s, height .5s; pointer-events: none; }
+.wt-ring.on { opacity: 1; }
+.wt-cursor { position: absolute; width: 3.1cqw; height: 3.1cqw; min-width: 18px; min-height: 18px; left: 50%; top: 60%; transform: translate(-22%, -12%); transition: left .7s cubic-bezier(.45, 0, .2, 1), top .7s cubic-bezier(.45, 0, .2, 1), opacity .3s; filter: drop-shadow(0 2px 3px rgba(0,0,0,.25)); pointer-events: none; z-index: 3; opacity: 0; }
+.wt-cursor.on { opacity: 1; }
+.wt-cursor.press { transform: translate(-22%, -12%) scale(.86); }
+.wt-ripple { position: absolute; width: 4.4cqw; height: 4.4cqw; margin: -2.2cqw 0 0 -2.2cqw; border-radius: 50%; background: rgba(var(--accent-rgb), .45); opacity: 0; pointer-events: none; z-index: 2; }
+.wt-ripple.go { animation: wt-rip .6s ease-out; }
+@keyframes wt-rip { from { transform: scale(.2); opacity: .9; } to { transform: scale(1.6); opacity: 0; } }
+.wt-typed { position: absolute; display: flex; align-items: center; padding-left: .95cqw; font: 400 1.05cqw/1 Inter, system-ui, sans-serif; color: #11181d; white-space: pre; overflow: hidden; pointer-events: none; z-index: 1; }
+.wt-typed::after { content: ''; width: 1.5px; height: 1.2cqw; margin-left: 1px; background: #11181d; animation: wt-blink 1s steps(1) infinite; }
+.wt-typed:empty::after, .wt-typed.done::after { display: none; }
+@keyframes wt-blink { 50% { opacity: 0; } }
+
+.wt-title { position: absolute; inset: 0; z-index: 4; display: flex; flex-direction: column; justify-content: center; padding: 0 9cqw; background: rgba(1, 31, 99, .92); color: #fff; opacity: 0; pointer-events: none; transition: opacity .4s; }
+.wt-title.on { opacity: 1; }
+.wt-title span { font: 600 1.15cqw/1.2 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: #8fd3f5; }
+.wt-title b { margin-top: 1.2cqw; font: 700 3.6cqw/1.08 'IBM Plex Sans', sans-serif; letter-spacing: -.02em; }
+.wt-title small { margin-top: 1.4cqw; font: 500 1.4cqw/1.3 'IBM Plex Sans', sans-serif; color: rgba(255,255,255,.75); }
+
+/* Right column: what is happening, and the playback controls. */
+.wt-side { flex: none; width: 300px; display: flex; flex-direction: column; gap: 14px; padding: 14px 14px 14px 4px; overflow-y: auto; }
+.wt-cap { background: #fff; border: 1px solid var(--line); border-top: 3px solid var(--brand); padding: 14px 16px 16px; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.wt-chip { font: 600 10.5px/1 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: #9a6b1e; background: #fbf4e6; padding: 5px 7px; }
+.wt-chip.staff { color: var(--brand); background: rgba(var(--brand-rgb), .08); }
+.wt-chip.agent { color: #0f6f4f; background: #ecf6f1; }
+.wt-scene { font: 600 14px/1.3 'IBM Plex Sans', sans-serif; color: var(--ink); }
+.wt-step { font-size: 11.5px; color: var(--faint); }
+.wt-cap p { margin: 6px 0 0; font-size: 16px; line-height: 1.55; color: var(--ink); }
+
+.wt-ctl { display: flex; flex-direction: column; gap: 8px; }
+.wt-row { display: grid; grid-template-columns: 1fr 1.3fr 1fr; gap: 6px; }
+.wt-row button { border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 10px 6px; font-weight: 600; font-size: 13px; cursor: pointer; }
+.wt-row button.pri { background: var(--brand); color: #fff; border-color: var(--brand); }
+.wt-row button:hover { border-color: var(--brand); }
+.wt-more { border: 1px solid var(--line); background: #fff; }
+.wt-more summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; padding: 9px 12px; font: 600 12.5px/1 'IBM Plex Sans', sans-serif; color: var(--soft); user-select: none; }
+.wt-more summary::-webkit-details-marker { display: none; }
+.wt-more summary::before { content: ''; width: 6px; height: 6px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg); transition: transform .15s; margin-right: 2px; }
+.wt-more[open] summary::before { transform: rotate(45deg); }
+.wt-more summary:hover { color: var(--ink); }
+.wt-more-b { display: flex; flex-direction: column; gap: 8px; padding: 0 10px 10px; }
+.wt-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.wt-row2 button { border: 1px solid var(--line); background: #fff; color: var(--ink); padding: 8px 6px; font-weight: 600; font-size: 12.5px; cursor: pointer; }
+.wt-row2 button:hover { border-color: var(--brand); }
+.wt-ver { display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--line); background: #fff; }
+.wt-ver button { border: 0; background: none; padding: 8px 6px; font-size: 12px; font-weight: 600; color: var(--soft); cursor: pointer; }
+.wt-ver button.on { background: var(--brand); color: #fff; }
+.wt-sp { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--line); background: #fff; }
+.wt-sp button { border: 0; background: none; padding: 8px 6px; font-size: 12px; font-weight: 600; color: var(--soft); cursor: pointer; }
+.wt-sp button.on { background: var(--ink); color: #fff; }
+.wt-keys { margin: 2px 0 0; font-size: 11.5px; color: var(--faint); }
+
+/* Embedded in the director: no own header. */
+.embed .wt-top .wt-brand { display: none; }
+
+@media (max-width: 900px) {
+  .wt-body { flex-direction: column; overflow-y: auto; }
+  .wt-rail { display: none; }
+  .wt-stage { flex: none; height: auto; container-type: inline-size; }
+  .wt-win { width: 100%; }
+  .wt-side { width: auto; padding: 0 10px 14px; }
+  .wt-flows { width: auto; padding: 12px 10px 0; }
+  .wt-keys, .wt-brand small, .wt-prog, .wt-railbtn { display: none; }
+  .wt-top { padding: 10px 16px; justify-content: space-between; }
+}

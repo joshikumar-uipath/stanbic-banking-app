@@ -36,6 +36,14 @@
 .ld-sub { font-size: 16px; line-height: 1.55; color: var(--ld-soft); max-width: 580px; margin: 0; }
 .ld-sub b { color: var(--ld-ink); font-weight: 600; }
 
+/* Feature guide banner — the static guide under public/guide/. */
+.ld-guide { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-top: 18px; padding: 13px 16px; border: 1px solid rgba(var(--ld-brand-rgb), .22); border-radius: 0; background: rgba(var(--ld-brand-rgb), .05); text-decoration: none; color: var(--ld-ink); max-width: 760px; }
+.ld-guide:hover { background: rgba(var(--ld-brand-rgb), .09); }
+.ld-guide:focus-visible { outline: 2px solid var(--ld-brand); outline-offset: 2px; }
+.ld-guide b { font: 700 14px/1.2 'IBM Plex Sans', 'Libre Franklin', system-ui, sans-serif; color: var(--ld-brand); }
+.ld-guide span { flex: 1 1 280px; font-size: 13.5px; color: var(--ld-soft); min-width: 0; }
+.ld-guide em { font: 600 13px/1 'IBM Plex Sans', 'Libre Franklin', system-ui, sans-serif; font-style: normal; color: var(--ld-brand); }
+
 /* ── Section heads ── */
 .ld-group-h { display: flex; align-items: baseline; justify-content: space-between; margin: 0 0 13px; padding: 0 4px; }
 .ld-group-h .l { font: 700 15px/1 'IBM Plex Sans', 'Libre Franklin', system-ui, sans-serif; letter-spacing: -.01em; color: var(--ld-ink); }

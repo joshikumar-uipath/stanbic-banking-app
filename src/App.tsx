@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import type { FormEvent } from 'react';
 import { Capacitor } from '@capacitor/core';
 import './App.css';
@@ -9,17 +9,19 @@ import type { TenantConnection } from './onboarding/tenantSelection';
 import type { UiPathSDKConfig } from '@uipath/uipath-typescript/core';
 import { ConversationalAgent } from '@uipath/uipath-typescript/conversational-agent';
 import type { AgentGetResponse } from '@uipath/uipath-typescript/conversational-agent';
-import HomeTab from './components/HomeTab';
-import CustomersTab from './components/CustomersTab';
-import ApprovalsTab from './components/ApprovalsTab';
-import OpenAccountTab from './components/OpenAccountTab';
 import DeskShell from './employee/DeskShell';
+import MobileWork from './employee/mobile/MobileWork';
+import MobileApprovals from './employee/mobile/screens/Approvals';
+import MobileClients from './employee/mobile/screens/Clients';
+import RoleSheet from './employee/mobile/RoleSheet';
+import { useEmployeeRole } from './employee/mobile/role';
 import ExploreTab from './components/ExploreTab';
 import ChatHistoryTab from './components/ChatHistoryTab';
+import { findPrimaryAgent } from './config/primaryAgent';
 import ChatView from './components/ChatView';
 import ProfileTab from './components/ProfileTab';
 import AlertsTab, { getInitialUnreadCount } from './components/AlertsTab';
-import BottomNav, { type Tab } from './components/BottomNav';
+import type { Tab } from './components/BottomNav';
 import LoopingVideo from './components/LoopingVideo';
 import GuestChat from './components/GuestChat';
 import WelcomeScreen from './components/WelcomeScreen';
@@ -193,53 +195,14 @@ function MainApp({ shell = 'mobile' }: { shell?: Shell }) {
   const [activeTab, setActiveTab] = useState<Tab>('home');
   const [customersOpen, setCustomersOpen] = useState(false); // Option B: Customers flow as an overlay launched from Home
   const [approvalsOpen, setApprovalsOpen] = useState(false); // Mobile Approvals — overlay launched from Home
-  const [openAccountOpen, setOpenAccountOpen] = useState(false); // Assisted account opening — overlay on the phone, a destination on the desk
-  const [exploreInitialCap, setExploreInitialCap] = useState<string | null>(null);
+  // Whose job the phone is doing (Relationship Manager, maker, verifier, ops).
+  const { role, setRole, config: roleCfg } = useEmployeeRole();
+  const [roleSheet, setRoleSheet] = useState(false);
+  const canSwitchRole = roleCfg.allowSwitch && roleCfg.roles.length > 1;
+  const [exploreInitialCap] = useState<string | null>(null);
   const [unreadAlerts, setUnreadAlerts] = useState(() => getInitialUnreadCount());
-  const [homeNavPressCount, setHomeNavPressCount] = useState(0);
-  const [selectedAgent, setSelectedAgent] = useState<AgentGetResponse | null>(null);
   const [chatAgent, setChatAgent] = useState<AgentGetResponse | null>(null);
   const [chatConversationId, setChatConversationId] = useState<string | undefined>(undefined);
-
-  // ── Claim Data Verification notification banner (app-wide) ──
-  const [claimNotif, setClaimNotif] = useState<{ Id: number; Title: string } | null>(null);
-  const [claimNotifDismissing, setClaimNotifDismissing] = useState(false);
-  const dismissClaimNotif = useCallback(() => {
-    setClaimNotifDismissing(true);
-    setTimeout(() => { setClaimNotif(null); setClaimNotifDismissing(false); }, 500);
-  }, []);
-  const claimNotifShownRef = useRef<Set<number>>(new Set());
-  const TEAL = branding.primaryColor;
-
-  const checkClaimNotif = useCallback(() => {
-    const token = sdk.getToken();
-    if (!token) return;
-    const orgName = import.meta.env.VITE_UIPATH_ORG_NAME || 'mea';
-    const tenantName = import.meta.env.VITE_UIPATH_TENANT_NAME || 'DefaultTenant';
-    const apiBase = import.meta.env.DEV
-      ? `/${orgName}/${tenantName}/orchestrator_`
-      : `https://staging.api.uipath.com/${orgName}/${tenantName}/orchestrator_`;
-    fetch(`${apiBase}/odata/Tasks/UiPath.Server.Configuration.OData.GetTasksAcrossFolders?$top=5&$orderby=CreationTime desc&$filter=Status ne 'Completed'`, {
-      headers: { Authorization: `Bearer ${token}` },
-    }).then(r => r.ok ? r.json() : null).then(data => {
-      if (!data) return;
-      const now = Date.now();
-      const recent = (data.value || []).find((t: { Id: number; Title: string; CreationTime: string }) =>
-        t.Title.includes('Claim Data Verification') &&
-        (now - new Date(t.CreationTime).getTime()) < 60000 &&
-        !claimNotifShownRef.current.has(t.Id)
-      );
-      if (recent) {
-        claimNotifShownRef.current.add(recent.Id);
-        setClaimNotif({ Id: recent.Id, Title: recent.Title });
-        setTimeout(() => dismissClaimNotif(), 6000);
-      }
-    }).catch(() => {});
-  }, [sdk]);
-
-  useEffect(() => {
-    if (isAuthenticated) checkClaimNotif();
-  }, [isAuthenticated, checkClaimNotif]);
 
   // iOS Low Power Mode blocks autoplay even for muted+playsInline videos.
   // First user gesture lifts the restriction — kick paused videos on the
@@ -247,7 +210,8 @@ function MainApp({ shell = 'mobile' }: { shell?: Shell }) {
   // play button.
   useEffect(() => {
     const playAll = () => {
-      document.querySelectorAll('video').forEach(v => {
+      // Videos that manage their own playback (data-managed) are left alone.
+      document.querySelectorAll<HTMLVideoElement>('video:not([data-managed])').forEach(v => {
         if (v.paused) v.play().catch(() => {});
       });
     };
@@ -259,6 +223,19 @@ function MainApp({ shell = 'mobile' }: { shell?: Shell }) {
 
   const conversationalAgent = useMemo(() => new ConversationalAgent(sdk), [sdk]);
 
+  // The phone's Aura tab hands off to the bank's agent (Ask Pulse) — from its
+  // header, and with the banker's question when Aura can't answer it itself.
+  const askPulse = useCallback(async (question?: string) => {
+    const all = await conversationalAgent.getAll().catch(() => []);
+    const agent = findPrimaryAgent(all) ?? all[0];
+    if (!agent) return;
+    setChatConversationId(undefined);
+    setChatContext(question?.trim()
+      ? { agentName: agent.name, summary: '', timeAgo: '', autoItems: [], reviewItems: [], prefill: question, prefillVoice: false }
+      : undefined);
+    setChatAgent(agent);
+  }, [conversationalAgent]);
+
   // Keep showing loading orb during OAuth callback — prevents brief login screen flash
   // while the auth hook is exchanging the code for a token
   const isOAuthCallback = new URLSearchParams(window.location.search).has('code');
@@ -269,7 +246,7 @@ function MainApp({ shell = 'mobile' }: { shell?: Shell }) {
     return <WelcomeScreen onContinue={() => setStage('chat')} />;
   }
 
-  // ── Guest chat ("Ask UiPath") ─────────────────────────────────────
+  // ── Guest chat ("Ask Pulse") ──────────────────────────────────────
   // Apple guideline 5.1.1(i): non-account-based features (chat with the AI)
   // must be accessible without sign-in.
   if (!isAuthenticated && stage === 'chat') {
@@ -323,7 +300,7 @@ function MainApp({ shell = 'mobile' }: { shell?: Shell }) {
             <img
               src={branding.logo}
               alt={branding.appName}
-              style={{ ...LOGO_SIZES[branding.logoSize ?? 'large'], objectFit: 'contain' }}
+              style={{ ...LOGO_SIZES[branding.logoSize === 'small' ? 'small' : 'medium'], objectFit: 'contain' }}
             />
           </div>
         )}
@@ -353,7 +330,7 @@ function MainApp({ shell = 'mobile' }: { shell?: Shell }) {
               <div className="w-10 h-1 rounded-full mx-auto mb-3" style={{ background: theme === 'light' ? 'rgba(0,0,0,0.18)' : 'rgba(255,255,255,0.18)' }} />
               {/* Header */}
               <div className="flex items-center justify-between mb-2">
-                <p className="font-bold" style={{ fontFamily: "'Poppins', Arial, sans-serif", fontSize: 17, color: theme === 'light' ? '#182126' : '#fff' }}>Sign in with UiPath</p>
+                <p className="font-bold" style={{ fontFamily: "'Poppins', Arial, sans-serif", fontSize: 17, color: theme === 'light' ? '#182126' : '#fff' }}>Sign in with SSO</p>
                 <button
                   type="button"
                   onClick={() => setSsoOpen(false)}
@@ -525,7 +502,7 @@ function MainApp({ shell = 'mobile' }: { shell?: Shell }) {
             <span style={{
               fontFamily: "'Poppins', Arial, sans-serif",
               fontWeight: 600,
-              fontSize: 52,
+              fontSize: 36,
               color: theme === 'light' ? '#182126' : '#ffffff',
               letterSpacing: -1,
               lineHeight: 1,
@@ -566,7 +543,7 @@ function MainApp({ shell = 'mobile' }: { shell?: Shell }) {
                 </svg>
                 Signing in...
               </>
-            ) : 'Sign in with UiPath'}
+            ) : 'Sign in with SSO'}
           </button>
 
           {/* Secondary path: expand inline to sign in with credentials */}
@@ -832,143 +809,58 @@ function MainApp({ shell = 'mobile' }: { shell?: Shell }) {
   }
 
   // ── Tabbed app (the phone) ────────────────────────────────────────
-  const tabContent = (
+  // The phone is its own app: the role's home and the tab bar around it
+  // (src/employee/mobile). Approvals and clients open over its content.
+  const overlay = (
     <>
-      {activeTab === 'home' && (
-        <HomeTab
-          conversationalAgent={conversationalAgent}
-          selectedAgent={selectedAgent}
-          onSelectAgent={setSelectedAgent}
-          onStartChat={(agent, ctx) => { setChatAgent(agent); setChatContext(ctx); }}
-          onLogout={logout}
-          userName={userName}
-          homeNavPressCount={homeNavPressCount}
-          onNavigateToTasks={() => { setExploreInitialCap('tasks'); setActiveTab('explore'); }}
-          onNavigateToExplore={(cap) => { setExploreInitialCap(cap); setActiveTab('explore'); }}
-          onOpenCustomers={() => setCustomersOpen(true)}
-          onOpenApprovals={() => setApprovalsOpen(true)}
-          onOpenAccount={() => setOpenAccountOpen(true)}
-        />
-      )}
-      {activeTab === 'chat' && (
-        <ChatHistoryTab
-          onExplore={() => setActiveTab('explore')}
-          conversationalAgent={conversationalAgent}
-          onOpenChat={(agent, conversationId) => {
-            setChatAgent(agent);
-            setChatConversationId(conversationId);
-          }}
-        />
-      )}
-      {activeTab === 'explore' && (
-        <ExploreTab
-          conversationalAgent={conversationalAgent}
-          onSelectAgent={(agent) => {
-            setChatAgent(agent);
-            setChatConversationId(undefined);
-          }}
-          initialCapability={exploreInitialCap}
-        />
-      )}
-      {activeTab === 'alerts' && <AlertsTab />}
-      {activeTab === 'profile' && (
-        <ProfileTab userName={userName} userEmail={userEmail} onLogout={logout} />
-      )}
-      {/* Work surfaces launched from Home — overlay the content area; the bottom
-          nav stays so the banker can hop away mid-task. */}
       {customersOpen && (
         <div className="absolute inset-0 z-40">
-          <CustomersTab onClose={() => setCustomersOpen(false)} />
+          <MobileClients onClose={() => setCustomersOpen(false)} />
         </div>
       )}
       {approvalsOpen && (
         <div className="absolute inset-0 z-40">
-          <ApprovalsTab onClose={() => setApprovalsOpen(false)} />
-        </div>
-      )}
-      {openAccountOpen && (
-        <div className="absolute inset-0 z-40">
-          <OpenAccountTab onClose={() => setOpenAccountOpen(false)} />
+          <MobileApprovals onClose={() => setApprovalsOpen(false)} />
         </div>
       )}
     </>
   );
 
   return (
-    <div className="flex flex-col h-full overflow-hidden relative" dir={isRtl ? 'rtl' : 'ltr'} style={{ background: '#000' }}>
-      {/* Claim notification banner — app-wide */}
-      {claimNotif && (
-        <div className="absolute top-0 left-0 right-0 z-50 px-3 pt-10" style={{ animation: `${claimNotifDismissing ? 'notifSlideOut' : 'notifSlideApp'} ${claimNotifDismissing ? '0.5s' : '0.6s'} cubic-bezier(0.16,1,0.3,1) forwards` }}>
-          <style>{`
-            @keyframes notifSlideApp { from { transform: translateY(-120%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-            @keyframes notifSlideOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-120%); opacity: 0; } }
-            @keyframes notifPulse { 0%,100% { box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 20px rgba(var(--brand-primary-rgb),0.15); } 50% { box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 30px rgba(var(--brand-primary-rgb),0.3); } }
-          `}</style>
-          <button
-            onClick={() => { dismissClaimNotif(); setTimeout(() => { setExploreInitialCap('tasks'); setActiveTab('explore'); }, 500); }}
-            className="w-full rounded-2xl overflow-hidden active:scale-95 transition-transform"
-            style={{ background: '#0a1218', border: `1.5px solid ${TEAL}65`, boxShadow: `0 0 25px ${TEAL}30, 0 0 50px ${TEAL}15, 0 4px 20px rgba(0,0,0,0.5)`, animation: 'notifPulse 2s ease-in-out infinite' }}
-          >
-            {/* Top section — UiPath branding bar */}
-            <div className="flex items-center justify-between px-4 pt-2.5 pb-1.5">
-              <div className="flex items-center gap-2">
-                <img src={theme === 'light' ? './uipath-logo-light.png' : './uipath-logo.png'} alt="UiPath" style={{ height: 14, objectFit: 'contain' }} />
-                <span style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.3)', letterSpacing: 0.5 }}>ACTION CENTER</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)' }}>just now</span>
-                <div onClick={(e) => { e.stopPropagation(); dismissClaimNotif(); }} className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                </div>
-              </div>
-            </div>
-            {/* Divider */}
-            <div style={{ height: 1, margin: '0 16px', background: 'rgba(255,255,255,0.06)' }} />
-            {/* Main content */}
-            <div className="flex items-center gap-3.5 px-4 py-3">
-              {/* Animated indicator */}
-              <div className="relative flex-shrink-0">
-                <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${TEAL}25 0%, ${TEAL}10 100%)`, border: `1px solid ${TEAL}35` }}>
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={TEAL} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
-                  </svg>
-                </div>
-                {/* Live pulse dot */}
-                <span className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full" style={{ background: 'var(--brand-primary)', border: '2px solid #0a1218', boxShadow: '0 0 8px rgba(var(--brand-primary-rgb),0.6)' }}>
-                  <span className="absolute inset-0 rounded-full animate-ping" style={{ background: 'var(--brand-primary)', opacity: 0.5 }} />
-                </span>
-              </div>
-              {/* Text */}
-              <div className="flex-1 min-w-0 text-left">
-                <p className="font-bold" style={{ fontSize: 15, color: '#fff', lineHeight: 1.2 }}>New Claim Verification</p>
-                <p className="mt-1" style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.5)', lineHeight: 1.3 }}>Property claim requires your review and approval</p>
-              </div>
-            </div>
-            {/* Action bar */}
-            <div className="flex items-center justify-between px-4 pb-3">
-              <span className="rounded-lg px-2.5 py-1 font-bold" style={{ fontSize: 10, background: `${TEAL}1a`, color: TEAL, border: `1px solid ${TEAL}30`, letterSpacing: 0.3 }}>TAP TO REVIEW</span>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12h14M12 5l7 7-7 7"/>
-              </svg>
-            </div>
-          </button>
-        </div>
+    <div className="flex flex-col h-full overflow-hidden relative" dir={isRtl ? 'rtl' : 'ltr'} style={{ background: theme === 'dark' ? '#0B0F14' : '#fff' }}>
+      <div className="flex-1 overflow-hidden relative">
+        <MobileWork
+          key={role}
+          role={role}
+          onRole={setRole}
+          onRoleSheet={() => { if (canSwitchRole) setRoleSheet(true); }}
+          onApprovals={() => setApprovalsOpen(true)}
+          onClients={() => setCustomersOpen(true)}
+          onAssistant={() => setActiveTab('chat')}
+          userName={userName}
+          userEmail={userEmail}
+          onLogout={logout}
+          roles={roleCfg.roles}
+          canSwitchRole={canSwitchRole}
+          tab={activeTab}
+          onTab={(tab) => {
+            setCustomersOpen(false);
+            setApprovalsOpen(false);
+            setActiveTab(tab);
+          }}
+          onAskAgent={askPulse}
+          conversationalAgent={conversationalAgent}
+          overlay={overlay}
+        />
+      </div>
+      {roleSheet && (
+        <RoleSheet
+          role={role}
+          roles={roleCfg.roles}
+          onPick={(r) => { setRole(r); setCustomersOpen(false); setApprovalsOpen(false); setActiveTab('home'); }}
+          onClose={() => setRoleSheet(false)}
+        />
       )}
-      <div className="flex-1 overflow-hidden relative">{tabContent}</div>
-      <BottomNav
-        activeTab={activeTab}
-        unreadAlerts={unreadAlerts}
-        onTabChange={(tab) => {
-          setCustomersOpen(false);
-          setApprovalsOpen(false);
-          setOpenAccountOpen(false);
-          if (tab === 'alerts') setUnreadAlerts(0);
-          if (tab === 'home') setHomeNavPressCount(c => c + 1);
-          if (tab !== 'explore') setExploreInitialCap(null);
-          if (tab === activeTab && tab !== 'home') setActiveTab('home');
-          else setActiveTab(tab);
-        }}
-      />
     </div>
   );
 }

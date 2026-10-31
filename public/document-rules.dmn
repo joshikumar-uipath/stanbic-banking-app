@@ -1,0 +1,298 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<dmn:definitions xmlns:dmn="https://www.omg.org/spec/DMN/20191111/MODEL/" xmlns:dmndi="https://www.omg.org/spec/DMN/20191111/DMNDI/" xmlns:dc="http://www.omg.org/spec/DMN/20180521/DC/" xmlns:di="http://www.omg.org/spec/DMN/20180521/DI/" id="AOF_DocumentRules" name="Account Opening — Document Rules" exporter="UiPath (https://bpmn.uipath.com)" exporterVersion="a0f9348b">
+  <dmn:decision id="d_DocumentRules" label="DocumentRules" name="DocumentRules">
+    <dmn:informationRequirement id="InformationRequirement_document">
+      <dmn:requiredInput href="#InputData_document" />
+    </dmn:informationRequirement>
+    <dmn:informationRequirement id="InformationRequirement_check">
+      <dmn:requiredInput href="#InputData_check" />
+    </dmn:informationRequirement>
+    <dmn:informationRequirement id="InformationRequirement_condition">
+      <dmn:requiredInput href="#InputData_condition" />
+    </dmn:informationRequirement>
+    <dmn:decisionTable id="dt_DocumentRules" hitPolicy="COLLECT">
+      <dmn:input id="ti_document" label="Document">
+        <dmn:inputExpression id="ie_expr_document" typeRef="string">
+          <dmn:text>document</dmn:text>
+        </dmn:inputExpression>
+      </dmn:input>
+      <dmn:input id="ti_check" label="Check">
+        <dmn:inputExpression id="ie_expr_check" typeRef="string">
+          <dmn:text>check</dmn:text>
+        </dmn:inputExpression>
+      </dmn:input>
+      <dmn:input id="ti_condition" label="Condition">
+        <dmn:inputExpression id="ie_expr_condition" typeRef="string">
+          <dmn:text>condition</dmn:text>
+        </dmn:inputExpression>
+      </dmn:input>
+      <dmn:output id="to_outcome" label="Outcome" name="outcome" typeRef="string" />
+      <dmn:output id="to_reason" label="Reason" name="reason" typeRef="string" />
+      <dmn:rule id="r_DOC_001">
+        <dmn:description>BR-DOC-04: Send fields read below the confidence threshold to a quick-review correction step</dmn:description>
+        <dmn:inputEntry id="ie_001_doc">
+          <dmn:text>"any"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_001_check">
+          <dmn:text>"confidence"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_001_cond">
+          <dmn:text>field.confidence &lt; 0.80</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_001_outcome">
+          <dmn:text>"Quick review"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_001_reason">
+          <dmn:text>"A field was read below the confidence threshold"</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+      <dmn:rule id="r_DOC_002">
+        <dmn:description>BR-DOC-01: Identify the type of each document from its content; unsure classifications go to a person</dmn:description>
+        <dmn:inputEntry id="ie_002_doc">
+          <dmn:text>"any"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_002_check">
+          <dmn:text>"type"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_002_cond">
+          <dmn:text>classification.confidence &lt; 0.70</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_002_outcome">
+          <dmn:text>"Quick review"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_002_reason">
+          <dmn:text>"The document type could not be identified with confidence"</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+      <dmn:rule id="r_DOC_003">
+        <dmn:description>BR-DOC-05: Reject an identification document past its expiry date</dmn:description>
+        <dmn:inputEntry id="ie_003_doc">
+          <dmn:text>"id"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_003_check">
+          <dmn:text>"expiry"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_003_cond">
+          <dmn:text>daysToExpiry &lt; 0</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_003_outcome">
+          <dmn:text>"Fail"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_003_reason">
+          <dmn:text>"The identification document has expired"</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+      <dmn:rule id="r_DOC_004">
+        <dmn:description>BR-DOC-05: Refer an identification document that is about to expire</dmn:description>
+        <dmn:inputEntry id="ie_004_doc">
+          <dmn:text>"id"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_004_check">
+          <dmn:text>"expiry"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_004_cond">
+          <dmn:text>daysToExpiry &lt; 30</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_004_outcome">
+          <dmn:text>"Refer"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_004_reason">
+          <dmn:text>"The identification document expires within 30 days"</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+      <dmn:rule id="r_DOC_005">
+        <dmn:description>BR-DOC-06: Utility bill currency window — default 90 days</dmn:description>
+        <dmn:inputEntry id="ie_005_doc">
+          <dmn:text>"utility-bill"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_005_check">
+          <dmn:text>"age"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_005_cond">
+          <dmn:text>ageDays &gt; 90</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_005_outcome">
+          <dmn:text>"Fail"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_005_reason">
+          <dmn:text>"The utility bill is older than the currency window"</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+      <dmn:rule id="r_DOC_006">
+        <dmn:description>BR-DOC-07: Proof of address must be for the address applied with</dmn:description>
+        <dmn:inputEntry id="ie_006_doc">
+          <dmn:text>"utility-bill"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_006_check">
+          <dmn:text>"address"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_006_cond">
+          <dmn:text>address.match &lt; 0.70</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_006_outcome">
+          <dmn:text>"Refer"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_006_reason">
+          <dmn:text>"The address on the bill differs from the application"</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+      <dmn:rule id="r_DOC_007">
+        <dmn:description>BR-DOC-07: ICAO 9303 check digits on the passport machine-readable zone</dmn:description>
+        <dmn:inputEntry id="ie_007_doc">
+          <dmn:text>"passport"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_007_check">
+          <dmn:text>"mrz"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_007_cond">
+          <dmn:text>mrz.valid == false</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_007_outcome">
+          <dmn:text>"Fail"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_007_reason">
+          <dmn:text>"A passport MRZ check digit does not verify"</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+      <dmn:rule id="r_DOC_008">
+        <dmn:description>BR-DOC-07: Tamper signal — creator or producer is an image or document editor</dmn:description>
+        <dmn:inputEntry id="ie_008_doc">
+          <dmn:text>"any"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_008_check">
+          <dmn:text>"tamper"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_008_cond">
+          <dmn:text>file.editedWithEditor == true</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_008_outcome">
+          <dmn:text>"Refer"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_008_reason">
+          <dmn:text>"The file was saved by an editing tool"</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+      <dmn:rule id="r_DOC_009">
+        <dmn:description>BR-DOC-07: Tamper signal — the PDF was re-saved (incremental update) or its modified date follows its creation date</dmn:description>
+        <dmn:inputEntry id="ie_009_doc">
+          <dmn:text>"any"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_009_check">
+          <dmn:text>"tamper"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_009_cond">
+          <dmn:text>file.modifiedAfterCreated == true</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_009_outcome">
+          <dmn:text>"Refer"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_009_reason">
+          <dmn:text>"The file was changed after it was created"</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+      <dmn:rule id="r_DOC_010">
+        <dmn:description>BR-DOC-07: Issuing-authority lookup (NIMC, NIS, FRSC, INEC)</dmn:description>
+        <dmn:inputEntry id="ie_010_doc">
+          <dmn:text>"id"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_010_check">
+          <dmn:text>"issuer"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_010_cond">
+          <dmn:text>issuer.found == false</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_010_outcome">
+          <dmn:text>"Fail"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_010_reason">
+          <dmn:text>"The issuing authority has no record of this document"</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+      <dmn:rule id="r_DOC_011">
+        <dmn:description>BR-DOC-07: Name on the issuer record must match the application</dmn:description>
+        <dmn:inputEntry id="ie_011_doc">
+          <dmn:text>"id"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_011_check">
+          <dmn:text>"issuer"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_011_cond">
+          <dmn:text>issuer.nameMatch &lt; 0.85</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_011_outcome">
+          <dmn:text>"Refer"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_011_reason">
+          <dmn:text>"The issuer holds a different name for this document"</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+      <dmn:rule id="r_DOC_012">
+        <dmn:description>BR-DOC-07: Corporate Affairs Commission lookup</dmn:description>
+        <dmn:inputEntry id="ie_012_doc">
+          <dmn:text>"cac-certificate"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_012_check">
+          <dmn:text>"issuer"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_012_cond">
+          <dmn:text>issuer.found == false</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_012_outcome">
+          <dmn:text>"Fail"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_012_reason">
+          <dmn:text>"CAC has no record of this RC number"</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+      <dmn:rule id="r_DOC_013">
+        <dmn:description>BR-DOC-08: Detect re-use of the same business registration certificate across applications and batches</dmn:description>
+        <dmn:inputEntry id="ie_013_doc">
+          <dmn:text>"cac-certificate"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_013_check">
+          <dmn:text>"reuse"</dmn:text>
+        </dmn:inputEntry>
+        <dmn:inputEntry id="ie_013_cond">
+          <dmn:text>cert.seenElsewhere &gt; 0</dmn:text>
+        </dmn:inputEntry>
+        <dmn:outputEntry id="oe_013_outcome">
+          <dmn:text>"Refer"</dmn:text>
+        </dmn:outputEntry>
+        <dmn:outputEntry id="oe_013_reason">
+          <dmn:text>"This certificate was already submitted on another application"</dmn:text>
+        </dmn:outputEntry>
+      </dmn:rule>
+    </dmn:decisionTable>
+  </dmn:decision>
+  <dmn:inputData id="InputData_document" label="document" name="document" />
+  <dmn:inputData id="InputData_check" label="check" name="check" />
+  <dmn:inputData id="InputData_condition" label="condition" name="condition" />
+  <dmndi:DMNDI>
+    <dmndi:DMNDiagram id="DMNDiagram_aof_document_rules">
+      <dmndi:DMNShape id="DMNShape_d_DocumentRules" dmnElementRef="d_DocumentRules">
+        <dc:Bounds height="80" width="180" x="430" y="180" />
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="DMNShape_InputData_document" dmnElementRef="InputData_document">
+        <dc:Bounds height="45" width="125" x="178" y="60" />
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="DMNShape_InputData_check" dmnElementRef="InputData_check">
+        <dc:Bounds height="45" width="125" x="178" y="180" />
+      </dmndi:DMNShape>
+      <dmndi:DMNShape id="DMNShape_InputData_condition" dmnElementRef="InputData_condition">
+        <dc:Bounds height="45" width="125" x="178" y="300" />
+      </dmndi:DMNShape>
+      <dmndi:DMNEdge id="DMNEdge_InformationRequirement_document" dmnElementRef="InformationRequirement_document">
+        <di:waypoint x="303" y="105" />
+        <di:waypoint x="430" y="220" />
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="DMNEdge_InformationRequirement_check" dmnElementRef="InformationRequirement_check">
+        <di:waypoint x="303" y="202" />
+        <di:waypoint x="430" y="220" />
+      </dmndi:DMNEdge>
+      <dmndi:DMNEdge id="DMNEdge_InformationRequirement_condition" dmnElementRef="InformationRequirement_condition">
+        <di:waypoint x="303" y="300" />
+        <di:waypoint x="430" y="220" />
+      </dmndi:DMNEdge>
+    </dmndi:DMNDiagram>
+  </dmndi:DMNDI>
+</dmn:definitions>

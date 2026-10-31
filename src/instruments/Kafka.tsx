@@ -20,7 +20,7 @@ const TOPIC_COLOR: Record<KafkaTopic, string> = {
   'account-created': '#16A34A',
   'bulk-upload': '#C8A24A',
   'exception-queue': '#DC2626',
-  'customer-notification': '#0033A1',
+  'customer-notification': 'var(--brand-primary, #0033A1)',
 };
 
 function ago(iso: string): string {
