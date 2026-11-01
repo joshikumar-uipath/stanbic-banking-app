@@ -336,6 +336,15 @@ export function useCaseDetail(c: OnboardingCase, onClose: () => void) {
         primary: true,
         opens: 'call',
       });
+    } else if (callWait?.kind === 'failed') {
+      live.push({
+        id: 'agent-failed',
+        title: `Call ${c.firstName || 'the customer'} — the voice agent's call failed`,
+        why: `The case is parked at Pending customer. It tried to place the call itself and the connector refused it, so Maestro has an open incident on the step. Call ${c.firstName || 'the customer'} from here about the missing documents; the case carries on from what is agreed.`,
+        kind: 'do',
+        primary: true,
+        opens: 'call',
+      });
     } else if (callWait?.kind === 'agent') {
       live.push({
         id: 'agent-calling',

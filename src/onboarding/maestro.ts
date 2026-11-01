@@ -368,13 +368,18 @@ async function caseStages(instanceId: string): Promise<CaseStagesRead | null> {
     const reached = STAGES.filter((s) => reachedNames.has(s));
     let active: string | null = reached.length ? reached[reached.length - 1] : null;
     const idx = active ? STAGES.indexOf(active as (typeof STAGES)[number]) : -1;
-    const completed = idx > 0 ? STAGES.slice(0, idx) : [];
+    let completed: string[] = idx > 0 ? STAGES.slice(0, idx) : [];
     // Pending customer is a primary stage the main-flow list does not know: a
     // case parked there for the RM's call read as "Intake" — which is where it
     // will go back to, but not where it is. It wins while it is open and Intake
     // is the furthest main-flow stage reached.
     const pendingCustomer = stages.find((e) => e.elementName === 'Pending customer' && e.status === 'InProgress');
-    if (pendingCustomer && idx <= 0) active = 'Pending customer';
+    if (pendingCustomer && idx <= 0) {
+      active = 'Pending customer';
+      // The case left Intake to get here, so Intake reads as done rather than
+      // the whole bar sitting dark.
+      if (stages.some((e) => e.elementName === 'Intake' && e.status !== 'NotStarted' && e.status !== 'InProgress')) completed = ['Intake'];
+    }
     // The steps listed are those of the stage the case is actually inside: a
     // secondary stage while one is open (its runs end on InProgress), else the
     // active primary. The list is headed with that stage's name.
@@ -406,7 +411,22 @@ async function caseStages(instanceId: string): Promise<CaseStagesRead | null> {
     // service's watcher keys on.
     const speaking = els.find((e) => e.elementName === 'Speaking to Customer' && e.status === 'InProgress');
     const rmCall = els.find((e) => e.elementName === 'Agent Conversation' && e.status === 'InProgress');
+    // The Stanbic plan places its call differently: a SendTask "Voice Agent
+    // Calling" inside Pending customer (an Integration Service activity), after
+    // "Search Missing Documents". Running = the agent is calling; Failed = the
+    // connector refused it (an open incident on the case); Completed while the
+    // stage is still open = the customer was reached and the case waits on them.
+    // In this plan "Agent Conversation" follows it: while that wait is open the
+    // AZURE agent is on the line, so it reads as the agent calling, not as the
+    // RM's call being due — that reading is kept for a plan with no call step.
+    const voiceCall = els.find((e) => e.elementName === 'Voice Agent Calling');
+    const voiceRun = voiceCall ? lastRun(voiceCall) : null;
+    const stageOpen = stages.some((e) => e.elementName === 'Pending customer' && e.status === 'InProgress');
     let callWait: CallWait | null = null;
+    if (!speaking && !rmCall && voiceCall && voiceRun && voiceRun !== 'NotStarted') {
+      const kind: CallWait['kind'] | null = voiceRun === 'InProgress' ? 'agent' : voiceRun === 'Failed' ? 'failed' : stageOpen ? 'done' : null;
+      if (kind) callWait = { kind, purpose: 'documents', stage: 'Pending customer', since: voiceCall.startedTimeUtc ?? '' };
+    }
     if (speaking) {
       // The stage it diverted from: the most recently started primary stage
       // still open beside the secondary — stages stay InProgress once entered.
@@ -415,7 +435,7 @@ async function caseStages(instanceId: string): Promise<CaseStagesRead | null> {
         .sort((a, b) => String(b.startedTimeUtc ?? '').localeCompare(String(a.startedTimeUtc ?? '')))[0]?.elementName ?? null;
       callWait = { kind: 'agent', purpose: PURPOSE_BY_STAGE[origin ?? ''] ?? 'screening', stage: origin, since: speaking.startedTimeUtc ?? '' };
     } else if (rmCall) {
-      callWait = { kind: 'due', purpose: 'documents', stage: 'Pending customer', since: rmCall.startedTimeUtc ?? '' };
+      callWait = { kind: voiceRun === 'Completed' ? 'agent' : 'due', purpose: 'documents', stage: 'Pending customer', since: rmCall.startedTimeUtc ?? '' };
     }
     // Every secondary stage the case has been into, with the primary it left
     // from. `elementRuns` is a list of status TRANSITIONS, not visits: a stage
@@ -506,8 +526,9 @@ export async function startCase(input: CaseInput): Promise<string> {
  */
 export interface CallWait {
   /** 'agent' — the voice service is on the call now; 'due' — the RM should call;
-   *  'done' — the call ended and was answered; 'missed' — the customer did not answer. */
-  kind: 'agent' | 'due' | 'done' | 'missed';
+   *  'done' — the call ended and was answered; 'missed' — the customer did not answer;
+   *  'failed' — the case tried to place the call and the connector refused it. */
+  kind: 'agent' | 'due' | 'done' | 'missed' | 'failed';
   purpose: 'screening' | 'delay' | 'consent' | 'documents';
   /** The primary stage the case diverted from, which is what decides the purpose. */
   stage: string | null;
@@ -680,8 +701,12 @@ export async function backfillStages(
 export async function getState(instanceId: string): Promise<LiveState> {
   // Fire all three reads AT ONCE — first paint is gated by the slowest call, not the sum
   // of all three. (The two extra reads are wasted only for an already-completed case.)
+  // The two Orchestrator reads are allowed to fail on their own: polling trips
+  // its rate limit (429) long before the case service's, and one refused read
+  // used to reject the whole state — the detail card then said "a real Maestro
+  // instance is starting" over a case that the case service could still describe.
   const [jr, stages, tr, caseDone] = await Promise.all([
-    orch<{ value: { State: string }[] }>('GET', `/odata/Jobs?%24filter=Key%20eq%20${instanceId}&%24select=State`),
+    orch<{ value: { State: string }[] }>('GET', `/odata/Jobs?%24filter=Key%20eq%20${instanceId}&%24select=State`).catch(() => ({ value: [] as { State: string }[] })),
     caseStages(instanceId),
     // Filter by the job SERVER-side. This used to pull the 40 most recent open
     // tasks tenant-wide and match CreatorJobKey in the browser — so once 40 newer
@@ -692,7 +717,7 @@ export async function getState(instanceId: string): Promise<LiveState> {
       'GET',
       `/odata/Tasks/UiPath.Server.Configuration.OData.GetTasksAcrossFolders?%24filter=${
         encodeURIComponent(`CreatorJobKey eq ${instanceId} and Status ne 'Completed'`)}&%24top=20`,
-    ),
+    ).catch(() => ({ value: [] as { Id: number; Title: string; OrganizationUnitId: number; CreatorJobKey: string }[] })),
     instanceDone(instanceId),
   ]);
   const jobState = jr.value?.[0]?.State ?? 'Unknown';
@@ -714,8 +739,13 @@ export async function getState(instanceId: string): Promise<LiveState> {
     const pending = (tr.value ?? []).find((t) => t.OrganizationUnitId === FOLDER_ID && t.CreatorJobKey === instanceId && STAGE_BY_TASK[t.Title]);
     const pendingStage = pending ? STAGE_BY_TASK[pending.Title] : null;
     // Prefer the case instance's real stage; fall back to the pending task's stage.
-    let activeStage = stages?.active ?? pendingStage;
-    let completedStages = stages?.completed ?? [];
+    // The element read failed (a 429 from polling, a blip): keep the last good
+    // read rather than painting "a real Maestro instance is starting" over a case
+    // that was at Pending customer a tick ago.
+    const prev = lastState.get(instanceId);
+    const keep = !stages && prev && !prev.done ? prev : null;
+    let activeStage = stages?.active ?? pendingStage ?? keep?.activeStage ?? null;
+    let completedStages = stages?.completed ?? keep?.completedStages ?? [];
     if (!stages && pendingStage) {
       const idx = STAGES.indexOf(pendingStage as (typeof STAGES)[number]);
       completedStages = idx > 0 ? STAGES.slice(0, idx) : [];
@@ -724,15 +754,15 @@ export async function getState(instanceId: string): Promise<LiveState> {
     if (pendingStage) { activeStage = pendingStage; completedStages = completedStages.filter((s) => s !== pendingStage); }
     result = {
       jobState, done: false, activeStage, completedStages,
-      stageTasks: stages?.tasks ?? [], stageTasksStage: stages?.tasksStage ?? null, checks: stages?.checks ?? [],
-      callWait: stages?.callWait ?? null,
-      secondaries: stages?.secondaries ?? [],
+      stageTasks: stages?.tasks ?? keep?.stageTasks ?? [], stageTasksStage: stages?.tasksStage ?? keep?.stageTasksStage ?? null, checks: stages?.checks ?? keep?.checks ?? [],
+      callWait: stages ? stages.callWait : keep?.callWait ?? null,
+      secondaries: stages?.secondaries ?? keep?.secondaries ?? [],
       // When the elements could be read they are the authority — including when
       // they say nothing is parked. The task query is scoped to the job, not the
       // stage, so an approval still open in an EARLIER stage would otherwise be
       // offered under the CURRENT stage's name.
-      pendingTaskId: stages ? stages.pending?.id ?? null : pending?.Id ?? null,
-      pendingTitle: stages ? stages.pending?.title ?? null : pending?.Title ?? null,
+      pendingTaskId: stages ? stages.pending?.id ?? null : pending?.Id ?? keep?.pendingTaskId ?? null,
+      pendingTitle: stages ? stages.pending?.title ?? null : pending?.Title ?? keep?.pendingTitle ?? null,
     };
   }
   lastState.set(instanceId, result);

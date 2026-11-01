@@ -485,10 +485,13 @@ function MaestroAction({ instanceId, corporate, state }: { instanceId: string; c
             {state.callWait.kind === 'agent' ? 'Voice agent calling'
               : state.callWait.kind === 'done' ? 'Voice agent · answered'
               : state.callWait.kind === 'missed' ? 'Voice agent · no answer'
+              : state.callWait.kind === 'failed' ? 'Voice agent · call failed'
               : 'Your call is due'}
           </span>
         )}
-        <span className={`dk-nba-live ${done ? 'ok' : ''}`}>{done ? 'Completed' : state?.jobState ?? 'starting…'}</span>
+        {/* The job read can be throttled while the case service still answers;
+            a case with a known stage is running, whatever the job read said. */}
+        <span className={`dk-nba-live ${done ? 'ok' : ''}`}>{done ? 'Completed' : state?.jobState && state.jobState !== 'Unknown' ? state.jobState : stage ? 'Running' : 'starting…'}</span>
       </div>
 
       <div className="ttl">
@@ -497,6 +500,7 @@ function MaestroAction({ instanceId, corporate, state }: { instanceId: string; c
           : state?.callWait?.kind === 'due' ? `${stage ?? 'Case'} · your call is due`
           : state?.callWait?.kind === 'done' ? `${stage ?? 'Case'} · voice agent reached the customer`
           : state?.callWait?.kind === 'missed' ? `${stage ?? 'Case'} · voice agent got no answer`
+          : state?.callWait?.kind === 'failed' ? `${stage ?? 'Case'} · voice agent could not place the call`
           : stage ? `${stage} · ${reviewing ? 'awaiting review' : awaiting ? 'awaiting approval' : 'in progress'}` : 'Case running in Maestro'}
       </div>
       <p className="why">
@@ -549,12 +553,14 @@ function MaestroAction({ instanceId, corporate, state }: { instanceId: string; c
           {state!.stageTasks!.map((t, i) => {
             const st = t.status === 'Completed' ? 'done'
               : t.status === 'InProgress' ? 'now'
-              : t.status === 'Faulted' ? 'bad' : 'next';
+              // The case service says 'Failed' for a step with an open incident.
+              : t.status === 'Faulted' || t.status === 'Failed' ? 'bad' : 'next';
             return (
               <div className={`dk-step ${st}`} key={`${t.name}-${i}`}>
                 <span className="pip" />
                 <span className="nm">{t.name}</span>
                 {t.kind === 'human' && st === 'now' && <span className="who">needs a person</span>}
+                {st === 'bad' && <span className="who bad">failed · incident open</span>}
                 {st === 'now' && t.link && (
                   <a href={t.link} target="_blank" rel="noreferrer" className="go">Open ↗</a>
                 )}

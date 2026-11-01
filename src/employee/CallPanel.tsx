@@ -91,6 +91,8 @@ export default function CallPanel({ subject, onClose, tab = 'call' }: { subject:
       // already stamps every real call with the Orchestrator folder it came
       // from; sending ours lets the page show only calls from this folder.
       folder: maestroConfig().folderKey,
+      // No `bank`: the agent says "I'm calling from your bank". Pass
+      // `bank: activeBank().name` to have it name this deployment's bank instead.
     });
     // Straight onto the history for a record whose calls are in the past.
     if (tab === 'calls') q.set('tab', 'calls');

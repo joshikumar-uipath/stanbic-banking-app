@@ -43,9 +43,19 @@ export default function Kyc({ c, onExit }: { c: OnboardingCase; onExit: () => vo
   // Auto-advance the day FaceID starts announcing completion. Inert until then.
   useFaceIdComplete(livenessDone);
 
+  // KYC is the LAST requirement only once the account exists. Offered straight
+  // after submit ("Complete KYC with them now"), it used to jump the record to
+  // FULLY_ACTIVATED while the Maestro case was still at Intake — the store's
+  // live-case guard could not catch it, because the case link lands a second or
+  // two after submit and a corporate case never reached the cache it read. So:
+  // record the evidence here, and let the account decide the state.
   const finish = async () => {
     await store.update(c.id, { validations: c.validations.map((v) => (v.kind === 'LIVENESS' ? { ...v, status: 'passed', attempts: v.attempts + 1, updatedAt: new Date().toISOString() } : v)) });
-    await store.advance(c.id, 'FULLY_ACTIVATED', 'KYC completed by the customer — documents, liveness and signature received');
+    if (c.accountNumber) {
+      await store.advance(c.id, 'FULLY_ACTIVATED', 'KYC completed by the customer — documents, liveness and signature received');
+    } else {
+      await store.publish(c.id, 'customer-notification', 'KYC completed by the customer — documents, liveness and signature received; activation follows once the account is open');
+    }
     setStage('done');
   };
 
@@ -152,7 +162,9 @@ export default function Kyc({ c, onExit }: { c: OnboardingCase; onExit: () => vo
           <div style={{ paddingTop: 20, textAlign: 'center' }}>
             <div className="cx-tick"><Icon name="check" size={38} strokeWidth={2.6} /></div>
             <h1 className="cx-h1" style={{ textAlign: 'center' }}>You&rsquo;re all set</h1>
-            <p className="cx-p" style={{ marginBottom: 18 }}>Your account is fully activated. Every limit is lifted and you can start using it right away.</p>
+            <p className="cx-p" style={{ marginBottom: 18 }}>{c.accountNumber
+              ? 'Your account is fully activated. Every limit is lifted and you can start using it right away.'
+              : 'Your documents, selfie and signature are in. We\u2019ll text you the moment the account is open — nothing else is needed from you.'}</p>
             {c.accountNumber && <div className="cx-appid">{c.accountNumber}</div>}
           </div>
         )}

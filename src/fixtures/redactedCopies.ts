@@ -7,7 +7,9 @@
 // is read with that original's (already masked) transcription in packageReads.ts.
 // ─────────────────────────────────────────────────────────────────────────────
 export const REDACTED_COPIES: Record<string, string> = {
-  // AOF Individual (redacted).pdf → AOF Individual.PDF
+  // AOF Individual (redacted).pdf → AOF Individual.PDF (the other bank's logo blanked on pages 1 and 10)
+  '913bc15ef3e1547a374d2b6e63c4bcd16547bce880bc032f890f2f92146871c4': '60dde2270e39018df87f00cc7263ba980b71c06ef6a8f972abd4f542be9e78f1',
+  // …and the earlier redacted copy that still carried the logo
   '07c364abacfddc0bb295ce25699e3f48a73cbf76e92572166c345d679f87b9e8': '60dde2270e39018df87f00cc7263ba980b71c06ef6a8f972abd4f542be9e78f1',
   // AOF Corporate (redacted).pdf → AOF Corporate.PDF
   '99d6c53b9a29a92668650c4e3b26645f458603ac2f4f30040b3a9bffa1cf8331': '50c09edbaa5b00e1f339c17b4dd08db7603d1fb40affd05f9029de3b1b5dee88',

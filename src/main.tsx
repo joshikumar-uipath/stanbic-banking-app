@@ -7,18 +7,22 @@ import App from './App'
 import { detectRoute, WEB_SHELLS } from './skeleton/routes'
 import { setLiveCaseGuard } from './onboarding/store'
 import { getLinkedInstance, getCachedState } from './onboarding/maestro'
+import { getCachedCorporateState } from './onboarding/maestro-corporate'
 import HomeButton from './skeleton/HomeButton'
 
 // The record's outcome must not run ahead of its Maestro case: "Fully activated"
 // is what the last task of Closure produces, not what a liveness approval
 // produces. Registered here rather than imported inside store.ts, which must not
-// depend on maestro.ts. Unknown case state does not block: the desk polls every
-// linked instance, so the gap is one tick.
+// depend on maestro.ts. A linked case blocks until it is known to have finished.
 setLiveCaseGuard((recordId) => {
   const inst = getLinkedInstance(recordId)
   if (!inst) return false
-  const live = getCachedState(inst)
-  return live ? !live.done : false
+  // Individual and corporate cases keep separate caches; a corporate record read
+  // only the individual one and so was never "live" here. A linked case whose
+  // state is not yet known counts as live: the one writer that legitimately
+  // finishes a record (the desk's completion sync) caches `done` first.
+  const live = getCachedState(inst) ?? getCachedCorporateState(inst)
+  return live ? !live.done : true
 })
 
 // The walkthrough capture's hook for the case's automated steps (dev server only).

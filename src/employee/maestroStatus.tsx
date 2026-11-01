@@ -41,6 +41,19 @@ async function settle(recordId: string): Promise<void> {
   } catch { /* the desk keeps polling; a failed settle retries next tick */ }
 }
 
+/** The inverse of settle(): a record that claims FULLY_ACTIVATED while its case is
+ *  still running got there by a writer the case never sanctioned (the KYC step taken
+ *  straight after submit, before the guard could see the link). An activated record
+ *  always carries an account number, so one without is put back where it was and the
+ *  correction is shared like any other write. Quiet and idempotent, like settle(). */
+async function unsettle(recordId: string): Promise<void> {
+  try {
+    const c = await store.get(recordId);
+    if (!c || c.state !== 'FULLY_ACTIVATED' || c.accountNumber) return;
+    await store.advance(recordId, 'PRE_REGISTERED', 'Outcome corrected — the record claimed activation while its Maestro case was still running; the case decides activation');
+  } catch { /* retry next tick */ }
+}
+
 /**
  * Live Maestro state for a set of desk records, keyed by record id. Regardless of how
  * many rows are linked, each refresh is just two calls (all job states + all open tasks);
@@ -132,16 +145,19 @@ export function useMaestroStates(recordIds: string[]): Record<string, LiveStateL
         })),
       ]);
       if (!alive) return;
-      const live = individualInstances.filter((i) => byInstance[i] && !byInstance[i].done);
-      const targets = refreshAll ? live : live.filter((i) => !byInstance[i].stage);
+      // A row the job read could not answer (Orchestrator's rate limit, mostly)
+      // is still asked of the case service, which is what names the stage anyway.
+      const live = individualInstances.filter((i) => !byInstance[i] || !byInstance[i].done);
+      const targets = refreshAll ? live : live.filter((i) => !byInstance[i] || !byInstance[i].stage);
       const stages = targets.length ? await backfillStages(targets) : {};
       if (!alive) return;
       setMstates((prev) => {
         const next = { ...prev };
         for (const [rec, inst] of individual) {
-          const s = byInstance[inst];
-          if (!s) continue;
           const b = stages[inst];
+          const s: LiveStateLite | undefined = byInstance[inst]
+            ?? (b ? { jobState: 'Unknown', done: false, awaiting: b.awaiting, stage: b.stage, callWait: b.callWait } : undefined);
+          if (!s) continue;
           // When the backfill answered, it read the case's own elements and is the
           // better source in BOTH directions — an approval it cannot see is one that
           // has been completed. Without a backfill this tick, `s.awaiting` already
@@ -153,10 +169,13 @@ export function useMaestroStates(recordIds: string[]): Record<string, LiveStateL
         return next;
       });
       for (const [rec, inst] of individual) {
-        if (byInstance[inst]?.done) void settle(rec);
+        const s = byInstance[inst];
+        if (s?.done) void settle(rec);
+        else if (s && s.jobState !== 'Unknown') void unsettle(rec);
       }
       for (const hit of corpStates) {
         if (hit?.[1].done) void settle(hit[0]);
+        else if (hit && hit[1].jobState !== 'Unknown') void unsettle(hit[0]);
       }
     };
     void tick(true);
@@ -243,12 +262,14 @@ export function MaestroCell({ m }: { m?: LiveStateLite }) {
     : call?.kind === 'due' ? 'Your call · due'
     : call?.kind === 'done' ? 'Voice agent · answered'
     : call?.kind === 'missed' ? 'Voice agent · no answer'
+    : call?.kind === 'failed' ? 'Voice agent · call failed'
     : m.awaiting ? 'Awaiting approval' : 'Running';
   const title = m.done ? 'Maestro case completed'
     : call?.kind === 'agent' ? `The voice agent is calling the customer now — ${CALL_PURPOSE_LABEL[call.purpose]}`
     : call?.kind === 'due' ? `Waiting for you to call the customer — ${CALL_PURPOSE_LABEL[call.purpose]}`
     : call?.kind === 'done' ? `The voice agent reached the customer — ${CALL_PURPOSE_LABEL[call.purpose]}`
     : call?.kind === 'missed' ? `The voice agent got no answer — ${CALL_PURPOSE_LABEL[call.purpose]}`
+    : call?.kind === 'failed' ? `The voice agent could not place the call (the case has an open incident) — ${CALL_PURPOSE_LABEL[call.purpose]}`
     : m.awaiting ? `Parked for approval at ${m.stage ?? 'this stage'}`
     : `Running the ${m.stage ?? 'case'} stage`;
   return (
@@ -261,7 +282,10 @@ export function MaestroCell({ m }: { m?: LiveStateLite }) {
         {m.stage && <span className={`dk-mchip ${stageClass(m.stage)}`}>{m.stage}</span>}
         <span className="dk-mbar" aria-hidden>
           {MAESTRO_STAGES.map((s, i) => {
-            const st = m.done || (idx >= 0 && i < idx) ? 'done' : i === idx ? 'on' : 'off';
+            // Pending customer sits off the main flow, between Intake and
+            // Verification: Intake is behind it, so that segment reads done.
+            const doneBefore = idx >= 0 ? idx : m.stage === 'Pending customer' ? 1 : 0;
+            const st = m.done || i < doneBefore ? 'done' : i === idx ? 'on' : 'off';
             return <i key={s} className={`seg ${st}`} />;
           })}
         </span>
