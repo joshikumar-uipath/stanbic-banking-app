@@ -9,6 +9,8 @@
 export const REDACTED_COPIES: Record<string, string> = {
   // AOF Individual (redacted).pdf → AOF Individual.PDF (the other bank's logo blanked on pages 1 and 10)
   '913bc15ef3e1547a374d2b6e63c4bcd16547bce880bc032f890f2f92146871c4': '60dde2270e39018df87f00cc7263ba980b71c06ef6a8f972abd4f542be9e78f1',
+  // AOF Individual copy.pdf (Downloads: the logo blacked out by hand, 2026-11-02) → AOF Individual.PDF
+  'fb86163d6c534e352170f01a0c6476cac40aa775be01165d902b0c0f4fbc9c24': '60dde2270e39018df87f00cc7263ba980b71c06ef6a8f972abd4f542be9e78f1',
   // …and the earlier redacted copy that still carried the logo
   '07c364abacfddc0bb295ce25699e3f48a73cbf76e92572166c345d679f87b9e8': '60dde2270e39018df87f00cc7263ba980b71c06ef6a8f972abd4f542be9e78f1',
   // AOF Corporate (redacted).pdf → AOF Corporate.PDF
