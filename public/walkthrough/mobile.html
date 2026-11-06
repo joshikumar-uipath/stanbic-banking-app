@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pulse for Bankers Walkthrough</title>
+<meta name="description" content="A guided tour of the Pulse for Bankers phone app for Stanbic IBTC: account opening, live Maestro cases, bulk opening, operations and the banker's book.">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* A bright presenter's stage in Stanbic blue: white ground, sky-blue light, phone floating left, story right, acts as a coloured rail. */
+:root{
+  --bg:#f3f7fd; --paper:#ffffff; --ink:#0b1b3d; --ink-2:#44527a; --ink-3:#7c88a8; --rule:#dde5f3;
+  --blue:#0033a1; --sky:#0091da; --sky-soft:#e6f3fc; --deep:#012169; --gold:#f0bd2d;
+  --shadow:0 30px 70px rgba(1,33,105,.22), 0 6px 18px rgba(1,33,105,.12);
+  --display:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif; --mono:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --act:#0091da;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;color:var(--ink);font-family:var(--display);line-height:1.5;font-size:15px;min-height:100%;
+  background:
+    radial-gradient(900px 520px at 8% -8%, rgba(0,145,218,.22), transparent 60%),
+    radial-gradient(700px 420px at 100% 10%, rgba(0,51,161,.14), transparent 60%),
+    linear-gradient(180deg,#f7faff 0%, var(--bg) 60%, #eef3fb 100%);}
+.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px max(20px,env(safe-area-inset-right,0px)) 12px max(20px,env(safe-area-inset-left,0px));background:rgba(255,255,255,.82);backdrop-filter:saturate(1.4) blur(10px);border-bottom:1px solid var(--rule)}
+.brand{display:flex;align-items:center;gap:14px}
+.brand img{height:34px;width:auto}
+.brand b{font-weight:700;font-size:16px;letter-spacing:-.01em;display:block}
+.brand span{font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.ctl{display:flex;align-items:center;gap:8px}
+.ctl button{appearance:none;border:1px solid var(--rule);background:#fff;color:var(--ink);font:inherit;font-size:13px;font-weight:500;padding:8px 14px;border-radius:999px;cursor:pointer;transition:background .15s,border-color .15s}
+.ctl button:hover{border-color:var(--sky);background:var(--sky-soft)}
+.ctl button[aria-pressed="true"]{background:var(--blue);border-color:var(--blue);color:#fff}
+.ctl button[aria-pressed="true"]::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--gold);margin-right:8px;animation:pulse 1.2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.ctl .k{font-family:var(--mono);font-size:11px;color:var(--ink-3);margin-left:8px}
+.prog{height:3px;background:var(--rule)}
+.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--sky));transition:width .4s ease}
+
+.stage{display:grid;grid-template-columns:auto minmax(0,1fr);gap:clamp(28px,6vw,96px);align-items:center;max-width:1200px;margin:0 auto;padding:26px max(20px,env(safe-area-inset-right,0px)) 10px max(20px,env(safe-area-inset-left,0px))}
+.phone-wrap{position:relative;justify-self:center}
+.phone-wrap::after{content:"";position:absolute;inset:auto 10% -26px 10%;height:40px;border-radius:50%;background:radial-gradient(closest-side, rgba(1,33,105,.25), transparent)}
+.phone{position:relative;aspect-ratio:402/874;height:min(calc(100vh - 290px),760px);min-height:440px;width:auto;max-width:100%;border-radius:46px;background:linear-gradient(160deg,#2a3350,#0f1630);padding:11px;box-shadow:var(--shadow), inset 0 0 0 1px rgba(255,255,255,.14);animation:float 7s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+.screen{position:relative;width:100%;height:100%;border-radius:36px;overflow:hidden;background:#fff}
+.screen img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.03);transition:opacity .45s ease,transform .6s ease}
+.screen img.on{opacity:1;transform:scale(1)}
+
+.story{min-width:0;display:grid;gap:16px;align-content:center}
+.story.enter > *{animation:up .5s ease both}
+.story.enter > :nth-child(2){animation-delay:.06s}.story.enter > :nth-child(3){animation-delay:.12s}.story.enter > :nth-child(4){animation-delay:.18s}.story.enter > :nth-child(5){animation-delay:.24s}
+@keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.actchip{display:inline-flex;align-items:center;gap:10px;justify-self:start;font-family:var(--mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--act);background:color-mix(in srgb,var(--act) 10%,#fff);border:1px solid color-mix(in srgb,var(--act) 30%,#fff);padding:6px 12px 6px 8px;border-radius:999px}
+.actchip i{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--act);color:#fff;font-style:normal;font-weight:600;font-size:11px}
+.actchip span{color:var(--ink-2);text-transform:none;letter-spacing:0;font-family:var(--display);font-size:13px}
+h1{margin:0;font-size:clamp(30px,3.8vw,46px);line-height:1.06;font-weight:800;letter-spacing:-.02em;text-wrap:balance;color:var(--deep)}
+.say{margin:0;font-size:clamp(16px,1.45vw,19px);line-height:1.6;color:var(--ink);max-width:60ch}
+.behind{margin:0;padding:14px 16px;border-radius:12px;background:var(--paper);border:1px solid var(--rule);box-shadow:0 4px 14px rgba(1,33,105,.06);color:var(--ink-2);font-size:14px;max-width:60ch;display:grid;grid-template-columns:auto 1fr;gap:4px 12px}
+.behind b{grid-row:1/3;align-self:start;display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:var(--sky-soft);color:var(--sky)}
+.behind b svg{width:18px;height:18px}
+.behind em{font-style:normal;font-family:var(--mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--sky)}
+.nav{display:flex;gap:10px;align-items:center;margin-top:4px}
+.nav button{appearance:none;border:1px solid var(--rule);background:#fff;color:var(--ink);font:inherit;font-weight:600;padding:11px 18px;border-radius:12px;cursor:pointer;transition:transform .12s,box-shadow .12s,background .15s}
+.nav button:hover{transform:translateY(-1px);box-shadow:0 6px 16px rgba(1,33,105,.12)}
+.nav button.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.nav button.primary:hover{background:#00298a}
+.nav button:disabled{opacity:.4;cursor:default;transform:none;box-shadow:none}
+.nav .pos{font-family:var(--mono);font-size:13px;color:var(--ink-3);margin-left:auto;font-variant-numeric:tabular-nums}
+
+.rail{max-width:1200px;margin:0 auto;padding:12px max(20px,env(safe-area-inset-right,0px)) 40px max(20px,env(safe-area-inset-left,0px))}
+.acts{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px}
+.act{appearance:none;text-align:left;font:inherit;border:1px solid var(--rule);background:#fff;border-radius:12px;padding:10px 12px;min-width:0;cursor:pointer;transition:border-color .15s,box-shadow .15s;border-top:3px solid var(--ac,var(--rule))}
+.act:hover{border-color:var(--ac);box-shadow:0 6px 16px rgba(1,33,105,.08)}
+.act.on{box-shadow:0 8px 22px rgba(1,33,105,.12);border-color:var(--ac)}
+.act .n{font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.act .s{font-size:11px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.dots{display:flex;gap:4px;margin-top:8px}
+.dot{flex:1;height:5px;border-radius:3px;background:var(--rule);border:0;padding:0;cursor:pointer;transition:background .2s}
+.dot.seen{background:color-mix(in srgb,var(--ac) 45%,#fff)}
+.dot.on{background:var(--ac)}
+.thumbs{display:flex;gap:12px;overflow-x:auto;padding:16px 4px 8px;scrollbar-width:thin}
+.thumb{position:relative;flex:0 0 auto;width:68px;aspect-ratio:402/874;border-radius:12px;overflow:hidden;border:2px solid #fff;box-shadow:0 2px 8px rgba(1,33,105,.12);background:#fff;cursor:pointer;padding:0;opacity:.7;transition:transform .15s,opacity .15s,border-color .15s}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb.on{border-color:var(--act);opacity:1;transform:translateY(-4px)}
+.thumb:hover{opacity:1}
+.thumb em{position:absolute;left:4px;top:4px;font-style:normal;font-family:var(--mono);font-size:9px;background:rgba(11,27,61,.75);color:#fff;padding:1px 5px;border-radius:999px}
+
+/* Cover and finish */
+.cover{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:24px;background:linear-gradient(160deg,#012169 0%,#0033a1 55%,#0091da 130%);color:#fff;transition:opacity .5s ease,visibility .5s}
+.cover[hidden]{display:none}
+.cover.out{opacity:0;visibility:hidden}
+.cover-in{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:clamp(24px,5vw,72px);align-items:center;max-width:1100px;width:100%}
+.cover .eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#bcd3ff;display:flex;align-items:center;gap:12px}
+.cover .eyebrow img{height:30px;background:#fff;padding:5px 8px;border-radius:6px}
+.cover h1{color:#fff;font-size:clamp(36px,5.5vw,68px);margin:16px 0 12px}
+.cover p{font-size:clamp(16px,1.6vw,20px);color:#dbe7ff;max-width:52ch;margin:0 0 22px;line-height:1.55}
+.cover .list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 18px;margin:0 0 28px;padding:0;list-style:none;color:#eaf1ff;font-size:14px}
+.cover .list li{display:flex;align-items:center;gap:10px}
+.cover .list i{width:8px;height:8px;border-radius:50%;background:var(--gold);flex:0 0 auto}
+.cover button{appearance:none;border:0;background:#fff;color:var(--blue);font:inherit;font-weight:700;font-size:16px;padding:14px 24px;border-radius:14px;cursor:pointer;box-shadow:0 12px 30px rgba(0,0,0,.25)}
+.cover button:hover{transform:translateY(-1px)}
+.fan{position:relative;width:min(38vw,360px);aspect-ratio:1/1.3;display:none}
+@media (min-width:900px){.fan{display:block}}
+.fan img{position:absolute;width:52%;border-radius:22px;box-shadow:0 30px 60px rgba(0,0,0,.35);border:6px solid #0f1630;background:#fff}
+.fan img:nth-child(1){left:0;top:10%;transform:rotate(-8deg)}
+.fan img:nth-child(2){left:24%;top:0;z-index:2}
+.fan img:nth-child(3){right:0;top:12%;transform:rotate(8deg)}
+.fin{position:fixed;inset:0;z-index:20;display:grid;place-items:center;padding:24px;background:rgba(243,247,253,.92);backdrop-filter:blur(8px)}
+.fin[hidden]{display:none}
+.fin-card{background:#fff;border:1px solid var(--rule);border-radius:20px;box-shadow:var(--shadow);padding:clamp(22px,3vw,40px);max-width:760px;width:100%}
+.fin-card h2{margin:0 0 6px;font-size:clamp(24px,3vw,34px);color:var(--deep);letter-spacing:-.015em}
+.fin-card p{margin:0 0 18px;color:var(--ink-2)}
+.fin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:22px}
+.fin-grid button{appearance:none;text-align:left;font:inherit;border:1px solid var(--rule);border-left:4px solid var(--ac);border-radius:10px;padding:10px 12px;background:#fff;cursor:pointer}
+.fin-grid b{display:block;font-size:14px}
+.fin-grid span{font-size:12px;color:var(--ink-3)}
+.fin-card .nav{margin:0}
+
+@media (max-width:860px){
+  .stage{grid-template-columns:1fr;gap:18px;padding-top:16px}
+  .phone-wrap{justify-self:stretch}
+  .phone{height:auto;min-height:0;width:min(290px,100%);margin:0 auto;animation:none}
+  .acts{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .ctl .k,.ctl .auto{display:none}
+  .brand img{height:26px}.brand b{font-size:14px}.brand span{display:none}
+  .cover-in{grid-template-columns:1fr}
+  .cover .list{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion: reduce){.screen img,.story.enter>*{transition:none;animation:none}.phone{animation:none}}
+button:focus-visible{outline:2px solid var(--sky);outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="cover" id="cover">
+  <div class="cover-in">
+    <div>
+      <div class="eyebrow"><img src="mobile/stanbic/stanbic-logo.png" alt="Stanbic IBTC"><span>Pulse for Bankers · demo walkthrough</span></div>
+      <h1>A day in the branch, on one phone</h1>
+      <p>Open an account from a paper form in minutes, follow every application live in UiPath Maestro, run bulk opening from maker to verifier, and clear exceptions by root cause. 31 scenes, about ten minutes.</p>
+      <ul class="list">
+        <li><i></i>Scan a form, 44 fields filled</li><li><i></i>Live case stages from Maestro</li>
+        <li><i></i>BVN, NIN and document checks</li><li><i></i>Bulk opening with four-eyes control</li>
+        <li><i></i>Exception triage by root cause</li><li><i></i>Aura, the assistant that acts</li>
+      </ul>
+      <button type="button" id="start">Start the walkthrough</button>
+    </div>
+    <div class="fan" id="fan"></div>
+  </div>
+</div>
+<div class="fin" id="fin" hidden>
+  <div class="fin-card">
+    <h2>That is Pulse for Bankers</h2>
+    <p>Six parts of a banker's day, one app, every step traceable in UiPath. Jump back into any act, or play it again.</p>
+    <div class="fin-grid" id="fingrid"></div>
+    <div class="nav"><button type="button" class="primary" id="again">Play again</button><button type="button" id="closefin">Close</button></div>
+  </div>
+</div>
+
+<header class="top">
+  <div class="brand"><img src="mobile/stanbic/stanbic-logo.png" alt="Stanbic IBTC"><div><b>Pulse for Bankers</b><span>Demo walkthrough · 31 scenes</span></div></div>
+  <div class="ctl"><button type="button" id="auto" class="auto" aria-pressed="false">Autoplay</button><button type="button" id="restart">Restart</button><span class="k">← → to move · space to play</span></div>
+</header>
+<div class="prog"><i id="prog"></i></div>
+<main class="stage">
+  <div class="phone-wrap"><div class="phone"><div class="screen" id="screen"></div></div></div>
+  <section class="story" id="story" aria-live="polite">
+    <div class="actchip" id="actchip"></div>
+    <h1 id="title"></h1>
+    <p class="say" id="say"></p>
+    <div class="behind"><b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/><circle cx="12" cy="12" r="3.5"/></svg></b><em>Behind the screen</em><span id="behind"></span></div>
+    <div class="nav"><button type="button" id="prev">Back</button><button type="button" id="next" class="primary">Next</button><span class="pos" id="pos"></span></div>
+  </section>
+</main>
+<nav class="rail" aria-label="Scenes">
+  <div class="acts" id="acts"></div>
+  <div class="thumbs" id="thumbs"></div>
+</nav>
+<script>
+const ACTS = [{"n": "Start of the day", "sub": "The relationship manager opens Pulse", "c": "#0091da"}, {"n": "One customer", "sub": "Open an account on the spot", "c": "#0033a1"}, {"n": "Follow the case", "sub": "Live from UiPath Maestro", "c": "#6c3fd1"}, {"n": "Many at once", "sub": "Bulk opening, maker to verifier", "c": "#0a8f6b"}, {"n": "Operations", "sub": "Exceptions and approvals", "c": "#d9640b"}, {"n": "Relationships and help", "sub": "Clients, Aura, alerts, roles", "c": "#c21f6b"}];
+const SCENES = [{"act": 0, "title": "Good afternoon", "say": "Pulse opens on the banker's day, not a menu. The Aura prompt comes first; under it, a rail shows what the platform is doing right now: 79 applications in flight in Maestro, 11 forms an agent has read and is waiting to have confirmed, 28 accounts a robot keyed into core banking today.", "behind": "Each card on the rail is a live count from the tenant: Maestro cases, agent tasks, RPA jobs, Case Management exceptions, Delegate approvals.", "img": "mobile/stanbic/01-home.png"}, {"act": 0, "title": "Your pipeline at a glance", "say": "Scroll once and the whole book is there: 135 applications, 17 that need this person, 11 waiting on a customer, 79 moving on their own, 26 opened. The oldest three that need attention are listed with the reason in plain words and a one-tap action each.", "behind": "Lane counts come from the record store; 'See the live case' deep-links into the Maestro instance behind the application.", "img": "mobile/stanbic/01b-home-pipeline.png"}, {"act": 1, "title": "Scan it, upload it, or type it", "say": "Tap 'One customer'. The banker can scan the paper form, upload the whole account-opening package, or type the details. Individual or corporate, same flow.", "behind": "The capture wizard is the customer's own six-step flow in RM mode, so what the banker captures is exactly what the customer would have submitted.", "img": "mobile/stanbic/05-capture.png"}, {"act": 1, "title": "The form is read in seconds", "say": "A ten-page handwritten account opening form goes in. The reader identifies it as the customer's account opening form, pages through it, and reports 44 application fields.", "behind": "Document reading runs on UiPath IXP. The page preview is the customer's actual scan; the right panel fills field by field as the read completes.", "img": "mobile/stanbic/05c-read.png"}, {"act": 1, "title": "Forty-four fields, filled", "say": "'Use these details' drops everything into the application: title, names, date of birth, phone, address, employment, next of kin. The banker checks and continues. Nothing is retyped.", "behind": "Every field keeps its source and confidence, so low-confidence values can be routed to a maker for confirmation later.", "img": "mobile/stanbic/05d-filled.png"}, {"act": 2, "title": "Pipeline by lane", "say": "Every customer the branch captured, in one list. Filter to 'Needs you', 'Waiting on customer', 'Moving' or 'Opened'. On the phone, swipe right to call, swipe left to nudge the customer with their KYC link.", "behind": "Status marks follow one grammar across the app: filled square needs you, hollow square waiting, half square moving, tick done.", "img": "mobile/stanbic/02-pipeline.png"}, {"act": 2, "title": "Live in Maestro", "say": "Open Emeka Chukwu. The stage bar is read from the live Maestro case: Intake, Verification, Decision, Activation, Closure. Inside Decision, four tasks are done and one needs a person. The button at the bottom completes that Maestro task from the phone.", "behind": "Stages and tasks come from the Maestro Case Management API for the instance linked to this record; 'Approve Decision and advance' completes the human task in Action Center.", "img": "mobile/stanbic/03-case.png"}, {"act": 2, "title": "Send the KYC link", "say": "If something is missing from the customer, send the KYC link by SMS and WhatsApp in one tap. The customer finishes documents, liveness and signature on their own phone. Nobody has to come into the branch.", "behind": "The link is a tokenised customer journey; when the customer completes it, the case moves on and the desk sees it.", "img": "mobile/stanbic/03b-sendlink.png"}, {"act": 2, "title": "Identity, field by field", "say": "The Identity tab shows the BVN validation against NIBSS: response 00, valid, not watch-listed. Each field is the form value beside the bureau value, so a mismatch is obvious at a glance. Below it, the NIN linkage.", "behind": "BVN and NIN checks are agent tasks in the Verification stage; the result is rendered as returned, nothing is re-derived on the phone.", "img": "mobile/stanbic/04b-identity.png"}, {"act": 2, "title": "Documents judged against the bank's rules", "say": "The Documents tab judges each document the customer gave: declared type, expiry, issuing authority. Here the voter's card passes: valid to 2030, and INEC holds a matching record.", "behind": "Document rules are a DMN decision table the bank owns; changing a rule changes the verdict without changing the app.", "img": "mobile/stanbic/04-docs.png"}, {"act": 2, "title": "Find anyone", "say": "Search by name, reference or account number from anywhere. Typing a surname lists every matching application with its state.", "behind": "Search runs over the record store and the Maestro links, so a reference from a Maestro email finds the same case.", "img": "mobile/stanbic/10-find.png"}, {"act": 3, "title": "A batch: how are they arriving?", "say": "'Many at once' starts a batch. Filled forms arrive as a zip and are read automatically, then confirmed by an Operations maker. Or a list of people, each of whom gets a link and fills the form on their own phone.", "behind": "A batch is a Maestro BPMN process that starts one case per record and runs a final check across the batch.", "img": "mobile/stanbic/06-newbatch.png"}, {"act": 3, "title": "About the batch", "say": "Name it, pick the segment and the booking branch. Four steps and the batch is running.", "behind": "Segment and branch drive routing rules and the account product.", "img": "mobile/stanbic/06b-newbatch2.png"}, {"act": 3, "title": "Batch progress", "say": "A co-operative of twenty: 85% decided, three still need the relationship manager, the rest opened or with Operations. Filter the people by You, Ops or Done. Opened accounts show the account number.", "behind": "Each person's row is their own case; the batch view rolls them up.", "img": "mobile/stanbic/07-batch.png"}, {"act": 3, "title": "The maker's queue", "say": "Switch the work role to Operations maker and Home changes. Eleven forms to confirm, five read with low confidence, about six minutes at this person's pace. Hardest first.", "behind": "Roles are set in admin and switchable on the device; Home, the queue and the actions follow the role.", "img": "mobile/stanbic/16-maker-home.png"}, {"act": 3, "title": "Focus mode: confirm what was read", "say": "One form at a time. For each doubtful field the handwriting crop sits above the value the agent read and its confidence. Correct, or edit. Fields read confidently are folded away. Every change is logged with the maker's name, the time, and before and after.", "behind": "This is the human-in-the-loop step of the IXP read, with the audit trail the regulator asks for.", "img": "mobile/stanbic/22-maker-review.png"}, {"act": 3, "title": "The verifier: ready to open", "say": "As Operations verifier, Home shows five accounts confirmed by makers and ready to open. They open on Post No Debit until documents are verified. Four-eyes rule: you cannot open an account you confirmed yourself.", "behind": "Maker and checker are the signed-in users; the app refuses self-approval at the data layer, not just in the UI.", "img": "mobile/stanbic/17-verifier-home.png"}, {"act": 3, "title": "Slide to open five accounts", "say": "The maker trail for each person is listed, then the commit. Opening an account cannot be undone, so it is a slide, not a tap.", "behind": "The slide starts the core-banking robot for each account; the account numbers appear on the batch screen as the jobs complete.", "img": "mobile/stanbic/21-authorise.png"}, {"act": 4, "title": "Exception triage", "say": "The Operations analyst's Home is a control panel: 84% straight-through against an 80% target, 17 open exceptions, 16 past SLA. Below, the queue grouped by root cause, with one fix per cause: 'Retry BVN on all 4'.", "behind": "Root causes are derived from the incident reason on each Maestro case, so a platform outage shows up as one line, not forty.", "img": "mobile/stanbic/18-ops-home.png"}, {"act": 4, "title": "One root cause, every case", "say": "Open a cause and see each case under it, how long it has been over SLA, and whether anyone owns it. Filter to past SLA, unowned, or mine.", "behind": "Taking a case assigns the Action Center task to this person.", "img": "mobile/stanbic/19-ops-queue.png"}, {"act": 4, "title": "Work one exception", "say": "A BVN that did not verify. The cause in plain words, every check with its result, and the actions: take the case, re-run the BVN check, escalate, reject.", "behind": "Re-run restarts the check task in Maestro; escalate hands the case to Compliance through Delegate.", "img": "mobile/stanbic/20-ops-case.png"}, {"act": 4, "title": "Approvals, most urgent first", "say": "Maker-checker approvals waiting on this person: six, worth 266.5 million naira, one past SLA. Filter by past SLA, high value or dual approval.", "behind": "Approvals are Action Center tasks assigned to this user's role; the amount thresholds come from the bank's policy.", "img": "mobile/stanbic/08-approvals.png"}, {"act": 4, "title": "One approval, full context", "say": "An overdraft limit increase: the request, who raised it, the maker's justification, the checks against the current limit. Approve and route, or reject with a reason.", "behind": "Over this person's limit, so 'Approve and route' sends it to a second approver automatically.", "img": "mobile/stanbic/08b-approval.png"}, {"act": 5, "title": "The banker's book", "say": "Clients: five key relationships, three at risk, eleven suggested actions, two KYC reviews due. Scan a walk-in's ID to pull up their profile.", "behind": "Signals are derived from product and transaction data; the list is sorted by what matters most right now.", "img": "mobile/stanbic/09-clients.png"}, {"act": 5, "title": "One client", "say": "Emeka Okafor: relationship value, monthly profit, products, the churn risk with its score, and the suggested retention call. Personal details are masked and the view is logged.", "behind": "Suggested actions carry a confidence and an exposure figure, so the banker knows what a missed call costs.", "img": "mobile/stanbic/09b-client.png"}, {"act": 5, "title": "Ask Aura", "say": "Ask in plain language: 'Which applications need me today?' Aura answers from live data, seventeen, oldest first, each with its reason, and offers to open the first one.", "behind": "Aura reads the same store and Maestro links as the screens; 'Ask Pulse' escalates to the bank's UiPath conversational agent for anything beyond the app.", "img": "mobile/stanbic/11-aura.png"}, {"act": 5, "title": "Follow-up with a bulk action", "say": "Tap a suggested follow-up, 'Who's stuck on BVN?'. Eight are, with their failed attempts. Re-run all eight in one tap, or call the first.", "behind": "The bulk action re-runs the BVN task on each case; nothing is retyped.", "img": "mobile/stanbic/11b-aura-bvn.png"}, {"act": 5, "title": "Alerts that carry their action", "say": "Alerts are grouped into Needs you, Customers and System, and each carries its action inline: re-run BVN, call, open. A gateway timeout on NIMC shows once with 'Re-run all', not as twenty separate failures.", "behind": "Alerts are derived from case incidents and events; marking read is per device.", "img": "mobile/stanbic/12b-alerts-needs.png"}, {"act": 5, "title": "Explore", "say": "Start something from here, see what each account needs, and watch six short films on how the platform does the work behind the screens: agents, robots, Maestro, case management, Delegate, tasks.", "behind": "Useful in a branch to show a customer what will happen to their application.", "img": "mobile/stanbic/13-explore.png"}, {"act": 5, "title": "One app, four roles", "say": "Profile shows this month's numbers and the work role: Relationship Manager, Operations maker, Operations verifier, Operations analyst. Switching changes Home and the queue.", "behind": "Admin sets the default and allowed roles per person; the switch is for shared devices and demos.", "img": "mobile/stanbic/14-profile.png"}, {"act": 5, "title": "Dark mode", "say": "Everything re-skins for low light; status colours and the Stanbic blue stay legible.", "behind": "Colours are tokens that flip with the system setting or the Profile toggle.", "img": "mobile/stanbic/15-dark-home.png"}];
+let i = 0, timer = null, seen = new Set();
+const $ = (s) => document.querySelector(s);
+const screen = $('#screen'), thumbs = $('#thumbs'), actsEl = $('#acts'), story = $('#story');
+SCENES.forEach((s, k) => {
+  const im = new Image(); im.src = s.img; im.alt = s.title; im.dataset.k = k; screen.appendChild(im);
+  const t = document.createElement('button'); t.type = 'button'; t.className = 'thumb'; t.title = s.title; t.setAttribute('aria-label', (k+1) + '. ' + s.title);
+  const ti = new Image(); ti.src = s.img; ti.alt = ''; t.appendChild(ti);
+  const n = document.createElement('em'); n.textContent = k + 1; t.appendChild(n);
+  t.onclick = () => { stop(); go(k); }; thumbs.appendChild(t);
+});
+ACTS.forEach((a, k) => {
+  const d = document.createElement('button'); d.type = 'button'; d.className = 'act'; d.dataset.k = k; d.style.setProperty('--ac', a.c);
+  d.innerHTML = '<div class="n">' + (k+1) + ' · ' + a.n + '</div><div class="s">' + a.sub + '</div><div class="dots"></div>';
+  d.onclick = () => { stop(); go(SCENES.findIndex((s) => s.act === k)); };
+  const dots = d.querySelector('.dots');
+  SCENES.forEach((s, j) => { if (s.act !== k) return; const b = document.createElement('span'); b.className = 'dot'; b.dataset.j = j; dots.appendChild(b); });
+  actsEl.appendChild(d);
+  const f = document.createElement('button'); f.type = 'button'; f.style.setProperty('--ac', a.c); f.innerHTML = '<b>' + (k+1) + ' · ' + a.n + '</b><span>' + a.sub + '</span>';
+  f.onclick = () => { $('#fin').hidden = true; go(SCENES.findIndex((s) => s.act === k)); }; $('#fingrid').appendChild(f);
+});
+[0, 6, 14].forEach((k) => { const im = new Image(); im.src = SCENES[k].img; im.alt = ''; $('#fan').appendChild(im); });
+function go(k) {
+  i = Math.max(0, Math.min(SCENES.length - 1, k)); seen.add(i);
+  const s = SCENES[i], a = ACTS[s.act];
+  document.documentElement.style.setProperty('--act', a.c);
+  screen.querySelectorAll('img').forEach((im) => im.classList.toggle('on', +im.dataset.k === i));
+  story.classList.remove('enter'); void story.offsetWidth; story.classList.add('enter');
+  $('#actchip').innerHTML = '<i>' + (s.act+1) + '</i>' + a.n + '<span>· ' + a.sub + '</span>';
+  $('#title').textContent = s.title; $('#say').textContent = s.say; $('#behind').textContent = s.behind;
+  $('#pos').textContent = String(i+1).padStart(2,'0') + ' / ' + SCENES.length;
+  $('#prog').style.width = ((i+1) / SCENES.length * 100) + '%';
+  $('#prev').disabled = i === 0; $('#next').textContent = i === SCENES.length - 1 ? 'Finish' : 'Next';
+  thumbs.querySelectorAll('.thumb').forEach((t, k2) => { t.classList.toggle('on', k2 === i); if (k2 === i) thumbs.scrollTo({ left: t.offsetLeft - thumbs.clientWidth / 2 + t.offsetWidth / 2, behavior: 'smooth' }); });
+  actsEl.querySelectorAll('.act').forEach((d) => d.classList.toggle('on', +d.dataset.k === s.act));
+  actsEl.querySelectorAll('.dot').forEach((b) => { const j = +b.dataset.j; b.classList.toggle('on', j === i); b.classList.toggle('seen', seen.has(j) && j !== i); });
+  try { history.replaceState(null, '', '#scene-' + (i+1)); } catch {}
+}
+function next() { if (i === SCENES.length - 1) { stop(); $('#fin').hidden = false; return; } go(i+1); }
+function play() { stop(); timer = setInterval(next, 9000); $('#auto').setAttribute('aria-pressed', 'true'); }
+function stop() { if (timer) clearInterval(timer); timer = null; $('#auto').setAttribute('aria-pressed', 'false'); }
+function startFromCover() { const c = $('#cover'); c.classList.add('out'); setTimeout(() => { c.hidden = true; }, 500); }
+$('#start').onclick = startFromCover;
+$('#next').onclick = () => { stop(); next(); };
+$('#prev').onclick = () => { stop(); go(i-1); };
+$('#restart').onclick = () => { stop(); seen.clear(); go(0); $('#fin').hidden = true; const c = $('#cover'); c.hidden = false; c.classList.remove('out'); };
+$('#again').onclick = () => { $('#fin').hidden = true; seen.clear(); go(0); play(); };
+$('#closefin').onclick = () => { $('#fin').hidden = true; };
+$('#auto').onclick = () => timer ? stop() : play();
+document.addEventListener('keydown', (e) => {
+  if (!$('#cover').hidden) { if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowRight') { e.preventDefault(); startFromCover(); } return; }
+  if (!$('#fin').hidden) { if (e.key === 'Escape' || e.key === 'Enter') $('#fin').hidden = true; return; }
+  if (e.key === 'ArrowRight' || e.key === 'PageDown') { stop(); next(); }
+  else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { stop(); go(i-1); }
+  else if (e.key === ' ') { e.preventDefault(); timer ? stop() : play(); }
+  else if (e.key === 'Home') { stop(); go(0); }
+});
+let sx = null; screen.addEventListener('touchstart', (e) => { sx = e.touches[0].clientX; }, { passive: true });
+screen.addEventListener('touchend', (e) => { if (sx == null) return; const dx = e.changedTouches[0].clientX - sx; if (Math.abs(dx) > 40) { stop(); dx < 0 ? next() : go(i-1); } sx = null; });
+const m = /scene-(\d+)/.exec(location.hash || '');
+go(m ? +m[1] - 1 : 0);
+if (m) { $('#cover').hidden = true; }
+</script>
+</body>
+</html>

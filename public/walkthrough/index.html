@@ -76,6 +76,10 @@
     </aside>
   </div>
 </div>
+<script>
+// ?mobile_brand=<brand> opens the phone-app walkthrough (mobile.html) instead of the desk one.
+(function(){var q=new URLSearchParams(location.search),b=q.get('mobile_brand');if(b){location.replace('./mobile.html?brand='+encodeURIComponent(b)+location.hash);}})();
+</script>
 <script src="./config.js"></script>
 <script src="./player.js"></script>
 </body>
