@@ -6,6 +6,7 @@ import LiveVideo from '../LiveVideo';
 import { useNav, type Route } from '../nav';
 import { NScreen, NSection, NGroup, NRow, NSheet, NButton } from '../nkit';
 import { useNk, haptic } from '../nk';
+import { useBank } from '../../../config/bank';
 
 const STARTS: { icon: string; label: string; go: 'capture' | 'newBatch' | 'find' | 'branches' }[] = [
   { icon: 'scanLine', label: 'Scan a form', go: 'capture' },
@@ -40,11 +41,12 @@ const FILMS: Film[] = [
 export default function Explore() {
   const nav = useNav();
   const nk = useNk();
+  const bank = useBank();
   const [film, setFilm] = useState<Film | null>(null);
 
   const start = (go: (typeof STARTS)[number]['go']) => {
     haptic();
-    if (go === 'branches') { window.open('https://www.google.com/maps/search/FirstBank+branch+near+me', '_blank', 'noreferrer'); return; }
+    if (go === 'branches') { window.open(`https://www.google.com/maps/search/${encodeURIComponent(bank.name + ' branch near me')}`, '_blank', 'noreferrer'); return; }
     nav.open({ k: go } as Route);
   };
 

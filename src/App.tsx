@@ -929,7 +929,9 @@ export default function App({ shell = 'mobile' }: { shell?: Shell } = {}) {
   // Local (no-PAT) admin config wins; otherwise the per-tenant Data Service cache;
   // otherwise Stanbic — matching every other surface, so a fresh browser with no
   // saved profile shows Stanbic branding rather than the bundled Aura default.
-  const local = useMemo(() => loadLocalConfig(), []);
+  // The native (Pulse) app is the bank's own: it stays on the Stanbic preset and
+  // ignores whatever branding an admin last saved on the shared tenant.
+  const local = useMemo(() => loadLocalConfig() ?? (Capacitor.isNativePlatform() ? stanbicConfig : null), []);
   const cached = useMemo(() => local ?? loadCachedConfig(connection) ?? stanbicConfig, [local, connection]);
   return (
     <ConfigProvider initialOverride={cached}>

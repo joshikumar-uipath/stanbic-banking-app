@@ -161,7 +161,7 @@ const FIELD_IDS: Record<string, string> = {
 const PACKS: Pack[] = [
   {
     id: 'firstbank-individual',
-    label: 'FirstBank individual account opening form',
+    label: 'Individual account opening form (scanned sample)',
     taxonomy: 'individual',
     // The uploaded file is named for the form, not the bank, so match either.
     match: /first\s*bank|aof[\s_-]*individual/i,
@@ -621,7 +621,7 @@ const PACKS: Pack[] = [
   },
   {
     id: 'firstbank-corporate',
-    label: 'FirstBank corporate / SME account opening form',
+    label: 'Corporate / SME account opening form (scanned sample)',
     taxonomy: 'corporate',
     match: /aof[\s_-]*corporate|corporate[\s_-]*aof/i,
     exceptions: [
