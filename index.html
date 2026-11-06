@@ -24,6 +24,11 @@
           the file. The shared blob URL means one fetch per file, used everywhere.
     -->
     <script>
+      // The coded-app host answers the bare /walkthrough/ directory with this shell, so
+      // send it (and its ?brand= / ?mobile_brand= query) on to the player's index.html.
+      if (/\/walkthrough\/?$/.test(location.pathname)) location.replace(location.pathname.replace(/\/?$/, '/') + 'index.html' + location.search + location.hash);
+    </script>
+    <script>
       (function () {
         // Default must match ThemeContext (currently 'light'). If they
         // disagree, the wrong-theme orb is preloaded and the right one
