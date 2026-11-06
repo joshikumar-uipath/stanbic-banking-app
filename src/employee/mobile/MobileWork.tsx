@@ -162,7 +162,7 @@ export default function MobileWork({ role, onRole, onRoleSheet, onApprovals, onC
     });
   }, []);
   // A question asked from a home's ask bar, handed to Aura (a new key per ask).
-  const [ask, setAsk] = useState<{ q?: string; n: number }>({ n: 0 });
+  const [ask, setAsk] = useState<{ q?: string; photo?: File; n: number }>({ n: 0 });
   // Leaving a half-finished flow (a batch, an authorisation) asks first.
   const [leaving, setLeaving] = useState(false);
   const nav = useMemo<WorkNav>(() => ({
@@ -184,7 +184,7 @@ export default function MobileWork({ role, onRole, onRoleSheet, onApprovals, onC
     tab,
     setTab: onTab,
     open: (r) => { onTab('home'); pushRoute(r); },
-    askAura: (q) => { setAsk((a) => ({ q: q?.trim() || undefined, n: a.n + 1 })); onTab('chat'); },
+    askAura: (q, photo) => { setAsk((a) => ({ q: q?.trim() || undefined, photo, n: a.n + 1 })); onTab('chat'); },
     toLauncher: goToLauncher,
   }), [pop, pushRoute, goHome, role, onRole, onRoleSheet, onApprovals, onClients, onAssistant, userName, userEmail, onLogout, roles, canSwitchRole, tab, onTab]);
 
@@ -224,7 +224,7 @@ export default function MobileWork({ role, onRole, onRoleSheet, onApprovals, onC
             ))}
             {/* The other tabs stay mounted too once visited, so a conversation, a
                 filter or an open film survives a trip to another tab. */}
-            {seen.has('chat') && <div className="mw-layer" style={{ display: tab === 'chat' ? 'block' : 'none' }}><ScreenBoundary onBack={() => onTab('home')}><Aura key={ask.n} agents={agents} onAskAgent={onAskAgent} conversationalAgent={conversationalAgent} initial={ask.q} /></ScreenBoundary></div>}
+            {seen.has('chat') && <div className="mw-layer" style={{ display: tab === 'chat' ? 'block' : 'none' }}><ScreenBoundary onBack={() => onTab('home')}><Aura key={ask.n} agents={agents} onAskAgent={onAskAgent} conversationalAgent={conversationalAgent} initial={ask.q} initialPhoto={ask.photo} /></ScreenBoundary></div>}
             {seen.has('explore') && <div className="mw-layer" style={{ display: tab === 'explore' ? 'block' : 'none' }}><ScreenBoundary onBack={() => onTab('home')}><Explore /></ScreenBoundary></div>}
             {seen.has('alerts') && <div className="mw-layer" style={{ display: tab === 'alerts' ? 'block' : 'none' }}><ScreenBoundary onBack={() => onTab('home')}><Alerts /></ScreenBoundary></div>}
             {seen.has('profile') && <div className="mw-layer" style={{ display: tab === 'profile' ? 'block' : 'none' }}><ScreenBoundary onBack={() => onTab('home')}><Profile /></ScreenBoundary></div>}

@@ -56,7 +56,8 @@ export interface WorkNav {
   /** From any tab: go to Home and open this screen on top of where you were. */
   open: (r: Route) => void;
   /** Go to Aura, asking this question (or just opening it). */
-  askAura: (q?: string) => void;
+  /** Open Aura with a question, a photo (camera/file) to read, or both. */
+  askAura: (q?: string, photo?: File) => void;
   toLauncher: () => void;
 }
 

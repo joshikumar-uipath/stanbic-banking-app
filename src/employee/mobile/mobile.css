@@ -316,6 +316,9 @@ html[data-theme='dark'] .mw-oops { background: #0B0F14; color: #EEF2F6; }
 .mw-aura-empty { flex: 1 0 auto; display: flex; flex-direction: column; justify-content: flex-end; padding-bottom: 8px; }
 .mw-aura-hero { position: relative; flex: 1 1 auto; min-height: 220px; max-height: 360px; margin: -16px -20px 18px; overflow: hidden; }
 .mw-aura-me { align-self: flex-end; max-width: 82%; color: #fff; border-radius: 18px 18px 4px 18px; padding: 10px 14px; font-size: 15px; line-height: 1.4; }
+.mw-aura-me.has-img { padding: 6px; }
+.mw-aura-me img { display: block; width: 100%; max-width: 220px; max-height: 240px; object-fit: cover; border-radius: 14px; }
+.mw-aura-me.has-img > img + * { display: block; padding: 6px 8px 2px; }
 .mw-aura-a { display: flex; flex-direction: column; max-width: 100%; }
 /* Ask Pulse's replies: where the answer came from, then its markdown set like Aura's own text. */
 .mw-aura-src { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 4px; }

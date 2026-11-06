@@ -29,13 +29,16 @@ import { PRIMARY_AGENT_LABEL } from '../../../config/primaryAgent';
 import ReactMarkdown from 'react-markdown';
 import type { ConversationalAgent } from '@uipath/uipath-typescript/conversational-agent';
 import { pulseThread, type PulseThread } from '../pulse';
+import { readPackage, PACKAGE_TYPE } from '../../../integrations/packageDocs';
+import { DOC_TYPE_LABEL, type DocType } from '../../../integrations/docChecks';
 
 interface Row { title: string; sub: string; color: string }
 interface Act { label: string; primary?: boolean; run?: () => Promise<string>; href?: string; route?: Route }
 interface Draft { to: string; phone: string; text: string }
 // `unknown`: Aura's own answerer had nothing — the question goes to Ask Pulse.
 // `md`: Ask Pulse's reply (markdown), streamed in place.
-interface Msg { id: number; who: 'me' | 'aura'; text?: string; rows?: Row[]; acts?: Act[]; draft?: Draft; note?: string; unknown?: boolean; md?: string }
+// `img`: a photo the banker sent, shown in their bubble.
+interface Msg { id: number; who: 'me' | 'aura'; text?: string; img?: string; rows?: Row[]; acts?: Act[]; draft?: Draft; note?: string; unknown?: boolean; md?: string }
 
 // The action on an answer Aura can't give: hand the question to Ask Pulse.
 const ASK_AGENT = PRIMARY_AGENT_LABEL;
@@ -50,7 +53,7 @@ const days = (iso: string) => Math.max(0, Math.round((Date.now() - Date.parse(is
 // `conversationalAgent` lets Aura put anything it can't answer itself to the
 // bank's agent (Ask Pulse) and show the reply here. `onAskAgent` opens the full
 // Ask Pulse chat from the header. Without either, it falls back to `agents`.
-export default function Aura({ agents, onAskAgent, conversationalAgent, initial }: { agents?: ReactNode; onAskAgent?: (question?: string) => void; conversationalAgent?: ConversationalAgent; initial?: string }) {
+export default function Aura({ agents, onAskAgent, conversationalAgent, initial, initialPhoto }: { agents?: ReactNode; onAskAgent?: (question?: string) => void; conversationalAgent?: ConversationalAgent; initial?: string; initialPhoto?: File }) {
   const nav = useNav();
   const nk = useNk();
   const bank = useBank();
@@ -123,6 +126,54 @@ export default function Aura({ agents, onAskAgent, conversationalAgent, initial 
     }, 450);
   };
 
+  // A photo (or file) from the camera button — here or on Home. Aura reads it with
+  // the same pipeline the application uses: identifies the document, reads a known
+  // form's fields, and offers the next step.
+  const camRef = useRef<HTMLInputElement>(null);
+  const attach = async (file: File) => {
+    haptic();
+    const img = file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined;
+    setMsgs((m) => [...m, { id: seq.current++, who: 'me', text: img ? undefined : file.name, img }]);
+    setThinking(true);
+    try {
+      const r = await readPackage([file]);
+      const f = r.files[0];
+      const facts = f?.facts;
+      const pkgLabel = f && f.type !== 'unknown' ? (PACKAGE_TYPE as Record<string, { label: string }>)[f.type]?.label : undefined;
+      const factLabel = facts && facts.t !== 'unknown' ? DOC_TYPE_LABEL[facts.t as DocType] : undefined;
+      const label = pkgLabel ?? factLabel;
+      const a: Partial<Msg> = {};
+      if (f && f.fields.length > 0) {
+        const who = r.rows.find((x) => /company|business name/i.test(x.name))?.value ?? r.rows.find((x) => /^(first name|surname|last name|full name)$/i.test(x.name))?.value;
+        a.text = `That's ${label ? `the ${label.toLowerCase()}` : 'an account opening form'}${who ? ` for ${who}` : ''} — I read ${f.fields.length} fields across ${f.pages} page${f.pages === 1 ? '' : 's'}.`;
+        a.rows = r.rows.slice(0, 4).map((x) => ({ title: x.value || '—', sub: x.name, color: x.confidence >= 0.8 ? C.green : C.orange }));
+        a.note = 'Open a new application and upload the same file to fill it in; the fields keep their confidence so a maker can check the doubtful ones.';
+        a.acts = [{ label: 'Open a new application', primary: true, route: { k: 'capture' } }];
+      } else if (label) {
+        a.text = `This looks like ${/^[aeiou]/i.test(label) ? 'an' : 'a'} ${label.toLowerCase()}.`;
+        const rows: Row[] = [];
+        if (facts?.n) rows.push({ title: `•••• ${String(facts.n).slice(-4)}`, sub: 'Document number', color: C.blue });
+        if (facts?.x) rows.push({ title: facts.x, sub: new Date(facts.x) < new Date() ? 'Expired' : 'Valid until', color: new Date(facts.x) < new Date() ? C.red : C.green });
+        if (facts?.mrz !== undefined) rows.push({ title: facts.mrz ? 'Check digits verify' : 'Check digits do not verify', sub: 'Machine-readable zone', color: facts.mrz ? C.green : C.red });
+        if (facts?.e) rows.push({ title: 'Saved by an editing tool', sub: facts.p ?? 'Producer', color: C.orange });
+        a.rows = rows;
+        a.note = rows.length ? undefined : 'Nothing else could be read off it in the browser; the full checks run once it is attached to an application.';
+        a.acts = [{ label: 'Find the customer', primary: true, route: { k: 'find' } }, { label: 'Open a new application', route: { k: 'capture' } }];
+      } else {
+        a.text = "I couldn't tell what this document is. Try a sharper photo with the whole page in frame, or tell me who it belongs to.";
+      }
+      setMsgs((m) => [...m, { id: seq.current++, who: 'aura', ...a }]);
+    } catch (e) {
+      setMsgs((m) => [...m, { id: seq.current++, who: 'aura', text: `I couldn't read that file — ${(e as Error).message || 'it may be damaged'}.` }]);
+    } finally { setThinking(false); }
+  };
+  useEffect(() => {
+    if (!initialPhoto) return;
+    const t = window.setTimeout(() => { void attach(initialPhoto); }, 0);
+    return () => window.clearTimeout(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const run = async (m: Msg, a: Act) => {
     if (a.route) { nav.open(a.route); return; }
     if (!a.run) return;
@@ -187,7 +238,7 @@ export default function Aura({ agents, onAskAgent, conversationalAgent, initial 
           </div>
         )}
         {msgs.map((m) => m.who === 'me'
-          ? <div key={m.id} className="mw-aura-me" style={{ background: nk.brandFill }}>{m.text}</div>
+          ? <div key={m.id} className={`mw-aura-me${m.img ? ' has-img' : ''}`} style={{ background: nk.brandFill }}>{m.img && <img src={m.img} alt="Photo sent to Aura" />}{m.text}</div>
           : (
             m.md === '' && !m.text ? null : <div key={m.id} className="mw-aura-a">
               {m.md && (
@@ -248,6 +299,11 @@ export default function Aura({ agents, onAskAgent, conversationalAgent, initial 
         ))}
       </div>
       <form className="mw-aura-in" onSubmit={(e) => { e.preventDefault(); ask(text); }}>
+        <input ref={camRef} type="file" accept="image/*,application/pdf" capture="environment" className="sr-only" tabIndex={-1} aria-hidden
+          onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void attach(f); }} />
+        <button type="button" className="mw-aura-mic tap" aria-label="Take a photo or add a file" onClick={() => camRef.current?.click()} style={{ color: nk.accent, background: nk.page, borderColor: nk.sep }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6.8 6.2A2.3 2.3 0 0 1 5.2 7.2l-1.1.2A2.1 2.1 0 0 0 2.2 9.6V18a2.2 2.2 0 0 0 2.2 2.2h15.1A2.2 2.2 0 0 0 21.8 18V9.6a2.1 2.1 0 0 0-1.8-2.2l-1.1-.2a2.3 2.3 0 0 1-1.6-1l-.8-1.3a2.2 2.2 0 0 0-1.7-1 49 49 0 0 0-5.2 0 2.2 2.2 0 0 0-1.7 1z" /><circle cx="12" cy="12.8" r="4.5" /></svg>
+        </button>
         <label htmlFor="aura-ask" className="sr-only">Ask Aura</label>
         <input id="aura-ask" value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask about a customer or a batch" autoComplete="off"
           style={{ background: nk.fill, color: nk.ink }} />

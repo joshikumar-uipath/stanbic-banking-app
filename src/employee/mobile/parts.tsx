@@ -1,5 +1,5 @@
 // Small pieces shared by the phone's screens.
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import LiveVideo from './LiveVideo';
 import { approvalsPulse } from '../../approvalsData';
 import { awaitingReview, awaitingAuthorisation } from '../bulk/engine';
@@ -30,8 +30,8 @@ export function BankMark({ height = 22 }: { height?: number }) {
  * The opening of every home: the Aura orb, a greeting, and an ask bar —
  * scan a form, explore, speak, or type a question for Aura.
  */
-export function AuraHero({ name, onAsk, onScan, onExplore, compact, strip }: {
-  name?: string; onAsk: (q?: string) => void; onScan: () => void; onExplore: () => void;
+export function AuraHero({ name, onAsk, onPhoto, onExplore, compact, strip }: {
+  name?: string; onAsk: (q?: string) => void; onPhoto: (f: File) => void; onExplore: () => void;
   /** A smaller orb, for homes whose own number should show without scrolling. */
   compact?: boolean;
   /** Shown under the ask bar (the Recently active strip on the RM's home). */
@@ -41,6 +41,7 @@ export function AuraHero({ name, onAsk, onScan, onExplore, compact, strip }: {
   const tint = nk.dark ? HERO_TINT.dark : HERO_TINT.light;
   const [q, setQ] = useState('');
   const [listening, setListening] = useState(false);
+  const camRef = useRef<HTMLInputElement>(null);
   const speak = () => {
     type Rec = { lang: string; interimResults: boolean; onresult: (e: { results: { [i: number]: { [j: number]: { transcript: string } } } }) => void; onend: () => void; start: () => void };
     const W = window as unknown as { SpeechRecognition?: new () => Rec; webkitSpeechRecognition?: new () => Rec };
@@ -67,7 +68,10 @@ export function AuraHero({ name, onAsk, onScan, onExplore, compact, strip }: {
       </div>
       <form className="mw-pill" onSubmit={(e) => { e.preventDefault(); haptic(); onAsk(q); setQ(''); }}
         style={{ background: nk.dark ? 'rgba(20,26,34,0.85)' : 'rgba(255,255,255,0.88)', borderColor: nk.dark ? 'rgba(255,255,255,0.12)' : 'rgba(var(--brand-primary-rgb),0.22)' }}>
-        <button type="button" className="mw-pill-i tap" style={iconBtn} aria-label="Scan a form" onClick={() => { haptic(); onScan(); }}>
+        {/* Camera: a photo or a file goes straight into the Aura conversation, which reads it. */}
+        <input ref={camRef} type="file" accept="image/*,application/pdf" capture="environment" className="sr-only" tabIndex={-1} aria-hidden
+          onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) onPhoto(f); }} />
+        <button type="button" className="mw-pill-i tap" style={iconBtn} aria-label="Take a photo for Aura" onClick={() => { haptic(); camRef.current?.click(); }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6.8 6.2A2.3 2.3 0 0 1 5.2 7.2l-1.1.2A2.1 2.1 0 0 0 2.2 9.6V18a2.2 2.2 0 0 0 2.2 2.2h15.1A2.2 2.2 0 0 0 21.8 18V9.6a2.1 2.1 0 0 0-1.8-2.2l-1.1-.2a2.3 2.3 0 0 1-1.6-1l-.8-1.3a2.2 2.2 0 0 0-1.7-1 49 49 0 0 0-5.2 0 2.2 2.2 0 0 0-1.7 1z" /><circle cx="12" cy="12.8" r="4.5" /></svg>
         </button>
         <button type="button" className="mw-pill-i tap" style={iconBtn} aria-label="Explore" onClick={() => { haptic(); onExplore(); }}>

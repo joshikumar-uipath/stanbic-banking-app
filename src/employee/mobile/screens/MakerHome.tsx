@@ -42,7 +42,7 @@ export default function MakerHome() {
 
   return (
     <NScreen title="Review" eyebrow={`Operations · Maker · ${today()}`} lead={<BankMark />}
-      hero={<AuraHero name={nav.userName && nav.userName !== 'User' ? nav.userName.split(' ')[0] : undefined} onAsk={nav.askAura} onScan={() => nav.push({ k: 'capture' })} onExplore={() => nav.setTab('explore')} compact />}
+      hero={<AuraHero name={nav.userName && nav.userName !== 'User' ? nav.userName.split(' ')[0] : undefined} onAsk={nav.askAura} onPhoto={(f) => nav.askAura(undefined, f)} onExplore={() => nav.setTab('explore')} compact />}
       tint={nk.dark ? HERO_TINT.dark : HERO_TINT.light}
       actions={<button type="button" className="mw-me tap" onClick={() => { haptic(); if (nav.canSwitchRole) nav.openRoleSheet(); else nav.setTab('profile'); }} aria-label={nav.canSwitchRole ? 'Switch role' : 'Your profile'}><NAvatar name={nav.userName || 'Maker'} size={32} solid /></button>}
       footer={queue.length ? <NButton icon="arrow" onClick={() => nav.push({ k: 'focus' })}>Start reviewing</NButton> : undefined}>

@@ -80,7 +80,7 @@ export default function RmHome() {
       title={who ? `${greeting()}, ${who}` : greeting()}
       eyebrow={today()}
       lead={<BankMark />}
-      hero={<AuraHero name={who || undefined} onAsk={nav.askAura} onScan={() => nav.push({ k: 'capture' })} onExplore={() => nav.setTab('explore')} strip={<RecentlyActive />} />}
+      hero={<AuraHero name={who || undefined} onAsk={nav.askAura} onPhoto={(f) => nav.askAura(undefined, f)} onExplore={() => nav.setTab('explore')} strip={<RecentlyActive />} />}
       tint={nk.dark ? HERO_TINT.dark : HERO_TINT.light} heroOnly
       actions={<>
         <NNavButton icon="search" label="Find a customer" onClick={() => nav.push({ k: 'find' })} />
